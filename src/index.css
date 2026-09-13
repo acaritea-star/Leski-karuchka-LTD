@@ -1,0 +1,497 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-heading: 'Manrope', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-label: 'Inter', sans-serif;
+
+  /* ===== Background: Warm Ivory / Cream ===== */
+  --background-50:  0.985 0.006 80;
+  --background-100: 0.955 0.010 80;
+  --background-200: 0.900 0.014 80;
+  --background-300: 0.820 0.018 80;
+  --background-400: 0.720 0.020 80;
+  --background-500: 0.620 0.020 80;
+  --background-600: 0.500 0.018 80;
+  --background-700: 0.380 0.015 80;
+  --background-800: 0.250 0.012 80;
+  --background-900: 0.150 0.010 80;
+  --background-950: 0.080 0.008 80;
+
+  /* ===== Foreground: Deep Warm Espresso ===== */
+  --foreground-50:  0.980 0.004 60;
+  --foreground-100: 0.920 0.006 60;
+  --foreground-200: 0.840 0.008 60;
+  --foreground-300: 0.740 0.010 60;
+  --foreground-400: 0.620 0.012 60;
+  --foreground-500: 0.500 0.010 60;
+  --foreground-600: 0.380 0.008 60;
+  --foreground-700: 0.280 0.006 60;
+  --foreground-800: 0.180 0.005 60;
+  --foreground-900: 0.110 0.004 60;
+  --foreground-950: 0.060 0.003 60;
+
+  /* ===== Primary: Amber Gold (Bulgarian taxi brand) ===== */
+  --primary-50:  0.970 0.030 78;
+  --primary-100: 0.930 0.060 78;
+  --primary-200: 0.870 0.090 78;
+  --primary-300: 0.800 0.130 78;
+  --primary-400: 0.720 0.155 78;
+  --primary-500: 0.640 0.175 78;
+  --primary-600: 0.550 0.155 78;
+  --primary-700: 0.440 0.125 78;
+  --primary-800: 0.320 0.090 78;
+  --primary-900: 0.210 0.060 78;
+  --primary-950: 0.120 0.035 78;
+
+  /* ===== Accent: Deep Teal (trust, tech, unique) ===== */
+  --accent-50:  0.970 0.025 185;
+  --accent-100: 0.920 0.050 185;
+  --accent-200: 0.850 0.080 185;
+  --accent-300: 0.770 0.110 185;
+  --accent-400: 0.680 0.140 185;
+  --accent-500: 0.590 0.155 185;
+  --accent-600: 0.500 0.135 185;
+  --accent-700: 0.400 0.105 185;
+  --accent-800: 0.290 0.075 185;
+  --accent-900: 0.190 0.050 185;
+  --accent-950: 0.110 0.030 185;
+
+  /* ===== Secondary: Warm Charcoal ===== */
+  --secondary-50:  0.970 0.008 30;
+  --secondary-100: 0.900 0.015 30;
+  --secondary-200: 0.820 0.025 30;
+  --secondary-300: 0.730 0.040 30;
+  --secondary-400: 0.630 0.055 30;
+  --secondary-500: 0.520 0.070 30;
+  --secondary-600: 0.430 0.060 30;
+  --secondary-700: 0.340 0.045 30;
+  --secondary-800: 0.250 0.035 30;
+  --secondary-900: 0.170 0.025 30;
+  --secondary-950: 0.090 0.015 30;
+}
+
+/* ===== Public marketing site brand scope — Explorer / Лески Каручка ===== */
+/* Scoped to the pre-login landing pages only; app pages keep their palette. */
+.brand-scope {
+  --font-heading: 'Sora', sans-serif;
+  --font-body: 'Sora', sans-serif;
+  --font-label: 'Sora', sans-serif;
+  font-family: 'Sora', sans-serif;
+
+  /* Background: warm sandy off-white (#F5F1EA) */
+  --background-50:  0.958 0.013 85;
+  --background-100: 0.932 0.017 85;
+  --background-200: 0.885 0.020 85;
+  --background-300: 0.810 0.022 85;
+  --background-400: 0.710 0.023 85;
+  --background-500: 0.610 0.023 85;
+  --background-600: 0.500 0.021 85;
+  --background-700: 0.390 0.018 85;
+  --background-800: 0.280 0.015 85;
+  --background-900: 0.180 0.011 85;
+  --background-950: 0.100 0.008 85;
+
+  /* Foreground: graphite neutral (#1A1A1A) */
+  --foreground-50:  0.975 0 0;
+  --foreground-100: 0.915 0 0;
+  --foreground-200: 0.840 0 0;
+  --foreground-300: 0.745 0 0;
+  --foreground-400: 0.625 0 0;
+  --foreground-500: 0.500 0 0;
+  --foreground-600: 0.395 0 0;
+  --foreground-700: 0.295 0 0;
+  --foreground-800: 0.210 0 0;
+  --foreground-900: 0.155 0 0;
+  --foreground-950: 0.110 0 0;
+
+  /* Primary: deep forest green (#1F3D2B) */
+  --primary-50:  0.950 0.022 155;
+  --primary-100: 0.910 0.040 155;
+  --primary-200: 0.820 0.055 155;
+  --primary-300: 0.680 0.070 155;
+  --primary-400: 0.520 0.075 155;
+  --primary-500: 0.360 0.068 155;
+  --primary-600: 0.300 0.062 155;
+  --primary-700: 0.250 0.054 155;
+  --primary-800: 0.200 0.045 155;
+  --primary-900: 0.140 0.032 155;
+  --primary-950: 0.080 0.018 155;
+
+  /* Accent: burnt ochre / terracotta (#C1652F) — CTA only */
+  --accent-50:  0.955 0.028 48;
+  --accent-100: 0.920 0.050 48;
+  --accent-200: 0.860 0.075 48;
+  --accent-300: 0.770 0.100 48;
+  --accent-400: 0.665 0.120 48;
+  --accent-500: 0.560 0.135 48;
+  --accent-600: 0.480 0.125 48;
+  --accent-700: 0.400 0.100 48;
+  --accent-800: 0.310 0.078 48;
+  --accent-900: 0.220 0.050 48;
+  --accent-950: 0.130 0.030 48;
+
+  /* Secondary: warm stone neutral (supporting) */
+  --secondary-50:  0.960 0.008 85;
+  --secondary-100: 0.920 0.010 85;
+  --secondary-200: 0.860 0.012 85;
+  --secondary-300: 0.780 0.014 85;
+  --secondary-400: 0.690 0.015 85;
+  --secondary-500: 0.590 0.015 85;
+  --secondary-600: 0.490 0.014 85;
+  --secondary-700: 0.390 0.012 85;
+  --secondary-800: 0.300 0.010 85;
+  --secondary-900: 0.200 0.008 85;
+  --secondary-950: 0.110 0.005 85;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: oklch(var(--background-50));
+  color: oklch(var(--foreground-950));
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* ===== Mobile & touch optimization ===== */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+  min-height: 100dvh;
+}
+
+/* ===== Mobile typography & touch ===== */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  h1, h2, h3 {
+    line-height: 1.18;
+  }
+}
+
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe-area insets */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pb-safe-nav {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+.px-safe {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== Custom animations ===== */
+@keyframes taxiBounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-1deg); }
+  75% { transform: translateY(-1px) rotate(1deg); }
+}
+
+.animate-taxi-bounce {
+  animation: taxiBounce 2.5s ease-in-out infinite;
+}
+
+/* ===== Post-login micro animations ===== */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: translateY(-6px) scale(0.94); }
+  60% { opacity: 1; transform: translateY(1px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.pop-in {
+  animation: popIn 0.35s ease-out both;
+}
+
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.progress-slide {
+  animation: progressSlide 1.4s ease-in-out infinite;
+}
+
+/* ===== Supercar logo intro — hero drive-through (one-shot, Apple-style easing) ===== */
+/* The animation is gated on .hero-car-play: the Hero component adds this class
+   only after the logo image has actually loaded/decoded. On slow mobile
+   networks the image used to arrive after the animation had already run, so
+   the "car" drove by invisibly (iPhone). Now the drive-through always waits. */
+.hero-logo-car-wrapper {
+  display: inline-block;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.hero-logo-car {
+  will-change: transform, opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.hero-car-play .hero-logo-car {
+  animation: carLogoDrive 4.2s cubic-bezier(0.45, 0, 0.55, 1) both;
+  -webkit-animation: carLogoDrive 4.2s cubic-bezier(0.45, 0, 0.55, 1) both;
+}
+
+@keyframes carLogoDrive {
+  0% {
+    transform: translateX(-135vw) rotate(-2deg);
+    -webkit-transform: translateX(-135vw) rotate(-2deg);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  32% {
+    transform: translateX(-25vw) rotate(-2deg);
+    -webkit-transform: translateX(-25vw) rotate(-2deg);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  44% {
+    transform: translateX(-25vw) rotate(-2deg);
+    -webkit-transform: translateX(-25vw) rotate(-2deg);
+    opacity: 1;
+    animation-timing-function: linear;
+  }
+  66% {
+    transform: translateX(0) rotate(0deg);
+    -webkit-transform: translateX(0) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.42, 0, 0.42, 1);
+  }
+  72% {
+    transform: translateX(0) rotate(0deg);
+    -webkit-transform: translateX(0) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.6, 0.04, 0.85, 0.35);
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(135vw) rotate(2deg);
+    -webkit-transform: translateX(135vw) rotate(2deg);
+    opacity: 0;
+  }
+}
+
+/* Mobile: shorter distance so the car stays visible on small screens */
+@media (max-width: 640px) {
+  .hero-car-play .hero-logo-car {
+    animation-name: carLogoDriveMobile;
+    -webkit-animation-name: carLogoDriveMobile;
+    animation-duration: 3.6s;
+    -webkit-animation-duration: 3.6s;
+  }
+  @keyframes carLogoDriveMobile {
+    0% {
+      transform: translateX(-110vw) rotate(-2deg);
+      -webkit-transform: translateX(-110vw) rotate(-2deg);
+      opacity: 0;
+    }
+    5% {
+      opacity: 1;
+      animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    32% {
+      transform: translateX(-20vw) rotate(-2deg);
+      -webkit-transform: translateX(-20vw) rotate(-2deg);
+      opacity: 1;
+      animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    44% {
+      transform: translateX(-20vw) rotate(-2deg);
+      -webkit-transform: translateX(-20vw) rotate(-2deg);
+      opacity: 1;
+      animation-timing-function: linear;
+    }
+    66% {
+      transform: translateX(0) rotate(0deg);
+      -webkit-transform: translateX(0) rotate(0deg);
+      opacity: 1;
+      animation-timing-function: cubic-bezier(0.42, 0, 0.42, 1);
+    }
+    72% {
+      transform: translateX(0) rotate(0deg);
+      -webkit-transform: translateX(0) rotate(0deg);
+      opacity: 1;
+      animation-timing-function: cubic-bezier(0.6, 0.04, 0.85, 0.35);
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(110vw) rotate(2deg);
+      -webkit-transform: translateX(110vw) rotate(2deg);
+      opacity: 0;
+    }
+  }
+}
+
+/* Hero content reveal — visible by default, hidden + animated while the car plays */
+.hero-car-play .hero-reveal-item {
+  opacity: 0;
+  animation: heroFadeIn 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 3.5s forwards;
+  -webkit-animation: heroFadeIn 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 3.5s forwards;
+}
+
+@keyframes heroFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade-only reveal (keeps transform free for hover effects, e.g. CTA) */
+.hero-car-play .hero-reveal-fade {
+  opacity: 0;
+  animation: heroFade 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 4s forwards;
+  -webkit-animation: heroFade 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 4s forwards;
+}
+
+@keyframes heroFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-logo-car,
+  .hero-car-play .hero-logo-car {
+    animation: none !important;
+    -webkit-animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .hero-reveal-item,
+  .hero-car-play .hero-reveal-item,
+  .hero-reveal-fade,
+  .hero-car-play .hero-reveal-fade {
+    animation: none !important;
+    -webkit-animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Honeypot field */
+.form-trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===== Cookie Consent banner ===== */
+.cookie-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: oklch(var(--background-50));
+  border-top: 1px solid oklch(var(--background-200));
+  box-shadow: 0 -4px 20px oklch(var(--foreground-950) / 0.06);
+}
+
+.cookie-banner-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem;
+}
+
+.cookie-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 2.5rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: oklch(var(--background-300));
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.cookie-toggle::after {
+  content: '';
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: oklch(var(--background-50));
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px oklch(var(--foreground-950) / 0.15);
+}
+.cookie-toggle:checked {
+  background: oklch(var(--primary-500));
+}
+.cookie-toggle:checked::after {
+  transform: translateX(1.25rem);
+}
+.cookie-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

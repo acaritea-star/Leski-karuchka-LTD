@@ -1,0 +1,388 @@
+
+> react@0.0.0 type-check
+> tsc --noEmit --project tsconfig.app.json
+
+src/contexts/AuthContext.tsx(117,35): error TS2345: Argument of type '{ id: string; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; first_name: string | null; last_name: string | null; phone: string | null; avatar_url: string | null; }' is not assignable to parameter of type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; }'.
+  Type '{ id: string; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; first_name: string | null; last_name: string | null; phone: string | null; avatar_url: string | null; }' is missing the following properties from type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; }': email, is_active, created_at, updated_at
+src/contexts/AuthContext.tsx(284,28): error TS2339: Property 'first_name' does not exist on type '{}'.
+src/contexts/AuthContext.tsx(285,27): error TS2339: Property 'last_name' does not exist on type '{}'.
+src/contexts/AuthContext.tsx(286,23): error TS2339: Property 'phone' does not exist on type '{}'.
+src/contexts/AuthContext.tsx(287,28): error TS2339: Property 'avatar_url' does not exist on type '{}'.
+src/contexts/AuthContext.tsx(290,16): error TS2322: Type '{} | null' is not assignable to type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; } | null'.
+  Type '{}' is missing the following properties from type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; }': id, first_name, last_name, phone, and 7 more.
+src/contexts/AuthContext.tsx(297,48): error TS2322: Type '(provider: "google" | "facebook") => Promise<{ data: { provider: Provider; url: string; } | { provider: Provider; url: null; }; error: AuthError | null; }>' is not assignable to type '(provider: "google" | "facebook") => Promise<OAuthResponse>'.
+  Type 'Promise<{ data: { provider: Provider; url: string; } | { provider: Provider; url: null; }; error: AuthError | null; }>' is not assignable to type 'Promise<OAuthResponse>'.
+    Type '{ data: { provider: Provider; url: string; } | { provider: Provider; url: null; }; error: AuthError | null; }' is not assignable to type 'OAuthResponse'.
+      Type '{ data: { provider: Provider; url: string; } | { provider: Provider; url: null; }; error: AuthError | null; }' is not assignable to type '{ data: { provider: Provider; url: null; }; error: AuthError; }'.
+        Types of property 'data' are incompatible.
+          Type '{ provider: Provider; url: string; } | { provider: Provider; url: null; }' is not assignable to type '{ provider: Provider; url: null; }'.
+            Type '{ provider: Provider; url: string; }' is not assignable to type '{ provider: Provider; url: null; }'.
+              Types of property 'url' are incompatible.
+                Type 'string' is not assignable to type 'null'.
+src/hooks/useDriverDeclines.ts(27,40): error TS2339: Property 'request_id' does not exist on type 'never'.
+src/hooks/useDriverDeclines.ts(42,10): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { onConflict?: string | undefined; ignoreDuplicates?: boolean | undefined; count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ ...; }, ... 5 more ..., "POST">', gave the following error.
+    Argument of type '{ request_id: string; driver_id: string; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { onConflict?: string | undefined; ignoreDuplicates?: boolean | undefined; count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Object literal may only specify known properties, and 'request_id' does not exist in type 'never[]'.
+src/hooks/usePushNotifications.ts(102,8): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { onConflict?: string | undefined; ignoreDuplicates?: boolean | undefined; count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ ...; }, ... 5 more ..., "POST">', gave the following error.
+    Argument of type '{ user_id: string; endpoint: string; p256dh: string; auth: string; user_agent: string; updated_at: string; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { onConflict?: string | undefined; ignoreDuplicates?: boolean | undefined; count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Object literal may only specify known properties, and 'user_id' does not exist in type 'never[]'.
+src/i18n/local/bg/common.ts(213,3): error TS1117: An object literal cannot have multiple properties with the same name.
+src/i18n/local/en/common.ts(213,3): error TS1117: An object literal cannot have multiple properties with the same name.
+src/lib/driverLocation.ts(96,6): error TS2339: Property 'catch' does not exist on type 'PromiseLike<void>'.
+src/lib/places.ts(94,16): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/pages/admin/analytics/page.tsx(97,37): error TS2339: Property 'id' does not exist on type 'never'.
+src/pages/admin/analytics/page.tsx(97,47): error TS2339: Property 'first_name' does not exist on type 'never'.
+src/pages/admin/analytics/page.tsx(97,69): error TS2339: Property 'last_name' does not exist on type 'never'.
+src/pages/admin/components/AdminCompanyContext.tsx(52,21): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/pages/admin/components/AdminCompanyContext.tsx(57,25): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/pages/admin/customers/page.tsx(30,37): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/customers/page.tsx(49,7): error TS2322: Type '{ totalTrips: number; totalSpent: number; }[]' is not assignable to type 'Customer[]'.
+  Type '{ totalTrips: number; totalSpent: number; }' is not assignable to type 'Customer'.
+    Type '{ totalTrips: number; totalSpent: number; }' is missing the following properties from type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; }': id, first_name, last_name, phone, and 7 more.
+src/pages/admin/customers/page.tsx(51,31): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/customers/page.tsx(52,31): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/drivers/page.tsx(59,41): error TS2339: Property 'user_id' does not exist on type '{}'.
+src/pages/admin/drivers/page.tsx(67,41): error TS2740: Type '{}' is missing the following properties from type '{ id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null; avatar_url: string | null; role: "CUSTOMER" | "DRIVER" | "COMPANY_ADMIN" | "SUPER_ADMIN"; company_id: string | null; is_active: boolean; created_at: string; updated_at: string; }': id, first_name, last_name, phone, and 7 more.
+src/pages/admin/drivers/page.tsx(67,54): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/drivers/page.tsx(70,7): error TS2322: Type '{ first_name: string; last_name: string; }[]' is not assignable to type 'DriverWithName[]'.
+  Type '{ first_name: string; last_name: string; }' is not assignable to type 'DriverWithName'.
+    Type '{ first_name: string; last_name: string; }' is missing the following properties from type '{ id: string; user_id: string; company_id: string; vehicle_id: string | null; is_online: boolean; is_verified: boolean; rating: number; total_trips: number; status: "available" | "busy" | "offline"; created_at: string; updated_at: string; }': id, user_id, company_id, vehicle_id, and 7 more.
+src/pages/admin/drivers/page.tsx(72,34): error TS2339: Property 'user_id' does not exist on type '{}'.
+src/pages/admin/drivers/page.tsx(73,33): error TS2339: Property 'user_id' does not exist on type '{}'.
+src/pages/admin/drivers/page.tsx(92,7): error TS2322: Type '{}[]' is not assignable to type '{ id: string; driver_id: string; company_id: string; type: "license" | "id_card" | "insurance" | "vehicle_registration"; file_url: string | null; status: "pending" | "approved" | "rejected"; reviewed_at: string | null; expires_at: string | null; created_at: string; }[]'.
+  Type '{}' is missing the following properties from type '{ id: string; driver_id: string; company_id: string; type: "license" | "id_card" | "insurance" | "vehicle_registration"; file_url: string | null; status: "pending" | "approved" | "rejected"; reviewed_at: string | null; expires_at: string | null; created_at: string; }': id, driver_id, company_id, type, and 5 more.
+src/pages/admin/news/edit/page.tsx(9,23): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/admin/news/edit/page.tsx(86,23): error TS2339: Property 'title' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(87,22): error TS2339: Property 'slug' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(88,25): error TS2339: Property 'excerpt' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(89,25): error TS2339: Property 'content' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(90,26): error TS2339: Property 'category' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(91,36): error TS2339: Property 'featured_image_url' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(92,36): error TS2339: Property 'featured_image_alt' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(93,29): error TS2339: Property 'author_name' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(94,27): error TS2339: Property 'seo_title' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(95,33): error TS2339: Property 'seo_description' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(96,24): error TS2339: Property 'status' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(97,43): error TS2339: Property 'published_at' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(98,29): error TS2339: Property 'is_featured' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(185,35): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/admin/news/edit/page.tsx(185,52): error TS2339: Property 'Insert' does not exist on type 'unknown'.
+src/pages/admin/news/edit/page.tsx(232,37): error TS2339: Property 'data' does not exist on type 'never'.
+src/pages/admin/news/edit/page.tsx(235,63): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/pages/admin/news/page.tsx(8,23): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/admin/news/page.tsx(63,50): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(71,33): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(73,49): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(74,51): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(76,27): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(76,45): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(77,27): error TS18046: 'b' is of type 'unknown'.
+src/pages/admin/news/page.tsx(77,45): error TS18046: 'b' is of type 'unknown'.
+src/pages/admin/news/page.tsx(90,36): error TS18046: 'article' is of type 'unknown'.
+src/pages/admin/news/page.tsx(91,15): error TS2339: Property 'published_at' does not exist on type 'Partial<unknown>'.
+src/pages/admin/news/page.tsx(93,70): error TS2345: Argument of type 'Partial<unknown>' is not assignable to parameter of type 'never'.
+src/pages/admin/news/page.tsx(93,88): error TS18046: 'article' is of type 'unknown'.
+src/pages/admin/news/page.tsx(106,90): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/news/page.tsx(182,7): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/pages/admin/news/page.tsx(222,28): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(224,24): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(227,44): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(229,68): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(231,35): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(234,35): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(237,24): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(246,46): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(252,26): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(254,44): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(261,26): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(271,26): error TS18046: 'a' is of type 'unknown'.
+src/pages/admin/news/page.tsx(307,61): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/admin/orders/page.tsx(41,57): error TS2339: Property 'customer_id' does not exist on type '{}'.
+src/pages/admin/orders/page.tsx(43,23): error TS2339: Property 'driver_id' does not exist on type '{}'.
+src/pages/admin/orders/page.tsx(79,7): error TS2322: Type '{ customer_name: string; driver_name: string; }[]' is not assignable to type 'Order[]'.
+  Type '{ customer_name: string; driver_name: string; }' is not assignable to type 'Order'.
+    Type '{ customer_name: string; driver_name: string; }' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/admin/orders/page.tsx(81,38): error TS2339: Property 'customer_id' does not exist on type '{}'.
+src/pages/admin/orders/page.tsx(82,55): error TS2339: Property 'driver_id' does not exist on type '{}'.
+src/pages/admin/vehicles/page.tsx(73,13): error TS2322: Type '{ driver_id: string | null; driver_name: string | null; }[]' is not assignable to type 'VehicleWithDriver[]'.
+  Type '{ driver_id: string | null; driver_name: string | null; }' is not assignable to type 'VehicleWithDriver'.
+    Type '{ driver_id: string | null; driver_name: string | null; }' is missing the following properties from type '{ id: string; company_id: string; vehicle_type_id: string | null; make: string; model: string; year: number | null; color: string | null; registration_number: string; capacity: number; insurance_expiry_date: string | null; inspection_expiry_date: string | null; is_active: boolean; created_at: string; updated_at: str...': id, company_id, vehicle_type_id, make, and 10 more.
+src/pages/admin/vehicles/page.tsx(74,68): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/admin/vehicles/page.tsx(82,70): error TS2322: Type '{}[]' is not assignable to type '{ id: string; company_id: string; name: string; capacity: number; multiplier: number; image_url: string | null; is_active: boolean; created_at: string; updated_at: string; }[]'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; name: string; capacity: number; multiplier: number; image_url: string | null; is_active: boolean; created_at: string; updated_at: string; }': id, company_id, name, capacity, and 5 more.
+src/pages/customer/components/DriverTracking.tsx(654,23): error TS2345: Argument of type 'string' is not assignable to parameter of type 'NonNullable<"pending" | "completed" | "accepted" | "arrived" | "in_progress" | "cancelled">'.
+src/pages/customer/home/page.tsx(330,17): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: { id?: string | undefined; company_id: string; customer_id: string; driver_id?: string | null | undefined; vehicle_type_id?: string | null | undefined; pickup_latitude: number; pickup_longitude: number; ... 21 more ...; estimated_duration_min?: number | ... 1 more ... | undefined; }, options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Argument of type '{ company_id: string; customer_id: string; pickup_latitude: number; pickup_longitude: number; pickup_address: string; destination_latitude: number; destination_longitude: number; destination_address: string; ... 6 more ...; vehicle_type_id: string; }' is not assignable to parameter of type '{ id?: string | undefined; company_id: string; customer_id: string; driver_id?: string | null | undefined; vehicle_type_id?: string | null | undefined; pickup_latitude: number; pickup_longitude: number; ... 21 more ...; estimated_duration_min?: number | ... 1 more ... | undefined; }'.
+      Types of property 'status' are incompatible.
+        Type 'string' is not assignable to type '"pending" | "completed" | "accepted" | "arrived" | "in_progress" | "cancelled" | undefined'.
+  Overload 2 of 2, '(values: { id?: string | undefined; company_id: string; customer_id: string; driver_id?: string | null | undefined; vehicle_type_id?: string | null | undefined; pickup_latitude: number; pickup_longitude: number; ... 21 more ...; estimated_duration_min?: number | ... 1 more ... | undefined; }[], options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Argument of type '{ company_id: string; customer_id: string; pickup_latitude: number; pickup_longitude: number; pickup_address: string; destination_latitude: number; destination_longitude: number; destination_address: string; ... 6 more ...; vehicle_type_id: string; }' is not assignable to parameter of type '{ id?: string | undefined; company_id: string; customer_id: string; driver_id?: string | null | undefined; vehicle_type_id?: string | null | undefined; pickup_latitude: number; pickup_longitude: number; ... 21 more ...; estimated_duration_min?: number | ... 1 more ... | undefined; }[]'.
+      Type '{ company_id: string; customer_id: string; pickup_latitude: number; pickup_longitude: number; pickup_address: string; destination_latitude: number; destination_longitude: number; destination_address: string; ... 6 more ...; vehicle_type_id: string; }' is missing the following properties from type '{ id?: string | undefined; company_id: string; customer_id: string; driver_id?: string | null | undefined; vehicle_type_id?: string | null | undefined; pickup_latitude: number; pickup_longitude: number; ... 21 more ...; estimated_duration_min?: number | ... 1 more ... | undefined; }[]': length, pop, push, concat, and 29 more.
+src/pages/customer/home/page.tsx(339,73): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/home/page.tsx(339,94): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/home/page.tsx(339,123): error TS2339: Property 'company_id' does not exist on type '{}'.
+src/pages/customer/home/page.tsx(349,32): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/home/page.tsx(350,36): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/home/page.tsx(372,33): error TS2322: Type 'string' is not assignable to type '"pending" | "completed" | "accepted" | "arrived" | "in_progress" | "cancelled"'.
+src/pages/customer/home/page.tsx(698,17): error TS2322: Type 'Dispatch<SetStateAction<"comfort" | "standard">>' is not assignable to type '(id: string) => void'.
+  Types of parameters 'value' and 'id' are incompatible.
+    Type 'string' is not assignable to type 'SetStateAction<"comfort" | "standard">'.
+src/pages/customer/home/page.tsx(700,17): error TS2322: Type 'Dispatch<SetStateAction<PaymentMethod>>' is not assignable to type '(method: string) => void'.
+  Types of parameters 'value' and 'method' are incompatible.
+    Type 'string' is not assignable to type 'SetStateAction<PaymentMethod>'.
+src/pages/customer/orders/page.tsx(115,51): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(118,50): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(156,40): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(157,26): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/customer/orders/page.tsx(158,18): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/customer/orders/page.tsx(273,51): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(276,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(283,42): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(286,41): error TS2339: Property 'created_at' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(301,34): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(307,34): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(316,30): error TS2339: Property 'estimated_distance_km' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(317,38): error TS2339: Property 'estimated_distance_km' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(319,30): error TS2339: Property 'estimated_duration_min' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(320,38): error TS2339: Property 'estimated_duration_min' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(324,45): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(326,30): error TS2339: Property 'vehicle_type_id' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(326,74): error TS2339: Property 'vehicle_type_id' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(329,53): error TS2339: Property 'vehicle_type_id' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(334,31): error TS2339: Property 'final_price' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(334,52): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(339,85): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(350,28): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/customer/orders/page.tsx(352,49): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/customer/orders/page.tsx(359,26): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/customer/orders/page.tsx(359,71): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/customer/settings/page.tsx(68,48): error TS2353: Object literal may only specify known properties, and 'language' does not exist in type '{ id?: string | undefined; first_name?: string | null | undefined; last_name?: string | null | undefined; phone?: string | null | undefined; email?: string | null | undefined; avatar_url?: string | ... 1 more ... | undefined; ... 4 more ...; updated_at?: string | undefined; }'.
+src/pages/driver/earnings/page.tsx(64,35): error TS2339: Property 'final_price' does not exist on type '{}'.
+src/pages/driver/earnings/page.tsx(64,55): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/earnings/page.tsx(65,45): error TS2339: Property 'completed_at' does not exist on type '{}'.
+src/pages/driver/earnings/page.tsx(78,9): error TS2322: Type '{}[]' is not assignable to type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }[]'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/driver/history/page.tsx(120,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(124,28): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(125,43): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(125,59): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(128,38): error TS2339: Property 'completed_at' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(128,59): error TS2339: Property 'cancelled_at' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(135,70): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(140,91): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(141,84): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(148,51): error TS2339: Property 'estimated_distance_km' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(149,33): error TS2339: Property 'estimated_duration_min' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(152,45): error TS2339: Property 'final_price' does not exist on type '{}'.
+src/pages/driver/history/page.tsx(152,65): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(59,62): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(63,23): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(63,65): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(68,34): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(76,24): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(82,23): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(82,62): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(89,34): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(101,24): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(117,46): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(118,30): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(136,46): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(137,30): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(142,48): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(149,35): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(155,28): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(171,35): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(172,36): error TS2339: Property 'company_id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(192,26): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(213,37): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(222,19): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(223,88): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(240,46): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(245,18): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(249,42): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(255,22): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(264,101): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(268,75): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(270,75): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(271,89): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(289,15): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(289,27): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(293,17): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(293,37): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(294,40): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(294,51): error TS2339: Property 'company_id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(308,15): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(308,34): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(308,46): error TS2339: Property 'company_id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(312,18): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(329,15): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(458,57): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(466,36): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(466,98): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(476,100): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(477,93): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(481,56): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(484,56): error TS2339: Property 'estimated_distance_km' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(496,72): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(524,100): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(533,88): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(534,95): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(538,56): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(554,29): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(562,30): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(566,101): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(567,30): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(572,36): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(578,24): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(606,25): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/home/page.tsx(624,48): error TS2339: Property 'rating' does not exist on type '{}'.
+src/pages/driver/profile/page.tsx(74,24): error TS2339: Property 'vehicle_id' does not exist on type '{}'.
+src/pages/driver/profile/page.tsx(78,34): error TS2339: Property 'vehicle_id' does not exist on type '{}'.
+src/pages/driver/profile/page.tsx(87,39): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(114,28): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(115,89): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(125,23): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(125,65): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(130,34): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(138,24): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(145,22): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(145,41): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(160,58): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(163,88): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(169,35): error TS2339: Property 'is_online' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(175,28): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(190,35): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(191,36): error TS2339: Property 'company_id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(210,26): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(231,37): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(242,16): error TS2339: Property 'customer_id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(244,16): error TS2339: Property 'customer_id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(246,55): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(251,19): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(252,88): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(296,19): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(297,71): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(334,19): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(335,71): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(373,19): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(374,71): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(384,39): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(388,48): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(402,101): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(406,75): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(409,75): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(425,33): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(429,18): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(431,38): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(434,88): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(446,15): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(448,50): error TS2345: Argument of type '{}' is not assignable to parameter of type 'Pick<{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }, "pickup_latitude" | ... 2 more ... | "destination_longitud...'.
+  Type '{}' is missing the following properties from type 'Pick<{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }, "pickup_latitude" | ... 2 more ... | "destination_longitud...': pickup_latitude, pickup_longitude, destination_latitude, destination_longitude
+src/pages/driver/requests/page.tsx(452,21): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(453,30): error TS2339: Property 'pickup_latitude' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(453,66): error TS2339: Property 'pickup_longitude' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(454,30): error TS2339: Property 'destination_latitude' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(454,71): error TS2339: Property 'destination_longitude' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(460,23): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(461,23): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(461,62): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(473,23): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(474,23): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(474,62): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(576,97): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(578,34): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(578,96): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(583,52): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(600,37): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(615,98): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(616,91): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(628,34): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(628,97): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(631,34): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(631,71): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(631,102): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(631,143): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(631,179): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(643,30): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(645,57): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/driver/requests/page.tsx(654,30): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(657,57): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/driver/requests/page.tsx(665,84): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(669,30): error TS2339: Property 'status' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(672,55): error TS2345: Argument of type '{}' is not assignable to parameter of type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }'.
+  Type '{}' is missing the following properties from type '{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }': id, company_id, customer_id, driver_id, and 25 more.
+src/pages/driver/requests/page.tsx(681,64): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(717,44): error TS2345: Argument of type '{}' is not assignable to parameter of type 'Pick<{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }, "pickup_latitude" | ... 2 more ... | "destination_longitud...'.
+  Type '{}' is missing the following properties from type 'Pick<{ id: string; company_id: string; customer_id: string; driver_id: string | null; vehicle_type_id: string | null; pickup_latitude: number; pickup_longitude: number; pickup_address: string | null; ... 20 more ...; estimated_duration_min: number | null; }, "pickup_latitude" | ... 2 more ... | "destination_longitud...': pickup_latitude, pickup_longitude, destination_latitude, destination_longitude
+src/pages/driver/requests/page.tsx(718,100): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(721,32): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(732,96): error TS2339: Property 'pickup_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(733,89): error TS2339: Property 'destination_address' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(751,32): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(751,84): error TS2339: Property 'payment_method' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(758,50): error TS2339: Property 'estimated_price' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(762,56): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(769,70): error TS2339: Property 'id' does not exist on type '{}'.
+src/pages/driver/requests/page.tsx(787,64): error TS2339: Property 'created_at' does not exist on type '{}'.
+src/pages/landing/home/components/NewsSection.tsx(9,51): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/landing/home/components/NewsSection.tsx(55,28): error TS18046: 'a' is of type 'unknown'.
+src/pages/landing/news/article/page.tsx(16,49): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/landing/news/article/page.tsx(17,49): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/landing/news/article/page.tsx(53,27): error TS2339: Property 'id' does not exist on type 'never'.
+src/pages/landing/news/article/page.tsx(67,29): error TS2339: Property 'seo_title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(67,64): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(68,35): error TS2339: Property 'seo_description' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(68,63): error TS2339: Property 'excerpt' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(69,28): error TS2339: Property 'featured_image_url' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(86,36): error TS2339: Property 'published_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(87,35): error TS2339: Property 'updated_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(88,29): error TS2339: Property 'author_name' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(93,35): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(96,40): error TS2339: Property 'published_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(97,39): error TS2339: Property 'updated_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(98,66): error TS2339: Property 'author_name' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(112,69): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(162,83): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(165,20): error TS2339: Property 'category' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(167,24): error TS2339: Property 'category' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(172,22): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(176,22): error TS2339: Property 'excerpt' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(182,24): error TS2339: Property 'author_name' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(186,35): error TS2339: Property 'published_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(190,36): error TS2339: Property 'content' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(194,20): error TS2339: Property 'featured_image_url' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(196,28): error TS2339: Property 'featured_image_url' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(197,28): error TS2339: Property 'featured_image_alt' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(197,58): error TS2339: Property 'title' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(202,46): error TS2339: Property 'content' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(204,20): error TS2339: Property 'updated_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(204,43): error TS2339: Property 'published_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(206,58): error TS2339: Property 'updated_at' does not exist on type '{}'.
+src/pages/landing/news/article/page.tsx(233,30): error TS18046: 'r' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(6,23): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/landing/news/components/ArticleCard.tsx(11,22): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(15,10): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(17,18): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(18,18): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(18,48): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(29,10): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(31,14): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(35,12): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(38,12): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(42,29): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/components/ArticleCard.tsx(43,30): error TS18046: 'article' is of type 'unknown'.
+src/pages/landing/news/page.tsx(11,51): error TS2344: Type '"news_articles"' does not satisfy the constraint '"audit_log" | "companies" | "coupons" | "driver_documents" | "driver_locations" | "drivers" | "ledger" | "notifications" | "payment_transactions" | "profiles" | "ratings" | ... 4 more ... | "vehicles"'.
+src/pages/landing/news/page.tsx(83,30): error TS18046: 'a' is of type 'unknown'.

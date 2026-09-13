@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /auth/callback
+Disallow: /customer/
+Disallow: /driver/
+Disallow: /admin/
+
+Sitemap: https://leskikaruchka.com/sitemap.xml
+
+Crawl-delay: 1

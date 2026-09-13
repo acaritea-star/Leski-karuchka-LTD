@@ -1,0 +1,51 @@
+# LLMs.txt for Leski Karuchka
+# https://llmstxt.org/
+
+# Overview
+Leski Karuchka (Лески Каручка) is a local ride-hailing app for ordering horse-drawn carriages in Levski, Pleven Province, Bulgaria (postal code 5900). Users can order a carriage online, track their driver live on a map, and pay with cash, card, or online — all at fixed transparent prices.
+
+# Core Services
+- City transport within Levski and surrounding villages (Bulgarene, Asenovtsi, Obnova, Gradishte)
+- Transport to bus station and railway station
+- Live driver tracking via GPS
+- Fixed upfront pricing — no surprises
+- Multiple payment methods: cash, card in-carriage, online
+
+# How to Use
+1. Register or log in at leskikaruchka.com/auth/login
+2. Enter pickup address and destination
+3. See exact price before ordering
+4. Track driver arrival live on map
+5. Pay your preferred way after the ride
+
+# Key Facts
+- Average wait time: ~5 minutes in Levski city
+- Operating hours: 07:00 – 23:00, every day
+- Service area: Levski (5900) and surrounding villages in Pleven Province
+- 18 verified drivers, 12 company partners
+- Currency: EUR (€)
+- Business address: bul. Bulgaria №58, Levski 5900, Bulgaria
+- Phone: +359 89 000 5900
+- Email: info@leski-karuchka.bg
+
+# Pricing
+- Base fare: 2.00 €
+- Per kilometer: 1.10 €
+- Per minute: 0.28 €
+- Minimum fare: 3.00 €
+- City ride examples: ~3.10 € – 3.60 €
+
+# Important Pages
+- Homepage: https://leskikaruchka.com/
+- About: https://leskikaruchka.com/about
+- Pricing: https://leskikaruchka.com/pricing
+- Contact: https://leskikaruchka.com/contact
+- Privacy Policy: https://leskikaruchka.com/privacy
+- Terms: https://leskikaruchka.com/terms
+- Cookie Policy: https://leskikaruchka.com/cookies
+- Driver Jobs: https://leskikaruchka.com/driver-join
+
+# No-Go Areas
+- This site does NOT provide medical, legal, or financial advice.
+- User accounts and ride data are handled per GDPR and Bulgarian data protection law.
+- All prices are estimates; final price is shown in-app before confirming the ride.
