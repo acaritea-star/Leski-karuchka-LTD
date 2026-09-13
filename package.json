@@ -1,0 +1,50 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "2.57.4",
+    "@tanstack/react-query": "5.87.4",
+    "i18next": "25.4.1",
+    "i18next-browser-languagedetector": "8.2.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-i18next": "15.7.4",
+    "react-router-dom": "7.18.3",
+    "recharts": "3.2.0",
+    "tailwindcss-animate": "1.0.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "autoprefixer": "10.6.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "5.2.0",
+    "eslint-plugin-react-refresh": "0.4.26",
+    "globals": "16.5.0",
+    "jiti": "2.7.0",
+    "postcss": "8.5.28",
+    "source-map": "0.7.6",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.8.3",
+    "typescript-eslint": "8.70.0",
+    "unplugin-auto-import": "19.3.0",
+    "vite": "8.3.0",
+    "vitest": "4.1.11"
+  },
+  "name": "react",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit --project tsconfig.app.json && vite build",
+    "dev": "vite",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit --project tsconfig.app.json",
+    "test": "vitest run",
+    "check": "npm run type-check && npm run test && npm run build"
+  },
+  "type": "module",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
