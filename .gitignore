@@ -1,0 +1,6 @@
+node_modules
+out/
+supabase/.temp/
+.env.local
+.env.*.local
+coverage/

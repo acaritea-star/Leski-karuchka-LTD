@@ -2,63 +2,26 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { supabase } from '@/lib/supabase';
 import AppMenu from '@/pages/customer/components/AppMenu';
-
-const NOTIF_KEY = 'leski_notifications_enabled';
-const PAYMENT_KEY = 'leski_default_payment';
-
-const PAYMENT_OPTIONS = [
-  { id: 'cash', icon: 'ri-cash-line', labelKey: 'payment_cash' },
-  { id: 'card', icon: 'ri-bank-card-line', labelKey: 'payment_card' },
-  { id: 'online', icon: 'ri-global-line', labelKey: 'payment_online' },
-] as const;
-
-function readNotificationsFlag(): boolean {
-  try {
-    return localStorage.getItem(NOTIF_KEY) !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-function readDefaultPayment(): string {
-  try {
-    const saved = localStorage.getItem(PAYMENT_KEY);
-    return saved === 'card' || saved === 'online' ? saved : 'cash';
-  } catch {
-    return 'cash';
-  }
-}
 
 export default function CustomerSettings() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [notifications, setNotifications] = useState<boolean>(() => readNotificationsFlag());
-  const [payment, setPayment] = useState<string>(() => readDefaultPayment());
+  const { enabled: notifications, enable, unregister, enabling } = usePushNotifications();
+  const [notificationError, setNotificationError] = useState(false);
   const [lang, setLang] = useState<'bg' | 'en'>(() =>
     i18n.language?.startsWith('en') ? 'en' : 'bg',
   );
 
-  const toggleNotifications = () => {
-    const next = !notifications;
-    setNotifications(next);
-    try {
-      localStorage.setItem(NOTIF_KEY, String(next));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const changePayment = (method: string) => {
-    setPayment(method);
-    try {
-      localStorage.setItem(PAYMENT_KEY, method);
-    } catch {
-      /* ignore */
-    }
+  const toggleNotifications = async () => {
+    if (!user) return;
+    setNotificationError(false);
+    const ok = notifications ? await unregister(user.id) : await enable(user.id);
+    setNotificationError(!ok);
   };
 
   const changeLang = async (lng: 'bg' | 'en') => {
@@ -181,6 +144,8 @@ export default function CustomerSettings() {
                 type="button"
                 role="switch"
                 aria-checked={notifications}
+                aria-label={t('settings_notifications')}
+                disabled={enabling}
                 onClick={toggleNotifications}
                 className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 ${
                   notifications ? 'bg-primary-500' : 'bg-background-300'
@@ -193,6 +158,7 @@ export default function CustomerSettings() {
                 />
               </button>
             </div>
+            {notificationError && <p role="alert" className="text-sm text-red-600 mt-2">{t('enable_notifications_error')}</p>}
           </div>
 
           {/* Default payment */}
@@ -203,26 +169,9 @@ export default function CustomerSettings() {
                 {t('settings_payment_default')}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {PAYMENT_OPTIONS.map((p) => {
-                const active = payment === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => changePayment(p.id)}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
-                      active
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-background-100 text-foreground-500 hover:bg-background-200'
-                    }`}
-                  >
-                    <i className={`${p.icon} text-sm ${active ? 'text-white' : 'text-foreground-400'}`} />
-                    {t(p.labelKey)}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <i className="ri-cash-line" /> {t('payment_cash')}
+            </p>
           </div>
         </section>
 

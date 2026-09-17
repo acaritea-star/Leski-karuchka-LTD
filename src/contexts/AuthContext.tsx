@@ -1,5 +1,6 @@
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
+import { unregisterPush } from '@/lib/pushSubscription';
 import {
   createContext,
   useContext,
@@ -106,7 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
         if (retryDelaysMs[attempt] > 0) {
-          // eslint-disable-next-line no-await-in-loop
           await new Promise((resolve) => { setTimeout(resolve, retryDelaysMs[attempt]); });
         }
 
@@ -114,11 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Make sure the client actually holds a session before querying —
           // without it the request goes out unauthenticated and RLS returns
           // zero rows with no error.
-          // eslint-disable-next-line no-await-in-loop
           const { data: sessionData } = await supabase.auth.getSession();
           const hasToken = Boolean(sessionData.session?.access_token);
 
-          // eslint-disable-next-line no-await-in-loop
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -134,7 +132,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (data) {
-            // eslint-disable-next-line no-await-in-loop
             return await buildAppUser(data, authUser);
           }
 
@@ -258,12 +255,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     stopDriverGps();
+    if (session?.user.id) {
+      try { await unregisterPush(session.user.id); }
+      catch { console.warn('Push cleanup failed; notification permission can be revoked in browser settings.'); }
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     queryClient.clear();
     setUser(null);
     setSession(null);
-  }, []);
+  }, [session?.user.id]);
 
   const updateProfile = useCallback(
     async (updates: Partial<AppUser>): Promise<{ data: Tables<'profiles'> | null; error: { message: string } | null }> => {

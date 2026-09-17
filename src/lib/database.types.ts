@@ -515,6 +515,7 @@ Row: {
 "user_agent": string | null;
 "created_at": string | null;
 "updated_at": string | null;
+"is_active": boolean;
 };
 Insert: {
 "id"?: string;
@@ -525,6 +526,7 @@ Insert: {
 "user_agent"?: string | null;
 "created_at"?: string | null;
 "updated_at"?: string | null;
+"is_active"?: boolean;
 };
 Update: {
 "id"?: string;
@@ -535,6 +537,7 @@ Update: {
 "user_agent"?: string | null;
 "created_at"?: string | null;
 "updated_at"?: string | null;
+"is_active"?: boolean;
 };
 Relationships: [{"columns": ["user_id"], "isOneToOne": false, "foreignKeyName": "push_subscriptions_user_id_fkey", "referencedColumns": ["id"], "referencedRelation": "users"}]; };
 "ratings": {
@@ -922,7 +925,11 @@ Relationships: [{"columns": ["company_id"], "isOneToOne": false, "foreignKeyName
 "srid": number | null;
 "type": string | null;
 }; Relationships: []; };
-}; Functions: { create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] }; }; Enums: {
+}; Functions: {
+create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
+register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
+request_push_recipients: { Args: { p_request_id: string }; Returns: { user_id: string }[] };
+}; Enums: {
 "cancelled_by": "customer" | "driver" | "admin" | "system";
 "discount_type": "percent" | "fixed";
 "document_status": "pending" | "approved" | "rejected";

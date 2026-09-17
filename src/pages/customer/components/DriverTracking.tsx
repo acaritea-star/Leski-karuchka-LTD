@@ -142,7 +142,7 @@ export default function DriverTracking({
   const headingToPickup = request.status === 'accepted' || request.status === 'arrived';
   const isWaiting = request.status === 'arrived';
   const canCancel =
-    request.status === 'accepted' || request.status === 'arrived' || request.status === 'in_progress';
+    request.status === 'accepted' || request.status === 'arrived';
 
   const targetLat = headingToPickup ? request.pickup_latitude : request.destination_latitude;
   const targetLng = headingToPickup ? request.pickup_longitude : request.destination_longitude;
