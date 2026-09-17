@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
@@ -17,7 +17,8 @@ function roleHome(user: AppUser | null): string {
 }
 
 export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: AuthGuardProps) {
-  const { user, loading, session } = useAuth();
+  const { user, loading, session, refreshProfile, profileError } = useAuth();
+  const [retrying, setRetrying] = useState(false);
   const navigate = useNavigate();
 
   const rolesKey = allowedRoles ? allowedRoles.join(',') : '';
@@ -48,11 +49,28 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
   }
 
   if (!user && session) {
+    const onRetry = async () => {
+      setRetrying(true);
+      try {
+        await refreshProfile();
+      } finally {
+        setRetrying(false);
+      }
+    };
     return (
       <main className="min-h-screen flex items-center justify-center p-6">
         <div role="alert" className="max-w-sm text-center space-y-4">
           <p>Профилът не е достъпен в момента. Опитай отново или се свържи с поддръжката.</p>
-          <button onClick={() => window.location.reload()} className="rounded-xl bg-primary-500 text-white px-5 py-3">Опитай отново</button>
+          {profileError && (
+            <p className="text-xs text-foreground-400 break-words">Техническа причина: {profileError}</p>
+          )}
+          <button
+            onClick={onRetry}
+            disabled={retrying}
+            className="rounded-xl bg-primary-500 text-white px-5 py-3 whitespace-nowrap cursor-pointer disabled:opacity-60"
+          >
+            {retrying ? 'Зареждане…' : 'Опитай отново'}
+          </button>
           <a href="/auth/login" className="block underline">Към входа</a>
         </div>
       </main>

@@ -91,7 +91,6 @@ export default function CustomerHome() {
   const [destination, setDestination] = useState<Location | null>(null);
   const [selectingField, setSelectingField] = useState<SelectingField>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFareDetails, setShowFareDetails] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [showPermission, setShowPermission] = useState(false);
@@ -121,6 +120,11 @@ export default function CustomerHome() {
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
 
+  // Network connectivity state
+  const [offline, setOffline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false,
+  );
+
   const activeRequestId = activeRequest?.id;
 
   useEffect(() => {
@@ -139,6 +143,18 @@ export default function CustomerHome() {
       registerPush(user.id);
     }
   }, [user?.id, registerPush]);
+
+  // Track online/offline connectivity
+  useEffect(() => {
+    const onOnline = () => setOffline(false);
+    const onOffline = () => setOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   const fare = route?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
@@ -177,6 +193,20 @@ export default function CustomerHome() {
       setSearchQuery('');
     },
     [selectingField, addRecent],
+  );
+
+  // Quick-pick a recent address directly from the bottom sheet (no field selected)
+  const selectRecentQuick = useCallback(
+    (preset: LocationPreset) => {
+      addRecent(preset);
+      const loc: Location = { address: preset.address, lat: preset.lat, lng: preset.lng };
+      if (!pickup) {
+        setPickup(loc);
+      } else if (!destination) {
+        setDestination(loc);
+      }
+    },
+    [addRecent, pickup, destination],
   );
 
   // Detect user's current location via GPS
@@ -245,14 +275,14 @@ export default function CustomerHome() {
       const {data, error} = await supabase.rpc('create_taxi_request', {
         p_quote_id: route.quote_id, p_request_id: bookingId.current, p_payment_method: 'cash',
       });
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error('Заявката не е потвърдена. Опитай отново.');
+      if (error) throw new Error();
+      if (!data) throw new Error();
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
       void broadcastPushToDrivers(data.company_id, t('push_new_request_title'),
         t('push_new_request_body', {pickup:pickup?.address,dest:destination?.address}),
         {tag:`request-${data.id}`,data:{request_id:data.id}});
-    } catch (error) {
-      setRequestError(error instanceof Error ? error.message : t('request_failed'));
+    } catch {
+      setRequestError(t('request_failed_hint'));
       setRequestStatus('error');
     } finally { bookingInFlight.current = false; }
   };
@@ -353,12 +383,17 @@ export default function CustomerHome() {
       computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleType,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
-          setRoute(result);
-          if (!result?.quote_id) setRequestError('Не успяхме да потвърдим маршрут и цена. Натисни „Обнови цената“.');
+          if (!result) {
+            setRoute(null);
+            setRequestError(t('route_failed'));
+          } else {
+            setRoute(result);
+            setRequestError('');
+          }
         });
     }, 350);
     return () => { active = false; clearTimeout(timer); };
-  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId]);
+  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, t]);
 
   const cancelRequest = async () => {
     if (!activeRequest) return;
@@ -385,9 +420,9 @@ export default function CustomerHome() {
         setConfirmCancel(false);
         setRequestError(t('request_already_taken'));
       }
-    } catch (err: unknown) {
+    } catch {
       setConfirmCancel(false);
-      setRequestError(err instanceof Error ? err.message : t('request_failed'));
+      setRequestError(t('request_failed_hint'));
     }
   };
 
@@ -436,14 +471,20 @@ export default function CustomerHome() {
       if (user?.company_id) companies = companies.eq('id',user.company_id);
       const {data:company,error:companyError} = await companies.maybeSingle();
       if (companyError || !company) { if(active) setRequestError('Няма активна компания.'); return; }
-      const {data,error} = await supabase.from('vehicle_types').select('*').eq('company_id',company.id).eq('is_active',true).order('multiplier').order('id');
+      const {data,error} = await supabase.from('vehicle_types').select('*').eq('company_id',company.id).order('multiplier').order('id');
       if (!active) return;
-      if(error || !data?.length) { setRequestError('Няма налични типове автомобили.'); return; }
-      setVehicleTypes(data); setVehicleType(current => data.some(v=>v.id===current)?current:data[0].id);
+      if(error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
+      setVehicleTypes(data);
+      const firstAvailable = data.find(v => v.is_active);
+      setVehicleType(current => {
+        const cur = data.find(v => v.id === current);
+        if (cur && cur.is_active) return current;
+        return firstAvailable ? firstAvailable.id : '';
+      });
     };
     void load();
     return () => {active=false;};
-  }, [user?.company_id]);
+  }, [user?.company_id, t]);
 
   // Redirect to orders after trip completed or cancelled
   useEffect(() => {
@@ -493,66 +534,45 @@ export default function CustomerHome() {
   return (
     <div className="relative h-[100dvh] bg-background-50 overflow-hidden lg:flex">
       {/* ===== MAP BACKGROUND ===== */}
-      <div className="absolute inset-0 z-0 h-[100dvh] lg:inset-auto lg:relative lg:h-full lg:flex-1 lg:min-w-0">
-        <BookingMap
-          pickup={pickup}
-          destination={destination}
-        />
-        <div className="absolute inset-0 z-[5] bg-gradient-to-b from-background-50/30 via-background-50/10 to-background-50 pointer-events-none" />
-        {pickup && (
-          <div className="absolute top-[70px] left-3 z-10 bg-white/95 backdrop-blur rounded-full pl-2.5 pr-3 py-1.5 flex items-center gap-1.5 border border-background-100 shadow-sm max-w-[70%] lg:top-4 lg:left-4">
-            <i className="ri-map-pin-2-fill text-primary-500 text-xs" />
-            <span className="text-[11px] font-medium text-foreground-700 truncate">
-              {pickup.address}
-            </span>
-          </div>
-        )}
+      <div className="absolute inset-0 z-0 lg:relative lg:flex-1 lg:min-w-0">
+        <BookingMap pickup={pickup} destination={destination} />
       </div>
 
-      {/* ===== CONTENT ===== */}
-      <div className="relative z-10 flex flex-col h-[100dvh] overflow-hidden lg:h-full lg:w-[420px] lg:shrink-0 lg:bg-background-50 lg:border-l lg:border-background-100 lg:overflow-y-auto">
-        {/* Header */}
-        <header className="px-4 pt-3 pb-1 flex items-center justify-between lg:px-5 lg:pt-4">
-          <div className="flex items-center gap-2.5">
-            <img
-              src={LOGO_URL}
-              alt={t('app_name')}
-              className="h-7 w-auto rounded-md bg-white shadow-sm"
-            />
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-foreground-950 font-heading leading-tight tracking-tight">
-                {t('app_name')}
-              </span>
-              <span className="text-[10px] font-semibold text-primary-700 leading-none">
-                {t('service_area_label')}
-              </span>
-            </div>
+      {/* ===== COMPACT FLOATING HEADER ===== */}
+      <header
+        className="absolute top-0 left-0 right-0 z-20 bg-white border-b border-background-100 lg:right-[420px]"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="h-14 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <img src={LOGO_URL} alt={t('app_name')} className="h-8 w-8 rounded-lg object-cover" />
+            <span className="text-[15px] font-bold text-foreground-950 font-heading leading-tight whitespace-nowrap">
+              {t('app_name')}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <NotificationBell />
             <AppMenu />
           </div>
-        </header>
-
-        {/* Greeting */}
-        <div className="px-4 pt-2 pb-1 rise-in lg:px-5 lg:pt-3">
-          <h1 className="text-2xl font-bold text-foreground-950 font-heading leading-tight">
-            {t('greeting_hello')}, <span className="text-primary-600">{firstName}</span>
-          </h1>
-          <p className="text-sm text-foreground-600 mt-0.5">
-            {t('where_to_subtitle')}
-          </p>
         </div>
+      </header>
 
-        {/* Enable push notifications (iOS requires a user tap) */}
-        <EnableNotificationsBanner />
+      {/* ===== OFFLINE BANNER ===== */}
+      {offline && (
+        <div className="absolute top-20 left-4 right-4 z-30 lg:right-[436px] flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5">
+          <i className="ri-wifi-off-line text-red-500 text-lg" />
+          <p className="text-[14px] font-medium text-red-700">{t('offline_message')}</p>
+        </div>
+      )}
 
-        {/* Spacer (mobile only — pushes panel to bottom over the map) */}
-        <div className="flex-1 min-h-0 lg:hidden" />
+      {/* ===== BOTTOM SHEET ===== */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 lg:static lg:w-[420px] lg:shrink-0 lg:h-full lg:flex lg:flex-col lg:bg-white lg:border-l lg:border-background-100">
+        <div className="mx-auto w-full max-w-md lg:max-w-none lg:flex-1 lg:flex lg:flex-col">
+          <div className="bg-white rounded-t-[16px] lg:rounded-none border-t border-background-100 lg:border-t-0 shadow-[0_-6px_24px_rgba(0,0,0,0.06)] lg:shadow-none max-h-[78vh] overflow-y-auto lg:max-h-none lg:flex-1 lg:h-full">
+            <div className="sticky top-0 z-10 flex justify-center pt-2.5 pb-1.5 bg-white lg:hidden">
+              <div className="w-10 h-1.5 rounded-full bg-background-200" />
+            </div>
 
-        {/* Bottom panel */}
-        <div className="px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:px-6 lg:px-4 lg:pb-6 lg:pt-2">
-          <div className="mx-auto w-full max-w-md rise-in lg:max-w-none" style={{ animationDelay: '120ms' }}>
             {activeRequest && activeRequest.status ? (
               <RequestStatusCard
                 request={activeRequest}
@@ -568,52 +588,71 @@ export default function CustomerHome() {
               />
             ) : (
               <>
-              <BookingCard
-                pickup={pickup}
-                destination={destination}
-                selectingField={selectingField}
-                onFieldClick={handleFieldClick}
-                onClearPickup={() => setPickup(null)}
-                onClearDestination={() => setDestination(null)}
-                onSwap={swapLocations}
-                vehicleType={vehicleType}
-                onVehicleTypeChange={setVehicleType}
-                vehicleOptions={vehicleTypes.map(v=>({id:v.id,label:v.name,icon:v.capacity>4?'ri-bus-line':'ri-car-line'}))}
-                paymentMethod={paymentMethod}
-                onPaymentMethodChange={() => {}}
-                fare={fare}
-                priceIsEstimate={priceIsEstimate}
-                showFareDetails={showFareDetails}
-                onToggleFareDetails={() => setShowFareDetails(!showFareDetails)}
-                canRequest={canRequest}
-                creating={requestStatus === 'creating'}
-                onRequest={createRequest}
-                requestError={requestError}
-              />
-              {pickup && destination && <button type="button" className="w-full py-3 text-sm underline" disabled={requestStatus === 'creating'} onClick={() => setQuoteRefresh(n=>n+1)}>Обнови цената</button>}
+                <EnableNotificationsBanner />
+                <BookingCard
+                  pickup={pickup}
+                  destination={destination}
+                  firstName={firstName}
+                  locating={locating}
+                  recent={recent}
+                  onSelectRecent={selectRecentQuick}
+                  onFieldClick={handleFieldClick}
+                  onClearPickup={() => setPickup(null)}
+                  onClearDestination={() => setDestination(null)}
+                  onSwap={swapLocations}
+                  onUseMyLocation={() => detectLocation('pickup')}
+                  vehicleType={vehicleType}
+                  onVehicleTypeChange={setVehicleType}
+                  vehicleOptions={vehicleTypes.map((v) => ({
+                    id: v.id,
+                    name: v.name,
+                    capacity: v.capacity,
+                    available: v.is_active,
+                  }))}
+                  fare={fare}
+                  priceIsEstimate={priceIsEstimate}
+                  onRefreshPrice={() => setQuoteRefresh((n) => n + 1)}
+                  canRequest={canRequest}
+                  creating={requestStatus === 'creating'}
+                  onRequest={createRequest}
+                  requestError={requestError}
+                />
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Location Picker Sheet */}
+      {/* ===== FULL-SCREEN LOCATION PICKER ===== */}
       {selectingField && !activeRequest && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectingField(null)} />
-          <div className="relative mx-auto max-w-md w-full px-3 pb-4 pt-2 animate-in slide-in-from-bottom-6 fade-in duration-300">
-            <div className="w-10 h-1 rounded-full bg-white/80 mx-auto mb-2" />
-            <div className="max-h-[65vh] overflow-y-auto rounded-2xl">
-              <LocationPicker
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                locating={locating}
-                locationError={locationError}
-                recent={recent}
-                onUseCurrent={() => detectLocation(selectingField || 'pickup')}
-                onSelect={selectLocation}
-              />
-            </div>
+        <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+          <div
+            className="flex items-center gap-1 px-2 border-b border-background-100"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectingField(null)}
+              aria-label={t('back')}
+              className="w-11 h-12 flex items-center justify-center cursor-pointer"
+            >
+              <i className="ri-arrow-left-line text-2xl text-foreground-700" />
+            </button>
+            <h2 className="text-[18px] font-bold text-foreground-950 font-heading">
+              {selectingField === 'pickup' ? t('pickup_search_title') : t('dest_search_title')}
+            </h2>
+          </div>
+          <div className="flex-1 min-h-0">
+            <LocationPicker
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              locating={locating}
+              locationError={locationError}
+              recent={recent}
+              onUseCurrent={() => detectLocation(selectingField || 'pickup')}
+              onSelect={selectLocation}
+              showCurrentLocation={selectingField === 'pickup'}
+            />
           </div>
         </div>
       )}
@@ -622,7 +661,7 @@ export default function CustomerHome() {
       {showPermission && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={chooseManually} />
-          <div className="relative bg-white rounded-t-3xl w-full max-w-md p-6 pb-8 animate-in slide-in-from-bottom-6 fade-in duration-300">
+          <div className="relative bg-white rounded-t-3xl w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-300">
             <div className="w-10 h-1 rounded-full bg-background-200 mx-auto mb-5" />
             <div className="w-14 h-14 rounded-2xl bg-accent-100 flex items-center justify-center mx-auto mb-4">
               <i className="ri-map-pin-range-line text-2xl text-accent-600" />

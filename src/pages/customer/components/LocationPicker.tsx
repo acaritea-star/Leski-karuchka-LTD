@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BULGARIA_CITIES, type LocationPreset } from '@/lib/geo';
+import type { LocationPreset } from '@/lib/geo';
 import {
   hasPlacesApi,
   searchPlaces,
@@ -16,6 +16,7 @@ interface LocationPickerProps {
   recent: LocationPreset[];
   onUseCurrent: () => void;
   onSelect: (preset: LocationPreset) => void;
+  showCurrentLocation?: boolean;
 }
 
 export default function LocationPicker({
@@ -26,6 +27,7 @@ export default function LocationPicker({
   recent,
   onUseCurrent,
   onSelect,
+  showCurrentLocation = true,
 }: LocationPickerProps) {
   const { t } = useTranslation();
 
@@ -40,21 +42,16 @@ export default function LocationPicker({
   const trimmed = searchQuery.trim();
   const placesEnabled = hasPlacesApi();
 
-  const popular = trimmed
-    ? BULGARIA_CITIES.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmed.toLowerCase()) ||
-          p.address.toLowerCase().includes(trimmed.toLowerCase())
-      )
-    : BULGARIA_CITIES;
-
+  const recentUnique = recent.filter(
+    (p, i, arr) => arr.findIndex((x) => x.address === p.address) === i,
+  );
   const recentFiltered = trimmed
-    ? recent.filter(
+    ? recentUnique.filter(
         (p) =>
           p.name.toLowerCase().includes(trimmed.toLowerCase()) ||
           p.address.toLowerCase().includes(trimmed.toLowerCase())
       )
-    : recent;
+    : recentUnique.slice(0, 3);
 
   // Debounced Google Places autocomplete search
   useEffect(() => {
@@ -102,176 +99,156 @@ export default function LocationPicker({
     }
   };
 
-  const showPopular =
-    !trimmed ||
-    !placesEnabled ||
-    placeError !== '' ||
-    (googleResults.length === 0 && !searchingPlaces);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && googleResults.length > 0) {
+      e.preventDefault();
+      void selectGooglePlace(googleResults[0]);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
-      {/* Search bar */}
-      <div className="relative mb-3">
-        <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
-        <input
-          type="text"
-          placeholder={t('search_placeholder')}
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-9 pr-9 py-3 bg-background-50 rounded-xl text-sm text-foreground-950 placeholder:text-foreground-400 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all"
-          autoFocus
-        />
-        {searchQuery && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-background-200 transition-colors cursor-pointer"
-          >
-            <i className="ri-close-line text-foreground-400 text-sm" />
-          </button>
-        )}
+    <div className="flex flex-col h-full bg-white">
+      {/* Search bar (sticky top) */}
+      <div className="px-4 pt-2 pb-2 border-b border-background-100 bg-white">
+        <div className="relative">
+          <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground-400 text-lg" />
+          <input
+            type="text"
+            placeholder={t('search_placeholder')}
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            enterKeyHint="search"
+            autoComplete="off"
+            className="w-full pl-11 pr-11 py-3 bg-background-50 rounded-2xl text-[17px] text-foreground-950 placeholder:text-foreground-500 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all"
+            autoFocus
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-background-200 transition-colors cursor-pointer"
+              aria-label="clear"
+            >
+              <i className="ri-close-line text-foreground-400 text-lg" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Use current location */}
-      <button
-        onClick={onUseCurrent}
-        disabled={locating}
-        className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-accent-50 hover:bg-accent-100 transition-colors cursor-pointer mb-3 text-left disabled:opacity-60"
-      >
-        <div className="w-10 h-10 rounded-lg bg-accent-500 flex items-center justify-center flex-shrink-0">
-          {locating ? (
-            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          ) : (
-            <i className="ri-focus-3-line text-white text-lg" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-semibold text-accent-700 block">
-            {locating ? t('detecting_location') : t('use_current_location')}
-          </span>
-          <span className="text-xs text-accent-600/70 block truncate">{t('current_location_hint')}</span>
-        </div>
-      </button>
+      {/* Scrollable results */}
+      <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+        {/* Use current location (only for pickup, not destination) */}
+        {showCurrentLocation && (
+          <button
+            onClick={onUseCurrent}
+            disabled={locating}
+            className="w-full flex items-center gap-3 py-3 cursor-pointer text-left disabled:opacity-60 mt-1"
+          >
+            <span className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center flex-shrink-0">
+              {locating ? (
+                <span className="w-5 h-5 border-2 border-accent-400 border-t-accent-600 rounded-full animate-spin" />
+              ) : (
+                <i className="ri-focus-3-line text-accent-600 text-xl" />
+              )}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="text-[16px] font-semibold text-foreground-900 block">
+                {locating ? t('detecting_location') : t('use_current_location')}
+              </span>
+              <span className="text-[14px] text-foreground-500 block truncate">
+                {t('current_location_hint')}
+              </span>
+            </span>
+          </button>
+        )}
 
-      {locationError && !locating && (
-        <p className="text-xs text-primary-600 flex items-center gap-1.5 mb-3 px-1">
-          <i className="ri-error-warning-line" />
-          {locationError}
-        </p>
-      )}
-
-      {/* Google Places search results (real addresses) */}
-      {trimmed && placesEnabled && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-foreground-400 uppercase tracking-wider mb-2 px-1">
-            {t('places_results')}
+        {locationError && !locating && (
+          <p className="text-[14px] text-red-600 flex items-start gap-1.5 my-2 px-1">
+            <i className="ri-error-warning-line mt-0.5" />
+            {locationError}
           </p>
+        )}
 
-          {searchingPlaces ? (
-            <div className="flex items-center justify-center gap-2 py-4 text-foreground-400">
-              <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs">{t('places_searching')}</span>
-            </div>
-          ) : placeError ? (
-            <div className="text-center py-4">
-              <i className="ri-cloud-off-line text-2xl text-foreground-300" />
-              <p className="text-sm text-foreground-500 mt-2">{placeError}</p>
-            </div>
-          ) : googleResults.length > 0 ? (
-            <div className="space-y-1 max-h-[240px] overflow-y-auto">
-              {googleResults.map((p) => (
-                <button
-                  key={p.place_id}
-                  onClick={() => selectGooglePlace(p)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-accent-100 flex items-center justify-center flex-shrink-0">
-                    {resolvingId === p.place_id ? (
-                      <div className="w-4 h-4 border-2 border-accent-300 border-t-accent-600 rounded-full animate-spin" />
-                    ) : (
-                      <i className="ri-map-pin-2-line text-accent-600 text-base" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground-900 block leading-snug truncate">
-                      {p.main_text || p.description}
+        {/* Google Places results (real addresses) */}
+        {trimmed && placesEnabled && (
+          <div className="mt-1">
+            {searchingPlaces ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-foreground-500">
+                <span className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-[15px]">{t('places_searching')}</span>
+              </div>
+            ) : placeError ? (
+              <div className="text-center py-8">
+                <i className="ri-cloud-off-line text-2xl text-foreground-300" />
+                <p className="text-[15px] text-foreground-600 mt-2">{placeError}</p>
+              </div>
+            ) : googleResults.length > 0 ? (
+              <div className="space-y-1">
+                {googleResults.map((p) => (
+                  <button
+                    key={p.place_id}
+                    onClick={() => selectGooglePlace(p)}
+                    className="w-full flex items-center gap-3 py-3 px-1 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center flex-shrink-0">
+                      {resolvingId === p.place_id ? (
+                        <span className="w-4 h-4 border-2 border-accent-300 border-t-accent-600 rounded-full animate-spin" />
+                      ) : (
+                        <i className="ri-map-pin-2-line text-accent-600 text-lg" />
+                      )}
                     </span>
-                    {p.secondary_text && (
-                      <span className="text-xs text-foreground-500 block leading-snug truncate mt-0.5">
-                        {p.secondary_text}
+                    <span className="flex-1 min-w-0">
+                      <span className="text-[16px] font-medium text-foreground-900 block leading-snug truncate">
+                        {p.main_text || p.description}
                       </span>
-                    )}
-                  </div>
-                  {resolvingId !== p.place_id && (
-                    <i className="ri-arrow-right-s-line text-foreground-300 text-lg flex-shrink-0" />
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <i className="ri-search-line text-2xl text-foreground-300" />
-              <p className="text-sm text-foreground-500 mt-2">{t('no_results')}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Recent locations (only when not typing) */}
-      {!trimmed && recentFiltered.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-foreground-400 uppercase tracking-wider mb-2 px-1">
-            {t('recent_locations')}
-          </p>
-          <div className="space-y-1">
-            {recentFiltered.map((preset) => (
-              <LocationRow key={`recent-${preset.id}-${preset.address}`} preset={preset} onSelect={onSelect} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Popular locations (fallback list, kept for offline / no-query state) */}
-      {showPopular && (
-        <div className={trimmed ? 'max-h-[260px] overflow-y-auto' : ''}>
-          <p className="text-xs font-semibold text-foreground-400 uppercase tracking-wider mb-2 px-1">
-            {t('popular_locations')}
-          </p>
-          <div className="space-y-1">
-            {popular.map((preset) => (
-              <LocationRow key={preset.id} preset={preset} onSelect={onSelect} />
-            ))}
-            {popular.length === 0 && (
-              <div className="text-center py-6">
-                <i className="ri-map-pin-line text-2xl text-foreground-300" />
-                <p className="text-sm text-foreground-500 mt-2">{t('no_results')}</p>
+                      {p.secondary_text && (
+                        <span className="text-[14px] text-foreground-500 block leading-snug truncate mt-0.5">
+                          {p.secondary_text}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <i className="ri-search-line text-2xl text-foreground-300" />
+                <p className="text-[15px] text-foreground-600 mt-2">{t('no_address_found')}</p>
               </div>
             )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        )}
 
-function LocationRow({
-  preset,
-  onSelect,
-}: {
-  preset: LocationPreset;
-  onSelect: (preset: LocationPreset) => void;
-}) {
-  return (
-    <button
-      onClick={() => onSelect(preset)}
-      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
-    >
-      <div className="w-9 h-9 rounded-lg bg-background-100 flex items-center justify-center flex-shrink-0">
-        <i className="ri-map-pin-line text-foreground-500 text-base" />
+        {/* Recent locations (only when not typing) */}
+        {!trimmed && recentFiltered.length > 0 && (
+          <div className="mt-1">
+            <p className="text-[13px] font-semibold text-foreground-500 mb-1.5 px-1">
+              {t('recent_locations')}
+            </p>
+            <div className="space-y-1">
+              {recentFiltered.map((preset) => (
+                <button
+                  key={`recent-${preset.id}-${preset.address}`}
+                  onClick={() => onSelect(preset)}
+                  className="w-full flex items-center gap-3 py-3 px-1 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
+                >
+                  <span className="w-10 h-10 rounded-lg bg-background-100 flex items-center justify-center flex-shrink-0">
+                    <i className="ri-time-line text-foreground-500 text-lg" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="text-[16px] font-medium text-foreground-900 block truncate">
+                      {preset.name || preset.address}
+                    </span>
+                    <span className="text-[14px] text-foreground-500 block truncate">
+                      {preset.address}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-foreground-900 block truncate">{preset.name}</span>
-        <span className="text-xs text-foreground-500 truncate block">{preset.address}</span>
-      </div>
-    </button>
+    </div>
   );
 }

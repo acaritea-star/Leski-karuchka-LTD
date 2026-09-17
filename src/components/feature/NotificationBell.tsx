@@ -130,7 +130,7 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 transition-colors cursor-pointer"
+        className="relative w-11 h-11 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
       >
         <i className="ri-notification-3-line text-foreground-600 text-lg" />
         {unread > 0 && (
