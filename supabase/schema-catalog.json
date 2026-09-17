@@ -147,6 +147,17 @@
   ],
   "columns": [
     {
+      "table_name": "push_subscriptions",
+      "column_name": "is_active",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "true",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
       "table_name": "ride_quotes",
       "column_name": "request_id",
       "ordinal_position": 8,

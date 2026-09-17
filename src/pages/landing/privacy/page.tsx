@@ -112,7 +112,6 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-2 mt-2">
               <li>Съответната компания за каручки, чийто шофьор изпълнява поръчката.</li>
-              <li>Платежни доставчици (Stripe, PayPal) — само за обработка на транзакции.</li>
               <li>Google Maps / Geocoding — само адреси (без име/телефон) за маршрутизация.</li>
               <li>Държавни органи — само при законово изискване.</li>
             </ul>

@@ -48,8 +48,8 @@ export async function sendPushToUser(
 }
 
 /**
- * Broadcast a push notification to ALL online drivers in a company.
- * Use this when a new taxi request is created.
+ * Notify eligible nearby drivers. options.data.request_id identifies the order;
+ * the server verifies ownership and uses the database's dispatch rule.
  */
 export async function broadcastPushToDrivers(
   companyId: string,

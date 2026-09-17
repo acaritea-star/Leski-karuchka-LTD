@@ -33,7 +33,11 @@ for name in sorted(s.get('views',[])):
  for c in sorted(tables[name],key=lambda c:c['ordinal_position']):
   a.append(json.dumps(c['column_name'])+': '+typ(c)+(' | null' if c['is_nullable']=='YES' else '')+';')
  a.append('}; Relationships: []; };')
-a.append('}; Functions: { create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] }; }; Enums: {')
+a.append('''}; Functions: {
+create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
+register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
+request_push_recipients: { Args: { p_request_id: string }; Returns: { user_id: string }[] };
+}; Enums: {''')
 for name,labels in sorted(enums.items()):a.append(json.dumps(name)+': '+' | '.join(map(json.dumps,labels))+';')
 a+=['}; CompositeTypes: { [_ in never]: never }; }; };','export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];','export type TablesInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];','export type TablesUpdate<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"];','export type Enums<T extends keyof Database["public"]["Enums"]> = Database["public"]["Enums"][T];']
 open(sys.argv[2],'w').write('\n'.join(a)+'\n')

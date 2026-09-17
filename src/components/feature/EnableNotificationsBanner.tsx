@@ -8,7 +8,7 @@ const DISMISS_KEY = 'leski_notifications_dismissed';
 export default function EnableNotificationsBanner() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { enable, permission, enabling } = usePushNotifications();
+  const { enable, permission, enabling, enabled } = usePushNotifications();
   const [dismissed, setDismissed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(DISMISS_KEY) === 'true';
@@ -21,7 +21,7 @@ export default function EnableNotificationsBanner() {
 
   if (!user?.id) return null;
   if (dismissed) return null;
-  if (permission === 'granted') return null;
+  if (enabled) return null;
   if (permission === 'denied') return null;
 
   const persistDismiss = () => {

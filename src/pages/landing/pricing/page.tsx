@@ -39,7 +39,7 @@ export default function PricingPage() {
       desc: t('landing.pricing_std_desc'),
       price: '2.50',
       icon: 'ri-roadster-line',
-      features: ['4 пътници', 'Климатик', 'Кеш / карта / онлайн'],
+      features: ['4 пътници', 'Климатик', 'Плащане в брой'],
     },
     {
       name: t('landing.pricing_comfort'),
@@ -201,12 +201,6 @@ export default function PricingPage() {
             <div className="flex flex-wrap justify-center gap-3">
               <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-background-100 text-foreground-700 text-sm font-semibold whitespace-nowrap">
                 <i className="ri-cash-line text-primary-500" /> Кеш
-              </span>
-              <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-background-100 text-foreground-700 text-sm font-semibold whitespace-nowrap">
-                <i className="ri-bank-card-line text-primary-500" /> Карта
-              </span>
-              <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-background-100 text-foreground-700 text-sm font-semibold whitespace-nowrap">
-                <i className="ri-smartphone-line text-primary-500" /> Онлайн
               </span>
             </div>
           </Reveal>

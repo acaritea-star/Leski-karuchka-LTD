@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
 
     const payload: PushPayload = await req.json();
 
-    if (!payload.user_id && !payload.company_id) {
-      return new Response(JSON.stringify({ error: 'Missing user_id or company_id' }), {
+    if (!!payload.user_id === !!payload.company_id) {
+      return new Response(JSON.stringify({ error: 'Provide exactly one recipient target' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
@@ -83,9 +83,11 @@ Deno.serve(async (req) => {
 
     if (typeof payload.title !== 'string' || typeof payload.body !== 'string' || payload.title.length>150 || payload.body.length>1000) return json({error:'Invalid message'},400);
     if (payload.company_id) {
+      const requestId = payload.data?.request_id;
+      if (typeof requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) return json({error:'Invalid request_id'},400);
       const {data:ride} = await admin.from('taxi_requests').select('id,pickup_address,destination_address')
-        .eq('company_id',payload.company_id).eq('customer_id',actor.id).eq('status','pending')
-        .gte('created_at',new Date(Date.now()-120000).toISOString()).order('created_at',{ascending:false}).limit(1).maybeSingle();
+        .eq('id',requestId).eq('company_id',payload.company_id).eq('customer_id',actor.id).eq('status','pending')
+        .gte('created_at',new Date(Date.now()-120000).toISOString()).maybeSingle();
       if (!ride) return json({error:'No matching pending ride'},403);
       payload.title='Нова заявка'; payload.body=`${ride.pickup_address} → ${ride.destination_address}`;
       payload.data={request_id:ride.id,type:'new_request',role:'DRIVER'};
@@ -111,22 +113,24 @@ Deno.serve(async (req) => {
         const { data, error } = await adminClient
           .from('push_subscriptions')
           .select('endpoint, p256dh, auth')
+          .eq('is_active', true)
           .eq('user_id', payload.user_id);
-        if (!error && data) subscriptions = data;
+        if (error) throw error;
+        if (data) subscriptions = data;
       } else if (payload.company_id) {
-        // Find online drivers for this company, then their subscriptions
-        const { data: onlineDrivers } = await adminClient
-          .from('drivers')
-          .select('user_id')
-          .eq('company_id', payload.company_id)
-          .eq('is_online', true);
+        // The database uses the same GPS/vehicle rule as feed access and acceptance.
+        const { data: onlineDrivers, error: recipientError } = await adminClient
+          .rpc('request_push_recipients', { p_request_id: payload.data?.request_id });
+        if (recipientError) throw recipientError;
 
         if (onlineDrivers && onlineDrivers.length > 0) {
-          const userIds = onlineDrivers.map((d) => d.user_id);
-          const { data } = await adminClient
+          const userIds = onlineDrivers.map((d: { user_id: string }) => d.user_id);
+          const { data, error } = await adminClient
             .from('push_subscriptions')
             .select('endpoint, p256dh, auth')
+            .eq('is_active', true)
             .in('user_id', userIds);
+          if (error) throw error;
           if (data) subscriptions = data;
         }
       }
