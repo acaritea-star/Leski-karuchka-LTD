@@ -5,30 +5,19 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NotificationBell from '@/components/feature/NotificationBell';
-import EnableNotificationsBanner from '@/components/feature/EnableNotificationsBanner';
 import DriverTracking from '@/pages/customer/components/DriverTracking';
 import LocationPicker from '@/pages/customer/components/LocationPicker';
 import AppMenu from '@/pages/customer/components/AppMenu';
 import BookingCard from '@/pages/customer/components/BookingCard';
 import RequestStatusCard from '@/pages/customer/components/RequestStatusCard';
 import BookingMap from '@/pages/customer/components/BookingMap';
-import WelcomeOnboarding from '@/pages/customer/components/WelcomeOnboarding';
+import CustomerLayout, { BookingSkeleton } from '@/pages/customer/components/CustomerLayout';
+import BookingSteps from '@/pages/customer/components/BookingSteps';
+import { recentLocations, stepAfterSelection, type BookingStep } from '@/pages/customer/components/bookingFlow';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { broadcastPushToDrivers } from '@/lib/push';
-import {
-  calculateDistance,
-  estimateDuration,
-  type LocationPreset,
-} from '@/lib/geo';
+import type { LocationPreset } from '@/lib/geo';
 import { computeRoute, reverseGeocode, type RouteResult } from '@/lib/googleMaps';
-import {
-  DEFAULT_PRICING,
-  pricingFromRow,
-  applyVehicleMultiplier,
-  calculateFare,
-  type PricingConfig,
-  type FareBreakdown,
-} from '@/lib/pricing';
 import { LOGO_URL } from '@/lib/logo';
 
 // Types
@@ -53,20 +42,17 @@ interface ActiveRequest {
   cancelled_by?: string | null;
 }
 
-type SelectingField = 'pickup' | 'dest' | null;
 type RequestStatus = 'idle' | 'creating' | 'created' | 'error';
-type PaymentMethod = 'cash' | 'card' | 'online';
 
 const TRACKING_STATUSES: Tables<'taxi_requests'>['status'][] = ['accepted', 'arrived', 'in_progress'];
 
 const RECENT_KEY = 'leski_recent_locations';
-const LOCATION_PERMISSION_KEY = 'leski_location_permission';
 const MAX_RECENT = 5;
 
 function loadRecent(): LocationPreset[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
-    return raw ? (JSON.parse(raw) as LocationPreset[]) : [];
+    return raw ? recentLocations(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
@@ -89,18 +75,10 @@ export default function CustomerHome() {
   // Location state
   const [pickup, setPickup] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
-  const [selectingField, setSelectingField] = useState<SelectingField>(null);
+  const [step, setStep] = useState<BookingStep>('pickup');
   const [searchQuery, setSearchQuery] = useState('');
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
-  const [showPermission, setShowPermission] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('leski_onboarded') !== 'true';
-    } catch {
-      return true;
-    }
-  });
   const [recent, setRecent] = useState<LocationPreset[]>(() => loadRecent());
 
   // Request state
@@ -108,17 +86,26 @@ export default function CustomerHome() {
   const [activeRequest, setActiveRequest] = useState<ActiveRequest | null>(null);
   const [requestError, setRequestError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [recovering, setRecovering] = useState(true);
+  const [recoveryError, setRecoveryError] = useState(false);
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
 
   // Booking options
-  const paymentMethod = 'cash';
   const [vehicleType, setVehicleType] = useState('');
   const [vehicleTypes, setVehicleTypes] = useState<Tables<'vehicle_types'>[]>([]);
   const [quoteRefresh, setQuoteRefresh] = useState(0);
+  const [configAttempt, setConfigAttempt] = useState(0);
   const bookingId = useRef(crypto.randomUUID());
   const bookingInFlight = useRef(false);
 
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
+  const [routeInput, setRouteInput] = useState('');
+  const [calculating, setCalculating] = useState(false);
+  const quoteInput = JSON.stringify([pickup, destination, vehicleType]);
+  const currentRoute = routeInput === quoteInput ? route : null;
+  const gpsRevision = useRef(0);
 
   // Network connectivity state
   const [offline, setOffline] = useState<boolean>(
@@ -135,7 +122,7 @@ export default function CustomerHome() {
 
   // Realtime subscription ref
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const autoLocatedRef = useRef(false);
+  useEffect(() => () => { ++gpsRevision.current; }, []);
 
   // Register for push notifications
   useEffect(() => {
@@ -156,18 +143,16 @@ export default function CustomerHome() {
     };
   }, []);
 
-  const fare = route?.breakdown ?? null;
+  const fare = currentRoute?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
-  const priceIsEstimate = !route?.quote_id;
-  const canRequest = !!route?.quote_id && !!route.quote_expires_at && Date.parse(route.quote_expires_at) > Date.now()
-    && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest;
+  const canRequest = !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
+    && !!fare && Number.isFinite(fare.total) && fare.total >= 0
+    && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError && !offline;
 
   const isTracking =
     !!activeRequest &&
     !!activeRequest.driver_id &&
     TRACKING_STATUSES.includes(activeRequest.status);
-
-  const firstName = (user?.first_name || user?.email?.split('@')[0] || '').trim();
 
   // Save a recently used location
   const addRecent = useCallback((preset: LocationPreset) => {
@@ -183,79 +168,66 @@ export default function CustomerHome() {
     (preset: LocationPreset) => {
       addRecent(preset);
       const loc: Location = { address: preset.address, lat: preset.lat, lng: preset.lng };
-      if (selectingField === 'pickup') {
+      ++gpsRevision.current;
+      setLocating(false);
+      setLocationError('');
+      if (step === 'pickup') {
         setPickup(loc);
-        setSelectingField('dest');
-      } else if (selectingField === 'dest') {
+        setStep(stepAfterSelection('pickup', !!destination));
+      } else if (step === 'dest') {
         setDestination(loc);
-        setSelectingField(null);
+        setStep(stepAfterSelection('dest', !!pickup));
       }
       setSearchQuery('');
     },
-    [selectingField, addRecent],
-  );
-
-  // Quick-pick a recent address directly from the bottom sheet (no field selected)
-  const selectRecentQuick = useCallback(
-    (preset: LocationPreset) => {
-      addRecent(preset);
-      const loc: Location = { address: preset.address, lat: preset.lat, lng: preset.lng };
-      if (!pickup) {
-        setPickup(loc);
-      } else if (!destination) {
-        setDestination(loc);
-      }
-    },
-    [addRecent, pickup, destination],
+    [step, pickup, destination, addRecent],
   );
 
   // Detect user's current location via GPS
   const detectLocation = useCallback(
-    (target: 'pickup' | 'dest' | 'auto') => {
+    () => {
       if (!('geolocation' in navigator)) {
         setLocationError(t('location_denied'));
-        localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
         return;
       }
       setLocating(true);
       setLocationError('');
+      const revision = ++gpsRevision.current;
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          localStorage.setItem(LOCATION_PERMISSION_KEY, 'granted');
           const { latitude, longitude } = pos.coords;
           // Resolve a precise street address from the GPS fix; fall back to the
           // generic label only if reverse geocoding is unavailable.
           let address = t('current_location');
           const geo = await reverseGeocode(latitude, longitude);
+          if (gpsRevision.current !== revision) return;
           if (geo?.formatted_address) {
             address = geo.formatted_address;
           }
           const loc: Location = { address, lat: latitude, lng: longitude };
-          if (target === 'dest') {
-            setDestination(loc);
-            setSelectingField(null);
-          } else {
-            setPickup(loc);
-            setSelectingField('dest');
-          }
+          setPickup(loc);
+          setStep(stepAfterSelection('pickup', !!destination));
           setSearchQuery('');
           setLocating(false);
         },
         () => {
-          localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+          if (gpsRevision.current !== revision) return;
           setLocating(false);
           setLocationError(t('location_denied'));
         },
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
       );
     },
-    [t],
+    [t, destination],
   );
 
   // Handle field click
-  const handleFieldClick = (field: SelectingField) => {
-    if (activeRequest) return;
-    setSelectingField(selectingField === field ? null : field);
+  const handleFieldClick = (field: BookingStep) => {
+    if (activeRequest || bookingInFlight.current || (field === 'confirm' && (!pickup || !destination))) return;
+    ++gpsRevision.current;
+    setLocating(false);
+    setLocationError('');
+    setStep(field);
     setSearchQuery('');
     setRequestError('');
   };
@@ -290,35 +262,26 @@ export default function CustomerHome() {
   // Recover any active request on mount
   useEffect(() => {
     if (!user?.id) return;
-    supabase
-      .from('taxi_requests')
-      .select('*')
-      .eq('customer_id', user.id)
-      .in('status', ['pending', ...TRACKING_STATUSES])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
+    let active = true;
+    setRecovering(true);
+    setRecoveryError(false);
+    const recover = async () => {
+      try {
+        const { data, error } = await supabase.from('taxi_requests').select('*')
+          .eq('customer_id', user.id).in('status', ['pending', ...TRACKING_STATUSES])
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (!active) return;
+        if (error) throw error;
         if (data) {
           setActiveRequest(data as ActiveRequest);
           setRequestStatus('created');
         }
-      });
-  }, [user?.id]);
-
-  // First-open location permission flow (waits for onboarding to finish)
-  useEffect(() => {
-    if (showOnboarding) return;
-    if (autoLocatedRef.current) return;
-    if (activeRequest || pickup) return;
-    autoLocatedRef.current = true;
-    const perm = localStorage.getItem(LOCATION_PERMISSION_KEY);
-    if (perm === 'granted') {
-      detectLocation('auto');
-    } else if (perm !== 'denied') {
-      setShowPermission(true);
-    }
-  }, [showOnboarding, activeRequest, pickup, detectLocation]);
+      } catch { if (active) setRecoveryError(true); }
+      finally { if (active) setRecovering(false); }
+    };
+    void recover();
+    return () => { active = false; };
+  }, [user?.id, recoveryAttempt]);
 
   // Polling fallback
   useEffect(() => {
@@ -377,26 +340,29 @@ export default function CustomerHome() {
   useEffect(() => {
     if (!pickup || !destination || !vehicleType || activeRequestId) return;
     let active = true;
-    setRoute(null); setRequestError('');
+    setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
       computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleType,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
-          if (!result) {
+          setCalculating(false);
+          if (!result?.quote_id || !result.quote_expires_at || !result.breakdown || !Number.isFinite(result.breakdown.total)) {
             setRoute(null);
             setRequestError(t('route_failed'));
           } else {
             setRoute(result);
+            setRouteInput(quoteInput);
             setRequestError('');
           }
         });
     }, 350);
     return () => { active = false; clearTimeout(timer); };
-  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, t]);
+  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, quoteInput, t]);
 
   const cancelRequest = async () => {
-    if (!activeRequest) return;
+    if (!activeRequest || cancelling) return;
+    setCancelling(true);
     setRequestError('');
     try {
       const { data, error } = await supabase
@@ -423,7 +389,7 @@ export default function CustomerHome() {
     } catch {
       setConfirmCancel(false);
       setRequestError(t('request_failed_hint'));
-    }
+    } finally { setCancelling(false); }
   };
 
   // Reset
@@ -431,6 +397,8 @@ export default function CustomerHome() {
     setActiveRequest(null);
     setRequestStatus('idle');
     setRequestError('');
+    setConfirmCancel(false);
+    setStep(pickup && destination ? 'confirm' : 'pickup');
   };
 
   // Share active trip
@@ -446,25 +414,9 @@ export default function CustomerHome() {
     }
   };
 
-  // Permission sheet actions
-  const allowLocation = () => {
-    setShowPermission(false);
-    detectLocation('auto');
-  };
-
-  const chooseManually = () => {
-    localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
-    setShowPermission(false);
-    setSelectingField('pickup');
-  };
-
-  const completeOnboarding = useCallback(() => {
-    localStorage.setItem('leski_onboarded', 'true');
-    setShowOnboarding(false);
-  }, []);
-
   // Fetch company pricing config
   useEffect(() => {
+    if (!user?.id) return;
     let active = true;
     const load = async () => {
       let companies = supabase.from('companies').select('id').eq('is_active',true).order('created_at').order('id').limit(1);
@@ -484,7 +436,7 @@ export default function CustomerHome() {
     };
     void load();
     return () => {active=false;};
-  }, [user?.company_id, t]);
+  }, [user?.id, user?.company_id, configAttempt, t]);
 
   // Redirect to orders after trip completed or cancelled
   useEffect(() => {
@@ -500,198 +452,55 @@ export default function CustomerHome() {
     }
   }, [activeRequest?.status, activeRequest?.id, activeRequest?.driver_id, navigate]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-foreground-500">{t('loading')}</span>
-        </div>
-      </div>
-    );
+  // Keep the existing live tracking and booking RPC contracts.
+  if (isTracking && activeRequest?.driver_id) {
+    return <DriverTracking request={{ ...activeRequest, driver_id: activeRequest.driver_id }} onCancel={resetRequest} />;
   }
 
-  // Live driver tracking view during an active trip
-  if (isTracking && activeRequest && activeRequest.driver_id) {
-    return (
-      <DriverTracking
-        request={{
-          id: activeRequest.id,
-          driver_id: activeRequest.driver_id,
-          status: activeRequest.status,
-          pickup_latitude: activeRequest.pickup_latitude,
-          pickup_longitude: activeRequest.pickup_longitude,
-          pickup_address: activeRequest.pickup_address,
-          destination_latitude: activeRequest.destination_latitude,
-          destination_longitude: activeRequest.destination_longitude,
-          destination_address: activeRequest.destination_address,
-        }}
-        onCancel={resetRequest}
-      />
-    );
-  }
+  const mapPickup = activeRequest
+    ? { address: activeRequest.pickup_address, lat: activeRequest.pickup_latitude, lng: activeRequest.pickup_longitude }
+    : pickup;
+  const mapDestination = activeRequest
+    ? { address: activeRequest.destination_address, lat: activeRequest.destination_latitude, lng: activeRequest.destination_longitude }
+    : destination;
 
-  return (
-    <div className="relative h-[100dvh] bg-background-50 overflow-hidden lg:flex">
-      {/* ===== MAP BACKGROUND ===== */}
-      <div className="absolute inset-0 z-0 lg:relative lg:flex-1 lg:min-w-0">
-        <BookingMap pickup={pickup} destination={destination} />
+  return <CustomerLayout
+    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={currentRoute} />}
+    header={<>
+      <div className="customer-brand">
+        <img src={LOGO_URL} alt="" />
+        <span>{t('app_name')}<small>{t('booking_tagline')}</small></span>
       </div>
-
-      {/* ===== COMPACT FLOATING HEADER ===== */}
-      <header
-        className="absolute top-0 left-0 right-0 z-20 bg-white border-b border-background-100 lg:right-[420px]"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <div className="h-14 flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <img src={LOGO_URL} alt={t('app_name')} className="h-8 w-8 rounded-lg object-cover" />
-            <span className="text-[15px] font-bold text-foreground-950 font-heading leading-tight whitespace-nowrap">
-              {t('app_name')}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <NotificationBell />
-            <AppMenu />
-          </div>
-        </div>
-      </header>
-
-      {/* ===== OFFLINE BANNER ===== */}
-      {offline && (
-        <div className="absolute top-20 left-4 right-4 z-30 lg:right-[436px] flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5">
-          <i className="ri-wifi-off-line text-red-500 text-lg" />
-          <p className="text-[14px] font-medium text-red-700">{t('offline_message')}</p>
-        </div>
-      )}
-
-      {/* ===== BOTTOM SHEET ===== */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 lg:static lg:w-[420px] lg:shrink-0 lg:h-full lg:flex lg:flex-col lg:bg-white lg:border-l lg:border-background-100">
-        <div className="mx-auto w-full max-w-md lg:max-w-none lg:flex-1 lg:flex lg:flex-col">
-          <div className="bg-white rounded-t-[16px] lg:rounded-none border-t border-background-100 lg:border-t-0 shadow-[0_-6px_24px_rgba(0,0,0,0.06)] lg:shadow-none max-h-[78vh] overflow-y-auto lg:max-h-none lg:flex-1 lg:h-full">
-            <div className="sticky top-0 z-10 flex justify-center pt-2.5 pb-1.5 bg-white lg:hidden">
-              <div className="w-10 h-1.5 rounded-full bg-background-200" />
-            </div>
-
-            {activeRequest && activeRequest.status ? (
-              <RequestStatusCard
-                request={activeRequest}
-                price={price}
-                confirmCancel={confirmCancel}
-                onShowCancel={() => setConfirmCancel(true)}
-                onKeepRequest={() => setConfirmCancel(false)}
-                onCancel={cancelRequest}
-                onReset={resetRequest}
-                onShare={shareTrip}
-                onNewOrder={resetRequest}
-                requestError={requestError}
-              />
-            ) : (
-              <>
-                <EnableNotificationsBanner />
-                <BookingCard
-                  pickup={pickup}
-                  destination={destination}
-                  firstName={firstName}
-                  locating={locating}
-                  recent={recent}
-                  onSelectRecent={selectRecentQuick}
-                  onFieldClick={handleFieldClick}
-                  onClearPickup={() => setPickup(null)}
-                  onClearDestination={() => setDestination(null)}
-                  onSwap={swapLocations}
-                  onUseMyLocation={() => detectLocation('pickup')}
-                  vehicleType={vehicleType}
-                  onVehicleTypeChange={setVehicleType}
-                  vehicleOptions={vehicleTypes.map((v) => ({
-                    id: v.id,
-                    name: v.name,
-                    capacity: v.capacity,
-                    available: v.is_active,
-                  }))}
-                  fare={fare}
-                  priceIsEstimate={priceIsEstimate}
-                  onRefreshPrice={() => setQuoteRefresh((n) => n + 1)}
-                  canRequest={canRequest}
-                  creating={requestStatus === 'creating'}
-                  onRequest={createRequest}
-                  requestError={requestError}
-                />
-              </>
-            )}
-          </div>
-        </div>
+      <div className="customer-header-actions"><NotificationBell /><AppMenu /></div>
+    </>}
+    notice={offline ? <><i className="ri-wifi-off-line" aria-hidden="true" />{t('offline_message')}</> : undefined}
+  >
+    {authLoading || recovering ? <BookingSkeleton label={t('booking_restoring')} />
+      : recoveryError ? <div className="booking-recovery">
+        <i className="ri-cloud-off-line" aria-hidden="true" />
+        <p role="alert">{t('booking_recovery_error')}</p>
+        <button type="button" className="booking-primary" onClick={() => setRecoveryAttempt(n => n + 1)}>{t('booking_retry')}</button>
       </div>
-
-      {/* ===== FULL-SCREEN LOCATION PICKER ===== */}
-      {selectingField && !activeRequest && (
-        <div className="fixed inset-0 z-[60] bg-white flex flex-col">
-          <div
-            className="flex items-center gap-1 px-2 border-b border-background-100"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
-          >
-            <button
-              type="button"
-              onClick={() => setSelectingField(null)}
-              aria-label={t('back')}
-              className="w-11 h-12 flex items-center justify-center cursor-pointer"
-            >
-              <i className="ri-arrow-left-line text-2xl text-foreground-700" />
-            </button>
-            <h2 className="text-[18px] font-bold text-foreground-950 font-heading">
-              {selectingField === 'pickup' ? t('pickup_search_title') : t('dest_search_title')}
-            </h2>
-          </div>
-          <div className="flex-1 min-h-0">
-            <LocationPicker
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              locating={locating}
-              locationError={locationError}
-              recent={recent}
-              onUseCurrent={() => detectLocation(selectingField || 'pickup')}
-              onSelect={selectLocation}
-              showCurrentLocation={selectingField === 'pickup'}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Location Permission Sheet */}
-      {showPermission && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={chooseManually} />
-          <div className="relative bg-white rounded-t-3xl w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-300">
-            <div className="w-10 h-1 rounded-full bg-background-200 mx-auto mb-5" />
-            <div className="w-14 h-14 rounded-2xl bg-accent-100 flex items-center justify-center mx-auto mb-4">
-              <i className="ri-map-pin-range-line text-2xl text-accent-600" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground-950 font-heading text-center mb-2">
-              {t('allow_location_title')}
-            </h2>
-            <p className="text-sm text-foreground-500 text-center mb-6">
-              {t('allow_location_desc')}
-            </p>
-            <button
-              onClick={allowLocation}
-              className="w-full py-3.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer mb-2"
-            >
-              {t('allow_location_btn')}
-            </button>
-            <button
-              onClick={chooseManually}
-              className="w-full py-3.5 bg-background-100 text-foreground-600 font-medium rounded-xl hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              {t('choose_manually')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* First-run welcome onboarding */}
-      {showOnboarding && (
-        <WelcomeOnboarding firstName={firstName} onClose={completeOnboarding} />
-      )}
-    </div>
-  );
+      : activeRequest ? <RequestStatusCard request={activeRequest} price={price}
+        confirmCancel={confirmCancel} cancelling={cancelling}
+        onShowCancel={() => setConfirmCancel(true)} onKeepRequest={() => setConfirmCancel(false)}
+        onCancel={cancelRequest} onReset={() => navigate('/customer/orders')}
+        onShare={shareTrip} onNewOrder={resetRequest} requestError={requestError} />
+      : <>
+        <BookingSteps step={step} canConfirm={!!pickup && !!destination}
+          disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
+        {step === 'confirm' && pickup && destination
+          ? <BookingCard pickup={pickup} destination={destination}
+            onFieldClick={handleFieldClick} onSwap={swapLocations}
+            vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
+            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active }))}
+            fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
+            calculating={calculating} priceExpired={!!fare && !currentRoute?.quote_id}
+            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
+            creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
+          : <LocationPicker key={step} searchQuery={searchQuery} onSearchChange={setSearchQuery}
+            locating={locating} locationError={locationError} recent={recent}
+            onUseCurrent={detectLocation} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
+      </>}
+  </CustomerLayout>;
 }

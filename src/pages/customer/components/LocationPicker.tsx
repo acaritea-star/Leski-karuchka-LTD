@@ -1,254 +1,114 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocationPreset } from '@/lib/geo';
-import {
-  hasPlacesApi,
-  searchPlaces,
-  getPlaceDetails,
-  type PlacePrediction,
-} from '@/lib/places';
+import { hasPlacesApi, searchPlaces, getPlaceDetails, type PlacePrediction } from '@/lib/places';
 
 interface LocationPickerProps {
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
-  locating: boolean;
-  locationError: string;
-  recent: LocationPreset[];
-  onUseCurrent: () => void;
-  onSelect: (preset: LocationPreset) => void;
-  showCurrentLocation?: boolean;
+  searchQuery: string; onSearchChange: (value: string) => void;
+  locating: boolean; locationError: string; recent: LocationPreset[];
+  onUseCurrent: () => void; onSelect: (preset: LocationPreset) => void; showCurrentLocation?: boolean;
 }
 
-export default function LocationPicker({
-  searchQuery,
-  onSearchChange,
-  locating,
-  locationError,
-  recent,
-  onUseCurrent,
-  onSelect,
-  showCurrentLocation = true,
-}: LocationPickerProps) {
+export default function LocationPicker({ searchQuery, onSearchChange, locating, locationError,
+  recent, onUseCurrent, onSelect, showCurrentLocation = true }: LocationPickerProps) {
   const { t } = useTranslation();
+  const [results, setResults] = useState<PlacePrediction[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const session = useRef(crypto.randomUUID());
+  const revision = useRef(0);
+  const selection = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  const query = searchQuery.trim();
+  const enabled = hasPlacesApi();
 
-  const [googleResults, setGoogleResults] = useState<PlacePrediction[]>([]);
-  const [searchingPlaces, setSearchingPlaces] = useState(false);
-  const [placeError, setPlaceError] = useState('');
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
-
-  const debounceRef = useRef<number | null>(null);
-  const sessionRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
-
-  const trimmed = searchQuery.trim();
-  const placesEnabled = hasPlacesApi();
-
-  const recentUnique = recent.filter(
-    (p, i, arr) => arr.findIndex((x) => x.address === p.address) === i,
-  );
-  const recentFiltered = trimmed
-    ? recentUnique.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmed.toLowerCase()) ||
-          p.address.toLowerCase().includes(trimmed.toLowerCase())
-      )
-    : recentUnique.slice(0, 3);
-
-  // Debounced Google Places autocomplete search
   useEffect(() => {
-    if (!trimmed || !placesEnabled) {
-      setGoogleResults([]);
-      setSearchingPlaces(false);
-      setPlaceError('');
-      return;
-    }
-
-    setSearchingPlaces(true);
-    setPlaceError('');
-
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(async () => {
+    const requestRevision = revision;
+    const version = ++requestRevision.current;
+    selection.current = false;
+    setResolving(null); setResults([]); setError('');
+    if (query.length < 2 || !enabled) { setSearching(false); return; }
+    setSearching(true);
+    const timer = window.setTimeout(async () => {
       try {
-        const results = await searchPlaces(trimmed, sessionRef.current);
-        setGoogleResults(results);
+        const predictions = await searchPlaces(query, session.current);
+        if (revision.current === version) setResults(predictions);
       } catch {
-        setGoogleResults([]);
-        setPlaceError(t('places_search_error'));
+        if (revision.current === version) setError(t('places_search_error'));
       } finally {
-        setSearchingPlaces(false);
+        if (revision.current === version) setSearching(false);
       }
-    }, 350);
+    }, 300);
+    return () => { ++requestRevision.current; window.clearTimeout(timer); };
+  }, [query, enabled, retry, t]);
+  useEffect(() => {
+    const lifetime = revision;
+    return () => { ++lifetime.current; };
+  }, []);
 
-    return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    };
-  }, [trimmed, placesEnabled, t]);
-
-  // Resolve a Google prediction to coordinates and hand it to the parent
-  const selectGooglePlace = async (prediction: PlacePrediction) => {
-    setResolvingId(prediction.place_id);
+  const choose = (place: LocationPreset) => { input.current?.blur(); onSelect(place); };
+  const resolve = async (prediction: PlacePrediction) => {
+    if (selection.current || locating) return;
+    selection.current = true;
+    const version = revision.current;
+    setResolving(prediction.place_id); setError('');
     try {
-      const details = await getPlaceDetails(prediction.place_id, sessionRef.current);
-      if (details) {
-        onSelect(details);
-        setGoogleResults([]);
-      } else {
-        setPlaceError(t('places_search_error'));
-      }
+      const place = await getPlaceDetails(prediction.place_id, session.current);
+      if (version !== revision.current) return;
+      if (place) choose(place); else setError(t('places_search_error'));
+    } catch {
+      if (version === revision.current) setError(t('places_search_error'));
     } finally {
-      setResolvingId(null);
+      if (version === revision.current) { setResolving(null); selection.current = false; }
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && googleResults.length > 0) {
-      e.preventDefault();
-      void selectGooglePlace(googleResults[0]);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Search bar (sticky top) */}
-      <div className="px-4 pt-2 pb-2 border-b border-background-100 bg-white">
-        <div className="relative">
-          <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground-400 text-lg" />
-          <input
-            type="text"
-            placeholder={t('search_placeholder')}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            enterKeyHint="search"
-            autoComplete="off"
-            className="w-full pl-11 pr-11 py-3 bg-background-50 rounded-2xl text-[17px] text-foreground-950 placeholder:text-foreground-500 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all"
-            autoFocus
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-background-200 transition-colors cursor-pointer"
-              aria-label="clear"
-            >
-              <i className="ri-close-line text-foreground-400 text-lg" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Scrollable results */}
-      <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-        {/* Use current location (only for pickup, not destination) */}
-        {showCurrentLocation && (
-          <button
-            onClick={onUseCurrent}
-            disabled={locating}
-            className="w-full flex items-center gap-3 py-3 cursor-pointer text-left disabled:opacity-60 mt-1"
-          >
-            <span className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center flex-shrink-0">
-              {locating ? (
-                <span className="w-5 h-5 border-2 border-accent-400 border-t-accent-600 rounded-full animate-spin" />
-              ) : (
-                <i className="ri-focus-3-line text-accent-600 text-xl" />
-              )}
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="text-[16px] font-semibold text-foreground-900 block">
-                {locating ? t('detecting_location') : t('use_current_location')}
-              </span>
-              <span className="text-[14px] text-foreground-500 block truncate">
-                {t('current_location_hint')}
-              </span>
-            </span>
-          </button>
-        )}
-
-        {locationError && !locating && (
-          <p className="text-[14px] text-red-600 flex items-start gap-1.5 my-2 px-1">
-            <i className="ri-error-warning-line mt-0.5" />
-            {locationError}
-          </p>
-        )}
-
-        {/* Google Places results (real addresses) */}
-        {trimmed && placesEnabled && (
-          <div className="mt-1">
-            {searchingPlaces ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-foreground-500">
-                <span className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[15px]">{t('places_searching')}</span>
-              </div>
-            ) : placeError ? (
-              <div className="text-center py-8">
-                <i className="ri-cloud-off-line text-2xl text-foreground-300" />
-                <p className="text-[15px] text-foreground-600 mt-2">{placeError}</p>
-              </div>
-            ) : googleResults.length > 0 ? (
-              <div className="space-y-1">
-                {googleResults.map((p) => (
-                  <button
-                    key={p.place_id}
-                    onClick={() => selectGooglePlace(p)}
-                    className="w-full flex items-center gap-3 py-3 px-1 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
-                  >
-                    <span className="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center flex-shrink-0">
-                      {resolvingId === p.place_id ? (
-                        <span className="w-4 h-4 border-2 border-accent-300 border-t-accent-600 rounded-full animate-spin" />
-                      ) : (
-                        <i className="ri-map-pin-2-line text-accent-600 text-lg" />
-                      )}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="text-[16px] font-medium text-foreground-900 block leading-snug truncate">
-                        {p.main_text || p.description}
-                      </span>
-                      {p.secondary_text && (
-                        <span className="text-[14px] text-foreground-500 block leading-snug truncate mt-0.5">
-                          {p.secondary_text}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <i className="ri-search-line text-2xl text-foreground-300" />
-                <p className="text-[15px] text-foreground-600 mt-2">{t('no_address_found')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Recent locations (only when not typing) */}
-        {!trimmed && recentFiltered.length > 0 && (
-          <div className="mt-1">
-            <p className="text-[13px] font-semibold text-foreground-500 mb-1.5 px-1">
-              {t('recent_locations')}
-            </p>
-            <div className="space-y-1">
-              {recentFiltered.map((preset) => (
-                <button
-                  key={`recent-${preset.id}-${preset.address}`}
-                  onClick={() => onSelect(preset)}
-                  className="w-full flex items-center gap-3 py-3 px-1 rounded-xl hover:bg-background-50 transition-colors cursor-pointer text-left"
-                >
-                  <span className="w-10 h-10 rounded-lg bg-background-100 flex items-center justify-center flex-shrink-0">
-                    <i className="ri-time-line text-foreground-500 text-lg" />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="text-[16px] font-medium text-foreground-900 block truncate">
-                      {preset.name || preset.address}
-                    </span>
-                    <span className="text-[14px] text-foreground-500 block truncate">
-                      {preset.address}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+  return <div className="booking-picker booking-enter">
+    <div className="booking-search">
+      <i className="ri-search-line" aria-hidden="true" />
+      <input ref={input} type="search" value={searchQuery} onChange={e => onSearchChange(e.target.value)}
+        aria-label={t(showCurrentLocation ? 'pickup_search_title' : 'dest_search_title')}
+        placeholder={t('booking_search_hint')} autoComplete="off" spellCheck={false} enterKeyHint="search"
+        onKeyDown={e => { if (e.key === 'Escape') { onSearchChange(''); input.current?.blur(); } }} />
+      {searchQuery && <button type="button" className="booking-icon-button" aria-label={t('booking_clear')}
+        onClick={() => { onSearchChange(''); input.current?.focus(); }}><i className="ri-close-line" aria-hidden="true" /></button>}
     </div>
-  );
+    <div className="booking-scroll" aria-busy={searching || !!resolving || locating}>
+      {showCurrentLocation && !query && <button type="button" className="booking-gps" disabled={locating || !!resolving}
+        onClick={onUseCurrent}>
+        {locating ? <span className="booking-spinner" /> : <i className="ri-focus-3-line" aria-hidden="true" />}
+        <span>{locating ? t('detecting_location') : t('booking_use_gps')}</span>
+        <i className="ri-arrow-right-up-line" aria-hidden="true" />
+      </button>}
+      {locationError && <p className="booking-error" role="alert">{locationError}</p>}
+      {error && <div className="booking-error" role="alert"><span>{error}</span>
+        <button type="button" onClick={() => setRetry(value => value + 1)}>{t('booking_retry')}</button></div>}
+      {query && !enabled && <p className="booking-hint" role="status">{t('booking_search_unavailable')}</p>}
+      {query.length === 1 && enabled && <p className="booking-hint">{t('booking_type_more')}</p>}
+      {searching && <div className="booking-results-loading" role="status">
+        <span className="sr-only">{t('places_searching')}</span>
+        <div className="skeleton-line" /><div className="skeleton-line w-3/4" />
+      </div>}
+      {!searching && query.length >= 2 && enabled && !error && results.length === 0 &&
+        <p className="booking-hint" role="status">{t('no_address_found')}</p>}
+      {!searching && results.map(place => <button type="button" key={place.place_id} className="booking-place"
+        disabled={!!resolving || locating} onClick={() => void resolve(place)}>
+        {resolving === place.place_id ? <span className="booking-spinner" /> : <i className="ri-map-pin-2-line" aria-hidden="true" />}
+        <span><strong>{place.main_text || place.description}</strong>{place.secondary_text && <small>{place.secondary_text}</small>}</span>
+      </button>)}
+      {!query && recent.length > 0 && <>
+        <p className="booking-recent-label">{t('recent_locations')}</p>
+        {recent.slice(0, 3).map(place => <button type="button" key={place.address} className="booking-place"
+          disabled={locating || !!resolving} onClick={() => choose(place)}>
+          <i className="ri-history-line" aria-hidden="true" />
+          <span><strong>{place.name || place.address}</strong>
+            {place.name && place.name !== place.address && <small>{place.address}</small>}</span>
+          <i className="ri-arrow-right-up-line" aria-hidden="true" />
+        </button>)}
+      </>}
+      {!query && recent.length === 0 && <p className="booking-hint">{t('booking_address_hint')}</p>}
+    </div>
+  </div>;
 }

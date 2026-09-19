@@ -59,7 +59,7 @@ export async function searchPlaces(
     });
     if (!res.ok) {
       console.error('[places] searchPlaces HTTP error:', res.status, res.statusText);
-      return [];
+      throw new Error('Places search unavailable');
     }
     const data = await res.json();
     
@@ -92,8 +92,8 @@ export async function searchPlaces(
         }
       )
       .filter((p: PlacePrediction | null): p is PlacePrediction => p !== null);
-  } catch {
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 

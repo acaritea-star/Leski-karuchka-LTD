@@ -130,6 +130,8 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-label={t('notifications_title')}
+        aria-expanded={open}
         className="relative w-11 h-11 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
       >
         <i className="ri-notification-3-line text-foreground-600 text-lg" />
@@ -141,7 +143,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 w-[320px] max-w-[85vw] bg-white rounded-2xl border border-background-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute right-0 top-11 w-[320px] max-w-[calc(100vw-100px)] bg-white rounded-2xl border border-background-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between px-4 py-3 border-b border-background-100">
             <h3 className="text-sm font-semibold text-foreground-950 font-heading">{t('notifications_title')}</h3>
             {unread > 0 && (

@@ -43,10 +43,8 @@ declare namespace google {
     class LatLngBounds {
       constructor(sw?: LatLngLiteral, ne?: LatLngLiteral);
       extend(point: LatLngLiteral): LatLngBounds;
-      getNorth(): number;
-      getSouth(): number;
-      getEast(): number;
-      getWest(): number;
+      getNorthEast(): { lat(): number; lng(): number };
+      getSouthWest(): { lat(): number; lng(): number };
     }
 
     class Map {
@@ -54,7 +52,7 @@ declare namespace google {
       setCenter(center: LatLngLiteral): void;
       setZoom(zoom: number): void;
       panTo(center: LatLngLiteral): void;
-      fitBounds(bounds: LatLngBounds, padding?: number): void;
+      fitBounds(bounds: LatLngBounds, padding?: number | { top?: number; bottom?: number; left?: number; right?: number }): void;
       getBounds(): LatLngBounds | undefined;
       getZoom(): number;
     }
