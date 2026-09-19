@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Booking UI · local preview</title>
+<style>body{margin:0;background:#e3e7df;font:14px system-ui}nav{padding:10px;display:flex;gap:12px;align-items:center}button,select{padding:6px}iframe{display:block;margin:8px auto;border:0;box-shadow:0 0 0 1px #bac3b5;width:390px;height:780px}</style></head>
+<body><nav><strong>Локален UX тест — примерни данни, без реални поръчки</strong><label>Размер <select id="size"><option value="390,780">390 × 780</option><option value="320,568">320 × 568</option><option value="390,400">390 × 400 (клавиатура)</option><option value="1100,760">Desktop</option></select></label></nav>
+<iframe title="Клиентски екран" src="./booking-screen.html"></iframe>
+<script>document.querySelector('#size').addEventListener('change',e=>{const [w,h]=e.target.value.split(',');const f=document.querySelector('iframe');f.style.width=w+'px';f.style.height=h+'px'})</script></body></html>

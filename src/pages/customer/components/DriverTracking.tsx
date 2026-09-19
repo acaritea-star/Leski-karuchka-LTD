@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { calculateDistance, estimateDuration } from '@/lib/geo';
 import { computeRoute, decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
+import CustomerLayout from './CustomerLayout';
+import AppMenu from './AppMenu';
 
 export interface TrackingRequest {
   id: string;
@@ -36,7 +38,7 @@ interface DriverLocation {
   speed: number | null;
 }
 
-const ROUTE_COLOR = '#0ea5a0';
+const ROUTE_COLOR = '#315943';
 const CAR_COLORS: Record<string, string> = {
   comfort: '#f59e0b',
   van: '#78716c',
@@ -116,7 +118,6 @@ export default function DriverTracking({
   const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
   const [location, setLocation] = useState<DriverLocation | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(true);
-  const [showBanner, setShowBanner] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
   const [liveRoute, setLiveRoute] = useState<{ distance_km: number; duration_min: number } | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -126,6 +127,8 @@ export default function DriverTracking({
   const [positionStale, setPositionStale] = useState(false);
   const [lastUpdateAt, setLastUpdateAt] = useState<number>(0);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
+  const [mapAttempt, setMapAttempt] = useState(0);
 
   // Google Maps refs
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -153,6 +156,8 @@ export default function DriverTracking({
     if (!el || mapRef.current) return;
 
     let cancelled = false;
+    setMapReady(false);
+    setMapError(false);
     loadGoogleMaps()
       .then(() => {
         if (cancelled || mapRef.current) return;
@@ -169,13 +174,13 @@ export default function DriverTracking({
           { lat: request.pickup_latitude, lng: request.pickup_longitude },
           { lat: request.destination_latitude, lng: request.destination_longitude },
         );
-        map.fitBounds(bounds, 60);
+        map.fitBounds(bounds, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
 
         mapRef.current = map;
         setMapReady(true);
       })
       .catch(() => {
-        /* map failed to load — UI still works */
+        if (!cancelled) setMapError(true);
       });
 
     return () => {
@@ -191,6 +196,7 @@ export default function DriverTracking({
       }
     };
   }, [
+    mapAttempt,
     request.pickup_latitude,
     request.pickup_longitude,
     request.destination_latitude,
@@ -386,7 +392,7 @@ export default function DriverTracking({
         b.extend({ lat, lng });
         b.extend({ lat: request.pickup_latitude, lng: request.pickup_longitude });
         b.extend({ lat: request.destination_latitude, lng: request.destination_longitude });
-        map.fitBounds(b, 60);
+        map.fitBounds(b, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
         lastRecenterRef.current = Date.now();
       } else {
         carMarkerRef.current.setPosition({ lat, lng });
@@ -399,12 +405,14 @@ export default function DriverTracking({
         const bounds = map.getBounds();
         if (!bounds) return;
         const pad = 0.12;
-        const latRange = bounds.getNorth() - bounds.getSouth();
-        const lngRange = bounds.getEast() - bounds.getWest();
-        const latMin = bounds.getSouth() + latRange * pad;
-        const latMax = bounds.getNorth() - latRange * pad;
-        const lngMin = bounds.getWest() + lngRange * pad;
-        const lngMax = bounds.getEast() - lngRange * pad;
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const latRange = ne.lat() - sw.lat();
+        const lngRange = ne.lng() - sw.lng();
+        const latMin = sw.lat() + latRange * pad;
+        const latMax = ne.lat() - latRange * pad;
+        const lngMin = sw.lng() + lngRange * pad;
+        const lngMax = ne.lng() - lngRange * pad;
         if (lat < latMin || lat > latMax || lng < lngMin || lng > lngMax) {
           lastRecenterRef.current = now;
           map.panTo({ lat, lng });
@@ -621,7 +629,6 @@ export default function DriverTracking({
   // ── Driver-found notification ──
   useEffect(() => {
     if (request.status === 'accepted' || request.status === 'arrived') {
-      setShowBanner(true);
       const timer = setTimeout(playChime, 350);
       return () => clearTimeout(timer);
     }
@@ -644,7 +651,7 @@ export default function DriverTracking({
     location && typeof location.speed === 'number' ? Math.round(location.speed * 3.6) : null;
 
   const handleCancel = async () => {
-    if (!onCancel) return;
+    if (!onCancel || cancelling) return;
     setCancelError(''); setCancelling(true);
     try {
       const {data,error} = await supabase.from('taxi_requests').update({status:'cancelled'})
@@ -655,247 +662,64 @@ export default function DriverTracking({
     finally { setCancelling(false); }
   };
 
-  return (
-    <div className="relative h-screen bg-background-50 overflow-hidden">
-      {cancelError && <p role="alert" className="absolute top-16 inset-x-3 z-30 p-3 text-red-700 bg-red-50">{cancelError}</p>}
-      {/* ===== Google Map ===== */}
-      <div ref={mapContainerRef} className="absolute inset-0 z-0" />
-
-      {/* Top/bottom gradients */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent pointer-events-none z-[5]" />
-      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/55 to-transparent pointer-events-none z-[5]" />
-
-      {/* Stale position warning */}
-      {positionStale && location && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[20] bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2 shadow-sm">
-          <i className="ri-time-line text-amber-600 text-sm" />
-          <span className="text-xs text-amber-700 font-medium">{t('position_not_updating')}</span>
-        </div>
-      )}
-
-      {/* ===== Header ===== */}
-      <header className="absolute top-0 left-0 right-0 z-10 px-4 py-3 flex items-center gap-2">
-        <button
-          onClick={() => navigate('/customer/orders')}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur text-foreground-700 hover:bg-white transition-colors cursor-pointer flex-shrink-0"
-        >
-          <i className="ri-arrow-left-line text-lg" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className="text-base font-bold text-white font-heading leading-tight">{t('live_tracking')}</p>
-          <p className="text-xs text-white/85 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
-            {t('live')}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button
-            onClick={() => changeZoom(1)}
-            aria-label={t('zoom_in')}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur text-foreground-700 hover:bg-white transition-all cursor-pointer active:scale-95"
-          >
-            <i className="ri-add-line text-lg" />
-          </button>
-          <button
-            onClick={() => changeZoom(-1)}
-            aria-label={t('zoom_out')}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur text-foreground-700 hover:bg-white transition-all cursor-pointer active:scale-95"
-          >
-            <i className="ri-subtract-line text-lg" />
-          </button>
-          <button
-            onClick={recenter}
-            aria-label={t('recenter_map')}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur text-primary-600 hover:bg-white transition-all cursor-pointer active:scale-95"
-          >
-            <i className="ri-crosshair-2-line text-lg" />
-          </button>
-        </div>
-      </header>
-
-      {/* ===== Driver found banner ===== */}
-      {showBanner && driverInfo && (
-        <div className="absolute top-16 left-0 right-0 z-10 px-4 pt-1">
-          <div className="bg-white/95 backdrop-blur-xl rounded-xl p-3 border-2 border-accent-400 animate-in slide-in-from-top-4 fade-in duration-300">
-            <div className="flex items-center gap-3">
-              {driverInfo.avatar_url ? (
-                <img src={driverInfo.avatar_url} alt={driverInfo.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-11 h-11 rounded-full bg-accent-500 flex items-center justify-center flex-shrink-0">
-                  <i className="ri-check-double-line text-white text-lg" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-accent-600 uppercase tracking-wider">{t('driver_found')}</p>
-                <p className="text-sm font-bold text-foreground-950 font-heading truncate leading-tight">
-                  {driverInfo.name} <span className="font-normal text-foreground-500 text-xs">{t('is_on_the_way')}</span>
-                </p>
-                {driverInfo.vehicle_label && (
-                  <p className="text-[11px] text-foreground-500 truncate flex items-center gap-1 mt-0.5">
-                    <i className="ri-car-line text-accent-600 text-[10px]" />{driverInfo.vehicle_label}
-                  </p>
-                )}
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-lg font-bold text-primary-600 font-heading leading-none">
-                  {etaMinutes ?? '—'}<span className="text-[10px] font-normal text-foreground-500 ml-0.5">{t('min')}</span>
-                </p>
-                <p className="text-[10px] text-foreground-500 mt-0.5">{t('arriving_in')}</p>
-              </div>
-              <button
-                onClick={() => setShowBanner(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-background-100 transition-colors cursor-pointer flex-shrink-0"
-              >
-                <i className="ri-close-line text-foreground-400" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Compact bottom panel ===== */}
-      <div className="absolute bottom-0 inset-x-0 z-10 px-3 pb-3">
-        <div className="bg-white rounded-xl p-3 animate-in slide-in-from-bottom-4 fade-in duration-300 max-h-[36vh] overflow-y-auto">
-          {/* Driver row */}
-          <div className="flex items-center gap-2.5 mb-2">
-            {driverInfo?.avatar_url ? (
-              <img src={driverInfo.avatar_url} alt={driverInfo.name} className="w-9 h-9 rounded-full object-cover" />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-accent-100 flex items-center justify-center flex-shrink-0">
-                <i className="ri-user-3-line text-accent-600 text-sm" />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-foreground-950 font-heading truncate">
-                {loadingInfo ? t('loading') : driverInfo?.name}
-              </p>
-              {driverInfo && !loadingInfo && (
-                <div className="flex items-center gap-1 text-[11px] text-foreground-500">
-                  <i className="ri-star-fill text-primary-500 text-[10px]" />
-                  <span className="font-medium text-foreground-700">{driverInfo.rating.toFixed(1)}</span>
-                  <span>·</span>
-                  <span>{driverInfo.total_trips} {t('trips')}</span>
-                </div>
-              )}
-            </div>
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-50 text-accent-600 text-[10px] font-semibold flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />{t('live')}
-            </span>
-          </div>
-
-          {/* Status + speed on one row */}
-          <div className="flex items-center gap-2 text-[11px] font-medium text-foreground-600 bg-background-50 rounded-lg px-2.5 py-1.5 mb-2">
-            <i className="ri-roadster-line text-accent-600 text-xs" />
-            <span className="truncate">
-              {isWaiting
-                ? t('driver_waiting')
-                : headingToPickup
-                  ? `${t('status_accepted')} · ${t('heading_to_you')}`
-                  : t('trip_in_progress_note')}
-            </span>
-            {speedKmh !== null && (
-              <span className="ml-auto flex items-center gap-1 flex-shrink-0 text-foreground-400">
-                <i className="ri-speed-up-line" />{speedKmh} {t('km')}/h
-              </span>
-            )}
-          </div>
-
-          {/* ETA + distance compact */}
-          {!isWaiting ? (
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div className="bg-accent-50 rounded-lg p-2">
-                <p className="text-[10px] text-foreground-500 mb-0.5">{t('arriving_in')}</p>
-                <p className="text-xl font-bold text-foreground-950 font-heading leading-none">
-                  {etaMinutes ?? '—'}<span className="text-[10px] font-normal text-foreground-500 ml-1">{t('min')}</span>
-                </p>
-              </div>
-              <div className="bg-background-50 rounded-lg p-2">
-                <p className="text-[10px] text-foreground-500 mb-0.5">{t('remaining_distance')}</p>
-                <p className="text-xl font-bold text-foreground-950 font-heading leading-none">
-                  {remainingKm !== null && remainingKm !== undefined ? remainingKm.toFixed(1) : '—'}
-                  <span className="text-[10px] font-normal text-foreground-500 ml-1">{t('km')}</span>
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-accent-50 rounded-lg p-2 mb-2 flex items-center gap-2">
-              <i className="ri-time-line text-accent-600 text-xs" />
-              <p className="text-xs font-medium text-foreground-800">{t('driver_waiting')} · {request.pickup_address}</p>
-            </div>
-          )}
-
-          {/* Route line */}
-          <div className="flex items-start gap-2 mb-2">
-            <div className="flex flex-col items-center flex-shrink-0 pt-0.5">
-              <div className="w-2 h-2 rounded-full bg-accent-500" />
-              <div className="w-px h-5 bg-background-200 my-0.5" />
-              <div className="w-2 h-2 rounded bg-foreground-400" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-0.5">
-              <p className="text-[11px] text-foreground-500 truncate">{request.pickup_address}</p>
-              <p className="text-[11px] text-foreground-500 truncate">{request.destination_address}</p>
-            </div>
-          </div>
-
-          {/* Trip total */}
-          {routeInfo && (
-            <p className="text-[10px] text-foreground-400 mb-2 flex items-center gap-1">
-              <i className="ri-route-line text-accent-500 text-[10px]" />
-              {t('trip_route')}: {routeInfo.distance_km.toFixed(1)} {t('km')} · ~{routeInfo.duration_min} {t('min')}
-            </p>
-          )}
-
-          {/* Actions row — call + cancel */}
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={driverInfo?.phone ? `tel:${driverInfo.phone}` : '#'}
-              className={`py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center justify-center gap-1.5 cursor-pointer
-                ${driverInfo?.phone ? 'bg-accent-500 text-white hover:bg-accent-600 active:scale-[0.98]' : 'bg-background-100 text-foreground-400 pointer-events-none'}`}
-            >
-              <i className="ri-phone-line" />{t('call_driver')}
-            </a>
-            {canCancel && (
-              <button
-                onClick={() => setCancelConfirm(true)}
-                className="py-2.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <i className="ri-close-circle-line" />{t('cancel_request')}
-              </button>
-            )}
-          </div>
+  return <CustomerLayout
+    map={<>
+      <div ref={mapContainerRef} className="absolute inset-0" />
+      {!mapReady && <div className="booking-map-state" role="status">
+        {mapError ? <><p>{t('booking_map_error')}</p>
+          <button type="button" className="booking-secondary" onClick={() => setMapAttempt(n => n + 1)}>{t('booking_retry')}</button></>
+          : <><span className="booking-spinner" /><p>{t('booking_map_loading')}</p></>}
+      </div>}
+      {mapReady && <div className="tracking-map-controls">
+        <button type="button" className="booking-icon-button" onClick={() => changeZoom(1)} aria-label={t('zoom_in')}><i className="ri-add-line" /></button>
+        <button type="button" className="booking-icon-button" onClick={() => changeZoom(-1)} aria-label={t('zoom_out')}><i className="ri-subtract-line" /></button>
+      </div>}
+    </>}
+    header={<>
+      <button type="button" className="booking-icon-button" onClick={() => navigate('/customer/orders')} aria-label={t('nav_orders')}><i className="ri-arrow-left-line" /></button>
+      <div className="customer-brand"><span>{t('live_tracking')}<small>{t('app_name')}</small></span></div>
+      <div className="customer-header-actions">
+        <button type="button" className="booking-icon-button" onClick={recenter} aria-label={t('recenter_map')}><i className="ri-focus-3-line" /></button><AppMenu />
+      </div>
+    </>}
+    notice={positionStale && location ? <><i className="ri-time-line" />{t('position_not_updating')}</> : undefined}
+  >
+    <div className="booking-status booking-enter">
+      <div className="booking-status-heading" role="status">
+        <div className="booking-status-icon"><i className={isWaiting ? 'ri-map-pin-user-line' : 'ri-taxi-line'} aria-hidden="true" /></div>
+        <div className="min-w-0">
+          <h2>{isWaiting ? t('driver_waiting') : headingToPickup ? t('heading_to_you') : t('status_in_progress')}</h2>
+          <p>{location && !positionStale && etaMinutes != null && !isWaiting
+            ? `${t('arriving_in')} ~${etaMinutes} ${t('min')}`
+            : isWaiting ? t('booking_meet_driver') : t('booking_waiting_location')}</p>
         </div>
       </div>
-
-      {/* Cancel confirmation modal */}
-      {cancelConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setCancelConfirm(false)} />
-          <div className="relative bg-white rounded-t-2xl w-full max-w-md p-5 pb-7 animate-in slide-in-from-bottom-6 fade-in duration-300">
-            <div className="w-10 h-1 rounded-full bg-background-200 mx-auto mb-4" />
-            <p className="text-sm text-foreground-700 text-center mb-4">{t('confirm_cancel')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setCancelConfirm(false)}
-                className="py-3 rounded-xl bg-background-100 text-foreground-600 text-sm font-semibold hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer"
-              >
-                {t('keep_request')}
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="py-3 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
-              >
-                {cancelling ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <i className="ri-close-circle-line" />
-                )}
-                {t('yes_cancel')}
-              </button>
-            </div>
+      <div className="booking-scroll">
+        {cancelConfirm ? <div className="booking-cancel-confirm">
+          <p>{t('confirm_cancel')}</p><div>
+            <button type="button" className="booking-secondary" disabled={cancelling} onClick={() => setCancelConfirm(false)}>{t('keep_request')}</button>
+            <button type="button" className="booking-secondary booking-danger" disabled={cancelling} onClick={handleCancel}>{cancelling ? t('booking_cancel_sending') : t('yes_cancel')}</button>
           </div>
-        </div>
-      )}
+        </div> : <>
+          <div className="tracking-driver">
+            {driverInfo?.avatar_url ? <img src={driverInfo.avatar_url} alt="" />
+              : <span className="tracking-avatar" aria-hidden="true"><i className="ri-user-3-line" /></span>}
+            <div className="min-w-0 flex-1"><strong>{loadingInfo ? t('loading') : driverInfo?.name || t('booking_driver_connecting')}</strong>
+              {driverInfo?.vehicle_label && <small>{driverInfo.vehicle_label}</small>}
+            </div>
+            {driverInfo && driverInfo.total_trips > 0 && <span className="tracking-rating"><i className="ri-star-fill" aria-hidden="true" /> {driverInfo.rating.toFixed(1)}</span>}
+          </div>
+          <div className="booking-status-route">
+            <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
+            <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
+          </div>
+        </>}
+        {cancelError && <p className="booking-error" role="alert">{cancelError}</p>}
+      </div>
+      <div className="booking-status-actions">
+        {driverInfo?.phone && <a className="booking-primary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
+        {canCancel && onCancel && !cancelConfirm && <button type="button" className="booking-secondary" onClick={() => setCancelConfirm(true)}>{t('cancel_request')}</button>}
+      </div>
     </div>
-  );
+  </CustomerLayout>;
 }

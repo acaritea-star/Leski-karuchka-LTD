@@ -18,6 +18,14 @@ export default function AppMenu() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  // The native modal traps keyboard focus and stays above the map and booking sheet.
+  useEffect(() => {
+    const element = dialog.current;
+    if (open) element?.showModal();
+    return () => element?.close();
+  }, [open]);
 
   // Lock background scroll while the drawer is open
   useEffect(() => {
@@ -104,7 +112,9 @@ export default function AppMenu() {
   };
 
   const drawer = open ? (
-    <div className="fixed inset-0 z-[70]">
+    <dialog ref={dialog} aria-label={t('menu_open')}
+      onCancel={event => { event.preventDefault(); closeMenu(); }}
+      className="fixed inset-0 z-[70] m-0 h-[100dvh] max-h-none w-full max-w-none border-0 bg-transparent p-0">
       <div
         className={`absolute inset-0 bg-black/40 ${
           closing ? 'animate-out fade-out duration-200' : 'animate-in fade-in duration-200'
@@ -183,7 +193,7 @@ export default function AppMenu() {
           </button>
         </div>
       </aside>
-    </div>
+    </dialog>
   ) : null;
 
   return (
@@ -193,6 +203,8 @@ export default function AppMenu() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('menu_open')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
       >
         <i className="ri-menu-line text-foreground-600 text-xl" />
