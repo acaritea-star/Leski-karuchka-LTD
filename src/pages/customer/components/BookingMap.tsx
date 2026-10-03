@@ -1,5 +1,5 @@
 /* global google */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { LEVSKI_CENTER } from '@/lib/geo';
@@ -8,7 +8,7 @@ import { drawRouteLine, mapPinIcon, type RouteLine } from '@/lib/mapLayers';
 import { frameMapPoints } from '@/lib/mapCamera';
 import type { BookingLocation } from './BookingCard';
 
-export default function BookingMap({ pickup, destination, route, initialCenter }: {
+function BookingMap({ pickup, destination, route, initialCenter }: {
   pickup: BookingLocation | null; destination: BookingLocation | null; route: RouteResult | null;
   initialCenter?: google.maps.LatLngLiteral;
 }) {
@@ -123,3 +123,12 @@ export default function BookingMap({ pickup, destination, route, initialCenter }
     </div>}
   </>;
 }
+
+// Address typing and fare state do not change the map's visual inputs.
+export default memo(BookingMap, (previous, next) =>
+  previous.pickup?.lat === next.pickup?.lat && previous.pickup?.lng === next.pickup?.lng
+  && previous.pickup?.address === next.pickup?.address
+  && previous.destination?.lat === next.destination?.lat && previous.destination?.lng === next.destination?.lng
+  && previous.destination?.address === next.destination?.address
+  && previous.route?.polyline === next.route?.polyline
+  && previous.initialCenter?.lat === next.initialCenter?.lat && previous.initialCenter?.lng === next.initialCenter?.lng);

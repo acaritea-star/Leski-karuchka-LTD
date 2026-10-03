@@ -12,6 +12,15 @@ declare namespace google {
       lng: number;
     }
 
+    class LatLng {
+      constructor(lat: number, lng: number);
+      lat(): number;
+      lng(): number;
+    }
+    class MVCArray<T> {
+      setAt(index: number, value: T): void;
+    }
+
     class Size {
       constructor(width: number, height: number);
     }
@@ -70,6 +79,7 @@ declare namespace google {
       constructor(opts?: Record<string, unknown>);
       setMap(map: Map | null): void;
       setPath(path: LatLngLiteral[]): void;
+      getPath(): MVCArray<LatLng>;
     }
 
     const event: {

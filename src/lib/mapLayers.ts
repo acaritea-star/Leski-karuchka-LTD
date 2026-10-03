@@ -39,8 +39,9 @@ export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options:
   let measured = measureRoute(path);
   let lastUpdate = -Infinity;
   let progress: number | undefined;
+  let tailIndex: number | undefined;
   const setPath = (next: RoutePoint[]) => { casing.setPath(next); line.setPath(next); };
-  return { setPath: next => { measured = measureRoute(next); progress = undefined; lastUpdate = -Infinity; setPath(next); }, follow: position => {
+  return { setPath: next => { measured = measureRoute(next); progress = undefined; tailIndex = undefined; lastUpdate = -Infinity; setPath(next); }, follow: position => {
     const now = performance.now();
     // Keep the car at animation-frame speed; redraw the road at most ten times per second.
     if (now - lastUpdate < 100) return;
@@ -48,7 +49,16 @@ export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options:
     const match = matchRoute(position, measured, progress);
     if (!match || match.distance > 35 || (progress != null && Math.abs(match.progress - progress) < .5)) return;
     progress = match.progress;
-    setPath(routeSection(measured, progress, measured.length));
+    let nextTail = match.segment + 1;
+    if (progress >= measured.metres[nextTail]) nextTail++;
+    const casingPath = casing.getPath?.(), linePath = line.getPath?.();
+    if (tailIndex === nextTail && casingPath && linePath) {
+      // Within one street segment only the moving head changes. Keep all
+      // remaining vertices in Maps instead of copying the full road twice.
+      const head = new google.maps.LatLng(match.point.lat, match.point.lng);
+      casingPath.setAt(0, head); linePath.setAt(0, head);
+    } else setPath(routeSection(measured, progress, measured.length));
+    tailIndex = nextTail;
   },
     remove: () => { casing.setMap(null); line.setMap(null); } };
 }
