@@ -1,6 +1,6 @@
-# Levski road snapshot
+# Road snapshots
 
-`levski.json` contains a subset of OpenStreetMap drivable street geometry near Levski, Bulgaria. It does not contain customer or driver locations.
+`levski.json` and `veliko-tarnovo.json` contain subsets of OpenStreetMap drivable street geometry around the named Bulgarian towns. It does not contain customer or driver locations.
 
 © OpenStreetMap contributors. Database available under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). See [OpenStreetMap copyright and attribution](https://www.openstreetmap.org/copyright). Retain these notices and the file metadata when redistributing this database or adapting it under ODbL.
 
