@@ -62,6 +62,7 @@ declare namespace google {
       constructor(opts?: Record<string, unknown>);
       setMap(map: Map | null): void;
       setPosition(position: LatLngLiteral): void;
+      setTitle(title: string): void;
       setIcon(icon: Icon | Symbol | null): void;
     }
 

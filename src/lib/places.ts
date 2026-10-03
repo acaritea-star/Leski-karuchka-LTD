@@ -29,7 +29,8 @@ export function hasPlacesApi(): boolean {
 export async function searchPlaces(
   query: string,
   sessionToken?: string,
-  language = 'bg'
+  language = 'bg',
+  signal?: AbortSignal
 ): Promise<PlacePrediction[]> {
   if (!API_KEY || query.trim().length < 2) return [];
 
@@ -49,6 +50,7 @@ export async function searchPlaces(
   try {
     const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
       method: 'POST',
+      signal,
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': API_KEY,

@@ -54,6 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const currentUser = useRef(user);
+  currentUser.current = user;
+  const currentSession = useRef<Session | null>(null);
 
   const enrichWithDriverCompany = useCallback(
     async (baseUser: AppUser): Promise<AppUser> => {
@@ -121,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
+            .abortSignal(AbortSignal.timeout(10_000))
             .maybeSingle();
 
           if (error) {
@@ -160,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return profileFetchRef.current.promise;
       }
       const promise = doFetchProfile(authUser).finally(() => {
-        if (profileFetchRef.current?.userId === authUser.id) {
+        if (profileFetchRef.current?.promise === promise) {
           profileFetchRef.current = null;
         }
       });
@@ -177,18 +181,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const applySession = (next: Session | null) => {
       if (!alive) return;
       const current = ++revision;
-      if (lastUserId !== next?.user.id) {
+      const identityChanged = lastUserId !== next?.user.id;
+      if (identityChanged) {
         queryClient.clear(); stopDriverGps(); setUser(null); setProfileError(null);
+        currentUser.current = null;
+        if (lastUserId) clearRecentLocations();
         profileFetchRef.current = null;
       }
       lastUserId = next?.user.id;
-      setSession(next); setLoading(!!next);
+      currentSession.current = next;
+      setSession(next);
+      // A refresh/confirmed sign-in for the same account validates its profile
+      // in the background. It must not unmount maps, forms and booking state.
+      setLoading(!!next && (identityChanged || !currentUser.current));
       if (!next) return;
       // Leave Supabase's auth callback before making another authenticated request.
       setTimeout(() => {
         if (!alive || current !== revision) return;
         void fetchProfile(next.user).then(result => {
           if (alive && current === revision) {
+            currentUser.current = result.user;
             setUser(result.user);
             setProfileError(result.error);
             setLoading(false);
@@ -205,15 +217,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
     const next = data.session;
-    if (!next) { setUser(null); return; }
+    if (!next) { currentUser.current = null; setUser(null); return; }
+    const expectedUserId = next.user.id;
     profileFetchRef.current = null;
-    setLoading(true);
+    setLoading(!currentUser.current);
     try {
       const result = await fetchProfile(next.user);
+      if (currentSession.current?.user.id !== expectedUserId) return;
+      currentUser.current = result.user;
       setUser(result.user);
       setProfileError(result.error);
     } finally {
-      setLoading(false);
+      if (currentSession.current?.user.id === expectedUserId) setLoading(false);
     }
   }, [fetchProfile]);
 
@@ -253,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .maybeSingle();
 
-      if (!error && data) {
+      if (!error && data && currentSession.current?.user.id === user.id) {
         setUser({
           ...user,
           first_name: data.first_name ?? '',

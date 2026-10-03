@@ -1,5 +1,6 @@
 /* global google */
 import type { RoutePoint } from './googleMaps';
+import { matchRoute, measureRoute, routeSection } from './routeGeometry';
 
 export const MAP_ROUTE_COLOR = '#315943';
 export const MAP_PICKUP_COLOR = '#bd8129';
@@ -22,7 +23,7 @@ export function mapCarSymbol(heading: number, color = MAP_CAR_COLOR): google.map
     fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 1.8 };
 }
 
-export type RouteLine = { setPath: (path: RoutePoint[]) => void; remove: () => void };
+export type RouteLine = { setPath: (path: RoutePoint[]) => void; follow: (position: RoutePoint) => void; remove: () => void };
 export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options: {
   color?: string; muted?: boolean; zIndex?: number;
 } = {}): RouteLine {
@@ -35,6 +36,19 @@ export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options:
     icons: options.muted ? [] : [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
       fillColor: '#ffffff', fillOpacity: 1, strokeColor: color, strokeWeight: 1, scale: 2 },
       offset: '60px', repeat: '120px', fixedRotation: false }] });
-  return { setPath: next => { casing.setPath(next); line.setPath(next); },
+  const measured = measureRoute(path);
+  let lastUpdate = -Infinity;
+  let progress: number | undefined;
+  const setPath = (next: RoutePoint[]) => { casing.setPath(next); line.setPath(next); };
+  return { setPath, follow: position => {
+    const now = performance.now();
+    // Keep the car at animation-frame speed; redraw the road at most ten times per second.
+    if (now - lastUpdate < 100) return;
+    lastUpdate = now;
+    const match = matchRoute(position, measured, progress);
+    if (!match || match.distance > 35 || (progress != null && Math.abs(match.progress - progress) < .5)) return;
+    progress = match.progress;
+    setPath(routeSection(measured, progress, measured.length));
+  },
     remove: () => { casing.setMap(null); line.setMap(null); } };
 }

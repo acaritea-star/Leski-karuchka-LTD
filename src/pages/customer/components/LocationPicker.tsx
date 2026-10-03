@@ -14,6 +14,8 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
   const { t } = useTranslation();
   const [results, setResults] = useState<PlacePrediction[]>([]);
   const [searching, setSearching] = useState(false);
+  const [loadingVisible, setLoadingVisible] = useState(false);
+  const [resultQuery, setResultQuery] = useState('');
   const [error, setError] = useState('');
   const [resolving, setResolving] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -28,29 +30,31 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
     const requestRevision = revision;
     const version = ++requestRevision.current;
     selection.current = false;
-    setResolving(null); setResults([]); setError('');
-    if (query.length < 2 || !enabled) { setSearching(false); return; }
+    setResolving(null); setError(''); setLoadingVisible(false);
+    if (query.length < 2 || !enabled) { setResults([]); setResultQuery(''); setSearching(false); return; }
     setSearching(true);
+    const controller = new AbortController();
+    const loadingTimer = window.setTimeout(() => setLoadingVisible(true), 450);
     const timer = window.setTimeout(async () => {
       try {
-        const predictions = await searchPlaces(query, session.current);
-        if (revision.current === version) setResults(predictions);
+        const predictions = await searchPlaces(query, session.current, 'bg', controller.signal);
+        if (revision.current === version) { setResults(predictions); setResultQuery(query); }
       } catch {
-        if (revision.current === version) setError(t('places_search_error'));
+        if (revision.current === version) { setResults([]); setError(t('places_search_error')); }
       } finally {
-        if (revision.current === version) setSearching(false);
+        if (revision.current === version) { setSearching(false); setLoadingVisible(false); window.clearTimeout(loadingTimer); }
       }
     }, 300);
-    return () => { ++requestRevision.current; window.clearTimeout(timer); };
-  }, [query, enabled, retry, t]);
+    return () => { ++requestRevision.current; controller.abort(); window.clearTimeout(timer); window.clearTimeout(loadingTimer); };
+  }, [query, enabled, retry, showCurrentLocation, t]);
   useEffect(() => {
     const lifetime = revision;
     return () => { ++lifetime.current; };
   }, []);
 
-  const choose = (place: LocationPreset) => { input.current?.blur(); onSelect(place); };
+  const choose = (place: LocationPreset) => { session.current = crypto.randomUUID(); input.current?.blur(); onSelect(place); };
   const resolve = async (prediction: PlacePrediction) => {
-    if (selection.current || locating) return;
+    if (selection.current || locating || searching || resultQuery !== query) return;
     selection.current = true;
     const version = revision.current;
     setResolving(prediction.place_id); setError('');
@@ -87,14 +91,14 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
         <button type="button" onClick={() => setRetry(value => value + 1)}>{t('booking_retry')}</button></div>}
       {query && !enabled && <p className="booking-hint" role="status">{t('booking_search_unavailable')}</p>}
       {query.length === 1 && enabled && <p className="booking-hint">{t('booking_type_more')}</p>}
-      {searching && <div className="booking-results-loading" role="status">
+      {searching && loadingVisible && results.length === 0 && <div className="booking-results-loading" role="status">
         <span className="sr-only">{t('places_searching')}</span>
         <div className="skeleton-line" /><div className="skeleton-line w-3/4" />
       </div>}
       {!searching && query.length >= 2 && enabled && !error && results.length === 0 &&
         <p className="booking-hint" role="status">{t('no_address_found')}</p>}
-      {!searching && results.map(place => <button type="button" key={place.place_id} className="booking-place"
-        disabled={!!resolving || locating} onClick={() => void resolve(place)}>
+      {results.map(place => <button type="button" key={place.place_id} className="booking-place"
+        disabled={!!resolving || locating || searching || resultQuery !== query} onClick={() => void resolve(place)}>
         {resolving === place.place_id ? <span className="booking-spinner" /> : <i className="ri-map-pin-2-line" aria-hidden="true" />}
         <span><strong>{place.main_text || place.description}</strong>{place.secondary_text && <small>{place.secondary_text}</small>}</span>
       </button>)}

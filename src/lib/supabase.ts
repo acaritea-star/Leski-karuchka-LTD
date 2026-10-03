@@ -4,6 +4,13 @@ import type { Database } from '@/lib/database.types';
 export const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string).replace(/\/$/, '');
 export const supabaseAnonKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
 
+// Preserve Supabase's existing project-specific key. This is only a routing
+// hint; the SDK and the server still validate the session and its privileges.
+export const authStorageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`;
+export function hasStoredSession(): boolean {
+  try { return localStorage.getItem(authStorageKey) !== null; } catch { return false; }
+}
+
 // Serialize auth operations through a simple in-memory queue instead of the
 // browser Navigator LockManager. Cross-tab LockManager contention can deadlock
 // supabase-js, so a request never receives its access token and RLS silently
@@ -30,6 +37,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
+    storageKey: authStorageKey,
     // CRITICAL: the /auth/callback page exchanges the PKCE code explicitly.
     // Auto-detection must stay OFF, otherwise the SDK and the page race to
     // exchange the same code and the session/profile can end up empty.

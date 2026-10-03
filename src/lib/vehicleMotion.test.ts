@@ -110,3 +110,12 @@ it('uses original GPS and server receipt times for freshness', () => {
   expect(freshFix({ ...fix(a, 45_000), receivedAt: 1000 }, 46_000)).toBe(false);
   expect(freshFix({ ...fix(a, 1000), accuracy: 500 }, 1000)).toBe(false);
 });
+
+it('shows a real GPS fix beyond the destination rather than hiding it at the end pin', () => {
+  const motion = new VehicleMotion(); motion.setRoute(path);
+  motion.update(fix(b, 1000), 1000);
+  const beyond = { lat: b.lat, lng: b.lng + .001 };
+  motion.update(fix(beyond, 6000), 6000);
+  expect(motion.sample(11000)).toMatchObject({ ...beyond, moving: false });
+  expect(motion.sample(90000)).toMatchObject({ ...beyond, moving: false });
+});

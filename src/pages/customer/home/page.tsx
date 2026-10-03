@@ -117,6 +117,8 @@ export default function CustomerHome() {
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeInput, setRouteInput] = useState('');
+  const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
+  const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
   const quoteInput = JSON.stringify([pickup, destination, vehicleType]);
   const currentRoute = routeInput === quoteInput ? route : null;
@@ -365,13 +367,14 @@ export default function CustomerHome() {
             setRequestError(t('route_failed'));
           } else {
             setRoute(result);
+            setVisualRoute({ endpoints, route: result });
             setRouteInput(quoteInput);
             setRequestError('');
           }
         });
     }, 350);
     return () => { active = false; clearTimeout(timer); };
-  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, quoteInput, t]);
+  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
 
   const cancelRequest = async () => {
     if (!activeRequest || cancelling) return;
@@ -478,7 +481,7 @@ export default function CustomerHome() {
     : destination;
 
   return <CustomerLayout
-    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={currentRoute} />}
+    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} />}
     header={<>
       <div className="customer-brand">
         <img src={LOGO_URL} alt="" />
@@ -511,7 +514,7 @@ export default function CustomerHome() {
             calculating={calculating} priceExpired={!!fare && !currentRoute?.quote_id}
             onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
-          : <LocationPicker key={step} searchQuery={searchQuery} onSearchChange={setSearchQuery}
+          : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}
             onUseCurrent={detectLocation} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
       </>}

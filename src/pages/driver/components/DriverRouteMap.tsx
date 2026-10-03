@@ -7,7 +7,7 @@ import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPositi
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { drawRouteLine, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
-import { matchRoute, measureRoute, remainingRoute } from '@/lib/routeGeometry';
+import { matchRoute, measureRoute } from '@/lib/routeGeometry';
 import { freshFix, type VehicleFix } from '@/lib/vehicleMotion';
 
 export interface NavInfo {
@@ -47,7 +47,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   const positionFresh = usePositionFreshness(pos);
   const { info: routeInfo, path: routePath, error: routeError } = useDrivingRoute(pos, targetLat, targetLng);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, pos, routePath, undefined,
-    frame => { if (routePath.length >= 2) activeLineRef.current?.setPath(remainingRoute(routePath, frame)); });
+    frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); });
 
   useEffect(() => {
     let active = true;
@@ -104,7 +104,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
     const base = drawRouteLine(map, routePath, { color, muted: true });
     const active = drawRouteLine(map, routePath, { color, zIndex: 20 });
     activeLineRef.current = active;
-    if (vehicleFrame.current) active.setPath(remainingRoute(routePath, vehicleFrame.current));
+    if (vehicleFrame.current) active.follow(vehicleFrame.current);
     return () => { base.remove(); active.remove(); activeLineRef.current = null; };
   }, [mapReady, routePath, targetKind, vehicleFrame]);
 

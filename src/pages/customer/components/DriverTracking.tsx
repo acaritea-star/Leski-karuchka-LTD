@@ -10,7 +10,7 @@ import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPositi
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { drawRouteLine, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
-import { measureRoute, remainingRoute } from '@/lib/routeGeometry';
+import { measureRoute } from '@/lib/routeGeometry';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
 
@@ -112,7 +112,7 @@ export default function DriverTracking({
   const tripPath = useMemo(() => routeInfo?.polyline ? measureRoute(decodePolyline(routeInfo.polyline)).points : [], [routeInfo]);
   const motionPath = livePath.length ? livePath : headingToPickup ? NO_ROUTE : tripPath;
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, location, motionPath, CAR_COLORS[vehicleType] || CAR_COLORS.standard,
-    frame => { if (motionPath.length >= 2) activeLineRef.current?.setPath(remainingRoute(motionPath, frame)); });
+    frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); });
 
   // ── Initialise Google map (once) ──
   useEffect(() => {
@@ -199,7 +199,7 @@ export default function DriverTracking({
     const active = activePath.length >= 2 && (headingToPickup || livePath.length >= 2)
       ? drawRouteLine(map, activePath, { color: headingToPickup ? MAP_PICKUP_COLOR : undefined, zIndex: 20 }) : null;
     activeLineRef.current = active ?? base;
-    if (activePath.length >= 2 && vehicleFrame.current) activeLineRef.current?.setPath(remainingRoute(activePath, vehicleFrame.current));
+    if (activePath.length >= 2 && vehicleFrame.current) activeLineRef.current?.follow(vehicleFrame.current);
     return () => { base?.remove(); active?.remove(); activeLineRef.current = null; };
   }, [tripPath, livePath, headingToPickup, mapReady, vehicleFrame]);
 

@@ -50,3 +50,22 @@ describe('address lookup', () => {
     expect(document.activeElement).not.toBe(screen.getByRole('searchbox'));
   });
 });
+
+it('keeps existing suggestions visible but blocks selecting stale addresses while searching', async () => {
+  let latest!: (value: Awaited<ReturnType<typeof searchPlaces>>) => void;
+  vi.mocked(searchPlaces).mockResolvedValueOnce([{ place_id: 'old', description: 'Първи адрес' }])
+    .mockReturnValueOnce(new Promise(resolve => { latest = resolve; }));
+  const view = render(<LocationPicker {...props} searchQuery="Лев" />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(301); });
+  view.rerender(<LocationPicker {...props} searchQuery="Левски" />);
+  const old = screen.getByRole('button', { name: 'Първи адрес' }) as HTMLButtonElement;
+  expect(old.disabled).toBe(true);
+  fireEvent.click(old);
+  expect(getPlaceDetails).not.toHaveBeenCalled();
+  await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+  expect(screen.queryByText('Търсене…')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Първи адрес' })).toBeTruthy();
+  await act(async () => { latest([{ place_id: 'new', description: 'Точен адрес' }]); });
+  expect(screen.queryByRole('button', { name: 'Първи адрес' })).toBeNull();
+  expect((screen.getByRole('button', { name: 'Точен адрес' }) as HTMLButtonElement).disabled).toBe(false);
+});
