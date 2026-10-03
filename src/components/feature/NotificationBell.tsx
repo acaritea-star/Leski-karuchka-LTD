@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { sendPushToUser } from '@/lib/push';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface Notification {
@@ -24,6 +23,8 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const fetchSequence = useRef(0);
+  const cancelPendingFetch = useCallback(() => { fetchSequence.current++; }, []);
 
   const unread = notifications.filter((n) => !n.is_read).length;
 
@@ -49,6 +50,7 @@ export default function NotificationBell() {
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
+    const sequence = ++fetchSequence.current;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -59,17 +61,32 @@ export default function NotificationBell() {
         .limit(30);
 
       if (error) throw error;
-      setNotifications((data || []) as Notification[]);
+      if (sequence === fetchSequence.current) setNotifications((data || []) as Notification[]);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     } finally {
-      setLoading(false);
+      if (sequence === fetchSequence.current) setLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    setNotifications([]);
+    void fetchNotifications();
+    const reconcile = () => {
+      if (document.visibilityState !== 'hidden') void fetchNotifications();
+    };
+    const interval = user?.id ? setInterval(reconcile, 30_000) : null;
+    window.addEventListener('online', reconcile);
+    window.addEventListener('focus', reconcile);
+    document.addEventListener('visibilitychange', reconcile);
+    return () => {
+      cancelPendingFetch();
+      if (interval) clearInterval(interval);
+      window.removeEventListener('online', reconcile);
+      window.removeEventListener('focus', reconcile);
+      document.removeEventListener('visibilitychange', reconcile);
+    };
+  }, [fetchNotifications, user?.id, cancelPendingFetch]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -85,17 +102,19 @@ export default function NotificationBell() {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
-          setNotifications((prev) => [newNotif, ...prev]);
+          setNotifications((prev) => [newNotif, ...prev.filter(n => n.id !== newNotif.id)].slice(0, 30));
           // Play soft customer chime for every new notification
           playCustomerSound();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') void fetchNotifications();
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, playCustomerSound]);
+  }, [user?.id, playCustomerSound, fetchNotifications]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -111,8 +130,9 @@ export default function NotificationBell() {
     if (!user?.id) return;
     const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
     if (unreadIds.length === 0) return;
-    await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    const { error } = await supabase.from('notifications').update({ is_read: true })
+      .eq('user_id', user.id).in('id', unreadIds);
+    if (!error) setNotifications((prev) => prev.map((n) => unreadIds.includes(n.id) ? { ...n, is_read: true } : n));
   };
 
   const formatTime = (dateStr: string) => {

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 export const GPS_HEARTBEAT_MS = 15_000;
 export const GPS_STALE_MS = 45_000;
+export const GPS_MAX_ACCURACY_METERS = 100;
 const MOVING_INTERVAL_MS = 5_000;
 let generation = 0;
 let watchId: number | null = null;
@@ -25,7 +26,7 @@ export function getCurrentPosition(): Promise<GeolocationPosition> {
 }
 export async function saveDriverPosition(id: string, company: string, position: GeolocationPosition): Promise<string> {
   if (Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла.');
-  if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy > 1000) throw new Error('Неточна GPS позиция. Изчакай по-добър сигнал.');
+  if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy < 0 || position.coords.accuracy > GPS_MAX_ACCURACY_METERS) throw new Error('Неточна GPS позиция. Изчакай по-добър сигнал.');
   const { data, error } = await supabase.from('driver_locations').upsert({
     driver_id: id, company_id: company,
     latitude: position.coords.latitude, longitude: position.coords.longitude,

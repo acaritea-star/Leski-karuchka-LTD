@@ -35,6 +35,7 @@ for name in sorted(s.get('views',[])):
  a.append('}; Relationships: []; };')
 a.append('''}; Functions: {
 create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
+accept_taxi_request: { Args: { p_request_id: string }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
 request_push_recipients: { Args: { p_request_id: string }; Returns: { user_id: string }[] };
 }; Enums: {''')

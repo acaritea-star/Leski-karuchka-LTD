@@ -40,6 +40,14 @@ describe('driver GPS writes',()=>{
     startDriverGps('driver','company');watch({...fix(),timestamp:Date.now()-60000});await flush();
     expect(single).not.toHaveBeenCalled();expect(getGpsStats().error).toContain('остаряла');
   });
+  it('rejects a location too imprecise for dispatch without claiming a successful write',async()=>{
+    const onUpdate=vi.fn(),onError=vi.fn();startDriverGps('driver','company',{onUpdate,onError});
+    const coarse={...fix(),coords:{...fix().coords,accuracy:101}};
+    watch(coarse);await flush();
+    expect(upsert).not.toHaveBeenCalled();expect(onUpdate).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('Неточна'));
+    watch(fix());await flush();expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
   it('allows only one write in flight',async()=>{
     let resolve!: (value:unknown)=>void;single.mockReturnValueOnce(new Promise(r=>{resolve=r;}));
     startDriverGps('driver','company');watch(fix());watch(fix(43.3));expect(single).toHaveBeenCalledTimes(1);

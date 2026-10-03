@@ -713,6 +713,7 @@ Row: {
 "updated_at": string;
 "estimated_distance_km": number | null;
 "estimated_duration_min": number | null;
+"expires_at": string | null;
 };
 Insert: {
 "id"?: string;
@@ -744,6 +745,7 @@ Insert: {
 "updated_at"?: string;
 "estimated_distance_km"?: number | null;
 "estimated_duration_min"?: number | null;
+"expires_at"?: string | null;
 };
 Update: {
 "id"?: string;
@@ -775,6 +777,7 @@ Update: {
 "updated_at"?: string;
 "estimated_distance_km"?: number | null;
 "estimated_duration_min"?: number | null;
+"expires_at"?: string | null;
 };
 Relationships: [{"columns": ["company_id"], "isOneToOne": false, "foreignKeyName": "taxi_requests_company_id_fkey", "referencedColumns": ["id"], "referencedRelation": "companies"}, {"columns": ["customer_id"], "isOneToOne": false, "foreignKeyName": "taxi_requests_customer_id_fkey", "referencedColumns": ["id"], "referencedRelation": "profiles"}, {"columns": ["driver_id"], "isOneToOne": false, "foreignKeyName": "taxi_requests_driver_id_fkey", "referencedColumns": ["id"], "referencedRelation": "drivers"}, {"columns": ["vehicle_type_id"], "isOneToOne": false, "foreignKeyName": "taxi_requests_vehicle_type_id_fkey", "referencedColumns": ["id"], "referencedRelation": "vehicle_types"}]; };
 "trips": {
@@ -927,6 +930,7 @@ Relationships: [{"columns": ["company_id"], "isOneToOne": false, "foreignKeyName
 }; Relationships: []; };
 }; Functions: {
 create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
+accept_taxi_request: { Args: { p_request_id: string }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
 request_push_recipients: { Args: { p_request_id: string }; Returns: { user_id: string }[] };
 }; Enums: {

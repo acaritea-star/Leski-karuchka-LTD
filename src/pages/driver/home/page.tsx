@@ -170,13 +170,7 @@ export default function DriverHome() {
   const acceptMutation = useMutation({
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error } = await supabase
-        .from('taxi_requests')
-        .update({ driver_id: driver.id, status: 'accepted', accepted_at: new Date().toISOString() })
-        .eq('id', requestId)
-        .eq('status', 'pending')
-        .select('*')
-        .single();
+      const { data, error } = await supabase.rpc('accept_taxi_request', { p_request_id: requestId });
       if (error) throw error;
       return data;
     },
@@ -190,7 +184,8 @@ export default function DriverHome() {
       }
       navigate('/driver/requests');
     },
-    onError: () => {
+    onError: (err) => {
+      setGpsError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.company_id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(user.company_id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.company_id) });

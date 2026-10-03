@@ -15,7 +15,6 @@ import CustomerLayout, { BookingSkeleton } from '@/pages/customer/components/Cus
 import BookingSteps from '@/pages/customer/components/BookingSteps';
 import { recentLocations, stepAfterSelection, type BookingStep } from '@/pages/customer/components/bookingFlow';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { broadcastPushToDrivers } from '@/lib/push';
 import type { LocationPreset } from '@/lib/geo';
 import { computeRoute, reverseGeocode, type RouteResult } from '@/lib/googleMaps';
 import { LOGO_URL } from '@/lib/logo';
@@ -267,9 +266,6 @@ export default function CustomerHome() {
       if (error) throw new Error();
       if (!data) throw new Error();
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
-      void broadcastPushToDrivers(data.company_id, t('push_new_request_title'),
-        t('push_new_request_body', {pickup:pickup?.address,dest:destination?.address}),
-        {tag:`request-${data.id}`,data:{request_id:data.id}});
     } catch {
       setRequestError(t('request_failed_hint'));
       setRequestStatus('error');

@@ -9,13 +9,12 @@ import { calculateFare } from '@/lib/pricing';
 import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
-  rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(), push: vi.fn(),
+  rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
   user: { id: 'customer', company_id: 'company', first_name: 'Тест', email: 'test@example.test' },
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: fake.user, loading: false }) }));
 vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register: fake.register }) }));
-vi.mock('@/lib/push', () => ({ broadcastPushToDrivers: fake.push }));
 vi.mock('@/lib/googleMaps', () => ({ computeRoute: fake.route, reverseGeocode: fake.reverse }));
 vi.mock('@/pages/customer/components/BookingMap', () => ({ default: () => <div>Map</div> }));
 vi.mock('@/pages/customer/components/DriverTracking', () => ({ default: () => <div>Tracking</div> }));

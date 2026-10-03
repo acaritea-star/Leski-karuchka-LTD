@@ -9,51 +9,10 @@ import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { sendPushToUser } from '@/lib/push';
 import type { Tables } from '@/lib/database.types';
 import { calculateDistance, estimateDuration } from '@/lib/geo';
 import DriverRouteMap, { type NavInfo } from '@/pages/driver/components/DriverRouteMap';
 import { useDriverDeclines } from '@/hooks/useDriverDeclines';
-
-// ── Notification helper ──
-async function notifyCustomer(
-  customerId: string,
-  companyId: string,
-  title: string,
-  message: string,
-  requestId: string,
-  status: string,
-) {
-  try {
-    await supabase.from('notifications').insert({
-      user_id: customerId,
-      company_id: companyId,
-      type: 'trip_status',
-      title,
-      message,
-      data: { request_id: requestId, status },
-    });
-  } catch {
-    /* silently ignore notification failures */
-  }
-}
-
-// ── Push helper for customer ──
-async function pushCustomer(
-  customerId: string,
-  title: string,
-  body: string,
-  type: string,
-  requireInteraction = false,
-) {
-  await sendPushToUser(customerId, title, body, {
-    tag: `trip-${type}`,
-    data: { type: 'trip_status', role: 'CUSTOMER' },
-    requireInteraction,
-    renotify: true,
-    vibrate: type === 'new_request' ? [300, 100, 300, 100, 300] : [150, 50, 150],
-  });
-}
 
 type TaxiRequest = Tables<'taxi_requests'>;
 type DriverRecord = Tables<'drivers'>;
@@ -190,28 +149,12 @@ export default function DriverRequests() {
   const acceptMutation = useMutation({
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error: updateError } = await supabase
-        .from('taxi_requests')
-        .update({ driver_id: driver.id, status: 'accepted', accepted_at: new Date().toISOString() })
-        .eq('id', requestId)
-        .eq('status', 'pending')
-        .select('*')
-        .single();
+      const { data, error: updateError } = await supabase.rpc('accept_taxi_request', { p_request_id: requestId });
       if (updateError) throw updateError;
       return data;
     },
-    onSuccess: async (data) => {
+    onSuccess: () => {
       setError('');
-      // Push to customer that driver accepted
-      if (data.customer_id) {
-        await pushCustomer(
-          data.customer_id,
-          t('push_driver_accepted_title'),
-          t('push_driver_accepted_body', { addr: data.pickup_address }),
-          'accepted',
-          true,
-        );
-      }
       if (driver?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       }
@@ -237,26 +180,8 @@ export default function DriverRequests() {
       if (error) throw error;
       return { ...request, status: 'arrived' as const };
     },
-    onSuccess: async (updated) => {
+    onSuccess: (updated) => {
       setError('');
-      // Push + in-app notification to customer
-      if (updated.customer_id && updated.company_id) {
-        notifyCustomer(
-          updated.customer_id,
-          updated.company_id,
-          t('push_driver_arrived_title'),
-          t('push_driver_arrived_body', { addr: updated.pickup_address }),
-          updated.id,
-          updated.status,
-        );
-        await pushCustomer(
-          updated.customer_id,
-          t('push_driver_arrived_title'),
-          t('push_driver_arrived_body', { addr: updated.pickup_address }),
-          'arrived',
-          true,
-        );
-      }
       if (driver?.id) {
         queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), updated);
       }
@@ -276,25 +201,8 @@ export default function DriverRequests() {
       if (error) throw error;
       return { ...request, status: 'in_progress' as const };
     },
-    onSuccess: async (updated) => {
+    onSuccess: (updated) => {
       setError('');
-      if (updated.customer_id && updated.company_id) {
-        notifyCustomer(
-          updated.customer_id,
-          updated.company_id,
-          t('push_trip_started_title'),
-          t('push_trip_started_body'),
-          updated.id,
-          updated.status,
-        );
-        await pushCustomer(
-          updated.customer_id,
-          t('push_trip_started_title'),
-          t('push_trip_started_body'),
-          'in_progress',
-          false,
-        );
-      }
       if (driver?.id) {
         queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), updated);
       }
@@ -314,26 +222,8 @@ export default function DriverRequests() {
       if (error) throw error;
       return { ...request, status: 'completed' as const };
     },
-    onSuccess: async (updated) => {
+    onSuccess: () => {
       setError('');
-      const priceLabel = `${parseFloat(String(updated.estimated_price)).toFixed(2)} ${t('lv')}`;
-      if (updated.customer_id && updated.company_id) {
-        notifyCustomer(
-          updated.customer_id,
-          updated.company_id,
-          t('push_trip_completed_title'),
-          t('push_trip_completed_body', { price: priceLabel }),
-          updated.id,
-          updated.status,
-        );
-        await pushCustomer(
-          updated.customer_id,
-          t('push_trip_completed_title'),
-          t('push_trip_completed_body', { price: priceLabel }),
-          'completed',
-          true,
-        );
-      }
       if (driver?.id) {
         queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), null);
       }
@@ -375,9 +265,8 @@ export default function DriverRequests() {
         },
       )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests' }, (payload) => {
-        const oldRow = payload.old as Partial<TaxiRequest> | undefined;
         const newRow = payload.new as TaxiRequest;
-        if (oldRow?.status === 'pending' && newRow.status !== 'pending' && newRow.company_id === companyId) {
+        if (newRow.company_id === companyId) {
           queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
         }
       })

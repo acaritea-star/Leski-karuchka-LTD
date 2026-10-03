@@ -2972,6 +2972,17 @@
       "is_generated": "NEVER",
       "data_type": "character varying",
       "udt_name": "varchar"
+    },
+    {
+      "table_name": "taxi_requests",
+      "column_name": "expires_at",
+      "ordinal_position": 30,
+      "is_nullable": "YES",
+      "column_default": "(clock_timestamp() + '00:02:00'::interval)",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
     }
   ],
   "foreign_keys": [
