@@ -6,3 +6,10 @@ it('allows Bulgarian service locations across the country', () => {
 it('rejects other countries including places inside the Bulgaria bounding rectangle', () => {
   for (const [lat,lng] of [[51.507,-.128],[40.64,22.94],[44.1598,28.6348],[41.734,22.195],[43.318,21.896],[NaN,25],[43,Infinity]]) expect(isInBulgaria(lat,lng)).toBe(false);
 });
+
+it('keeps the frontend-only boundary copy identical to the backend helper', async () => {
+  const { readFile } = await import('node:fs/promises');
+  expect(await readFile(new URL('./serviceArea.ts', import.meta.url), 'utf8')).toBe(
+    await readFile(new URL('../../supabase/functions/_shared/serviceArea.ts', import.meta.url), 'utf8'),
+  );
+});
