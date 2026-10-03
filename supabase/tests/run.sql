@@ -5,4 +5,5 @@ SET LOCAL statement_timeout = '30s';
 \ir core.sql
 \ir cash_geo_push.sql
 \ir reliable_dispatch.sql
+\ir competing_acceptance.sql
 ROLLBACK;

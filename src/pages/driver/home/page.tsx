@@ -149,9 +149,8 @@ export default function DriverHome() {
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
-      const goingOnline = !driver.is_online;
 
       return await setDriverOnline(driver, goingOnline);
     },
@@ -188,6 +187,7 @@ export default function DriverHome() {
       navigate('/driver/requests');
     },
     onError: (err) => {
+      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setGpsError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.company_id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(user.company_id) });
@@ -470,7 +470,8 @@ export default function DriverHome() {
                 onClick={() => {
                   if (toggleInFlight.current || !driver || !user?.id) return;
                   toggleInFlight.current = true;
-                  void queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) }).then(() => toggleMutation.mutate());
+                  const goingOnline = !driver.is_online;
+                  void queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) }).then(() => toggleMutation.mutate(goingOnline));
                 }}
                 disabled={toggling}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all duration-300 whitespace-nowrap cursor-pointer relative overflow-hidden mb-3

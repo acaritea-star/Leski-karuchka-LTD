@@ -9,6 +9,7 @@ import { calculateFare } from '@/lib/pricing';
 import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
+  readById: vi.fn(), notify: null as null | ((payload: { new: Record<string, unknown> }) => void),
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
   user: { id: 'customer', company_id: 'company', first_name: 'Тест', email: 'test@example.test' },
@@ -23,13 +24,14 @@ vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
 vi.mock('@/lib/places', () => ({ hasPlacesApi: () => false }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
   rpc: fake.rpc, removeChannel: vi.fn(),
-  channel: () => { const channel = { on: () => channel, subscribe: () => channel }; return channel; },
+  channel: () => { const channel = { on: (_event: string, _filter: unknown, callback: typeof fake.notify) => { fake.notify = callback; return channel; }, subscribe: () => channel }; return channel; },
   from: (table: string) => {
     const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? { id: 'company' }
       : [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true }],
     error: table === 'taxi_requests' && fake.recoveryError ? { message: 'offline' } : null });
-    const query = { select: () => query, eq: () => query, in: () => query, order: () => query,
-      limit: () => query, maybeSingle: async () => result(), then: (resolve: (data: unknown) => unknown) => Promise.resolve(result()).then(resolve) };
+    let byId = false;
+    const query = { select: () => query, abortSignal: () => query, eq: (field: string) => { if (field === 'id') byId = true; return query; }, in: () => query, order: () => query,
+      limit: () => query, maybeSingle: async () => table === 'taxi_requests' && byId ? fake.readById() : result(), then: (resolve: (data: unknown) => unknown) => Promise.resolve(result()).then(resolve) };
     return query;
   },
 } }));
@@ -47,6 +49,8 @@ const chooseRoute = async () => {
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); fake.active = null; fake.recoveryError = false;
+  fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
+  fake.notify = null;
   fake.route.mockResolvedValue(quote());
   fake.rpc.mockImplementation(async () => {
     fake.active = { id: 'request', company_id: 'company', driver_id: null, status: 'pending', pickup_address: pickup.address,
@@ -109,4 +113,21 @@ describe('customer booking integration', () => {
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(fake.rpc).not.toHaveBeenCalled();
   });
+});
+
+it('keeps the accepted Realtime status when a slow earlier poll returns pending, with no overlapping reads', async () => {
+  const pending = { id:'request',company_id:'company',driver_id:null,status:'pending',pickup_address:pickup.address,
+    destination_address:destination.address,pickup_latitude:pickup.lat,pickup_longitude:pickup.lng,
+    destination_latitude:destination.lat,destination_longitude:destination.lng,estimated_price:5,updated_at:'2026-10-03T18:00:00Z' };
+  fake.active = pending;
+  let finish!: (value: unknown) => void;
+  fake.readById.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  await mount();
+  expect(fake.readById).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
+  expect(fake.readById).toHaveBeenCalledTimes(1);
+  act(() => fake.notify?.({ new:{ ...pending,status:'accepted',driver_id:'driver',updated_at:'2026-10-03T18:00:01Z' } }));
+  expect(screen.getByText('Tracking')).toBeTruthy();
+  await act(async () => finish({ data:pending,error:null }));
+  expect(screen.getByText('Tracking')).toBeTruthy();
 });

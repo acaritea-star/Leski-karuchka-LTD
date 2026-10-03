@@ -1,3 +1,4 @@
+import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -41,6 +42,7 @@ interface ActiveRequest {
   destination_address: string;
   estimated_price: number | null;
   cancelled_by?: string | null;
+  updated_at?: string;
 }
 
 type RequestStatus = 'idle' | 'creating' | 'created' | 'error';
@@ -287,7 +289,7 @@ export default function CustomerHome() {
       try {
         const { data, error } = await supabase.from('taxi_requests').select('*')
           .eq('customer_id', user.id).in('status', ['pending', ...TRACKING_STATUSES])
-          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+          .order('created_at', { ascending: false }).limit(1).abortSignal(AbortSignal.timeout(10_000)).maybeSingle();
         if (!active) return;
         if (error) throw error;
         if (data) {
@@ -305,23 +307,21 @@ export default function CustomerHome() {
   useEffect(() => {
     if (!activeRequestId) return;
     const requestId = activeRequestId;
+    let active = true, inFlight = false;
+    const controller = new AbortController();
     const poll = async () => {
+      if (!active || inFlight || document.visibilityState === 'hidden') return;
+      inFlight = true;
       try {
-        const { data } = await supabase
-          .from('taxi_requests')
-          .select('*')
-          .eq('id', requestId)
-          .maybeSingle();
-        if (data) {
-          setActiveRequest((prev) => (prev ? { ...prev, ...(data as ActiveRequest) } : prev));
-        }
-      } catch {
-        // silently ignore
-      }
+        const { data, error } = await supabase.from('taxi_requests').select('*').eq('id', requestId)
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])).maybeSingle();
+        if (active && !error && data) setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest));
+      } catch { /* Realtime and the next bounded poll can recover a missed read. */ }
+      finally { inFlight = false; }
     };
-    poll();
-    const id = setInterval(poll, 5000);
-    return () => clearInterval(id);
+    void poll();
+    const id = setInterval(() => void poll(), 5000);
+    return () => { active = false; controller.abort(); clearInterval(id); };
   }, [activeRequestId]);
 
   // Realtime subscription
@@ -341,7 +341,7 @@ export default function CustomerHome() {
         },
         (payload) => {
           setActiveRequest((prev) =>
-            prev ? ({ ...prev, ...(payload.new as ActiveRequest) }) : prev,
+            mergeRequestSnapshot(prev, payload.new as ActiveRequest),
           );
         },
       )

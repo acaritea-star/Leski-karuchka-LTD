@@ -1,6 +1,6 @@
 import { setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +27,7 @@ function routeStats(r: Pick<TaxiRequest, 'pickup_latitude' | 'pickup_longitude' 
 
 export default function DriverRequests() {
   const { t } = useTranslation();
+  const toggleInFlight = useRef(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -105,6 +106,7 @@ export default function DriverRequests() {
   // Reset nav info when active request changes (pickup → destination switch)
   useEffect(() => {
     setDriverNavInfo(null);
+    setError('');
   }, [activeRequest?.id, activeRequest?.status]);
 
   // ── Incoming requests ──
@@ -127,23 +129,33 @@ export default function DriverRequests() {
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
-      const goingOnline = !driver.is_online;
 
-      await setDriverOnline(driver, goingOnline);
-      return goingOnline;
+      return await setDriverOnline(driver, goingOnline);
     },
-    onSuccess: () => {
+    onSuccess: async (confirmed) => {
+      if (user?.id) {
+        await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
+        queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
+      }
       setGpsError('');
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverRecord(user.id) });
       }
     },
+    onSettled: () => { toggleInFlight.current = false; },
     onError: (err) => {
       setGpsError(err instanceof Error ? err.message : t('gps_error'));
     },
   });
+
+  const toggleAvailability = () => {
+    if (toggleInFlight.current || !driver || !user?.id) return;
+    const target = !driver.is_online;
+    toggleInFlight.current = true;
+    void queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) }).then(() => toggleMutation.mutate(target));
+  };
 
   // ── Accept request ──
   const acceptMutation = useMutation({
@@ -163,6 +175,7 @@ export default function DriverRequests() {
       }
     },
     onError: (err) => {
+      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.company_id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.company_id) });
@@ -187,6 +200,7 @@ export default function DriverRequests() {
       }
     },
     onError: (err) => {
+      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('trip_arrived_error'));
     },
   });
@@ -208,6 +222,7 @@ export default function DriverRequests() {
       }
     },
     onError: (err) => {
+      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('trip_start_error'));
     },
   });
@@ -229,6 +244,7 @@ export default function DriverRequests() {
       }
     },
     onError: (err) => {
+      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('trip_end_error'));
     },
   });
@@ -237,6 +253,7 @@ export default function DriverRequests() {
   useEffect(() => {
     if (!user?.company_id || !driver?.id) return;
     const companyId = user.company_id;
+    let subscribed = false;
 
     const channel = supabase
       .channel(`driver-requests-panel-${driver.id}`)
@@ -270,7 +287,15 @@ export default function DriverRequests() {
           queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
         }
       })
-      .subscribe();
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          if (subscribed) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
+          }
+          subscribed = true;
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -392,7 +417,7 @@ export default function DriverRequests() {
             <p className="text-foreground-600 font-medium text-sm mb-1">{t('go_online_to_receive')}</p>
             <p className="text-xs text-foreground-400 mb-5">{t('go_online_hint')}</p>
             <button
-              onClick={() => toggleMutation.mutate()}
+              onClick={toggleAvailability}
               disabled={toggling}
               className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap cursor-pointer
                 ${toggling ? 'opacity-70' : 'active:scale-[0.98]'}
@@ -563,7 +588,7 @@ export default function DriverRequests() {
                     {incomingRequests.length} {incomingRequests.length === 1 ? t('request_unit_one') : t('request_unit_other')}
                   </p>
                   <button
-                    onClick={() => toggleMutation.mutate()}
+                    onClick={toggleAvailability}
                     disabled={toggling}
                     className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1"
                   >

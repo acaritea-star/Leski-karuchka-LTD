@@ -11,9 +11,10 @@ INSERT INTO public.vehicle_types(id,company_id,name) SELECT vehicle_type,company
 INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number) SELECT vehicle,company,vehicle_type,'Test','Test','TEST-'||left(vehicle::text,8) FROM test_ids;
 UPDATE public.profiles SET company_id=(SELECT company FROM test_ids),role='DRIVER' WHERE id=(SELECT driver_user FROM test_ids);
 UPDATE test_ids SET driver=(SELECT id FROM public.drivers WHERE user_id=test_ids.driver_user);
-UPDATE public.drivers SET is_verified=true,vehicle_id=(SELECT vehicle FROM test_ids),is_online=true WHERE id=(SELECT driver FROM test_ids);
+UPDATE public.drivers SET is_verified=true,vehicle_id=(SELECT vehicle FROM test_ids),is_online=false WHERE id=(SELECT driver FROM test_ids);
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT driver,company,43.2,25.6,10,now() FROM test_ids;
+UPDATE public.drivers SET is_online=true WHERE id=(SELECT driver FROM test_ids);
 INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
  SELECT quote,customer,company,vehicle_type,'{"pickup_latitude":43.2,"pickup_longitude":25.6,"destination_latitude":43.3,"destination_longitude":25.7,"pickup_address":"Test pickup","destination_address":"Test destination","distance_km":12,"duration_min":20,"total":15,"breakdown":{"total":15}}'::jsonb FROM test_ids;
 CREATE FUNCTION pg_temp.must_fail(q text) RETURNS void LANGUAGE plpgsql AS $$
