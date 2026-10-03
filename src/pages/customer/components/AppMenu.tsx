@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
+import { openCookieSettings } from '@/lib/cookieConsent';
 
 interface MenuItem {
   path: string;
@@ -68,6 +69,7 @@ export default function AppMenu() {
   const secondaryItems: MenuItem[] = [
     { path: '/contact', labelKey: 'menu_help', icon: 'ri-question-line' },
     { path: '/privacy', labelKey: 'menu_privacy', icon: 'ri-shield-check-line' },
+    { path: '/terms', labelKey: 'menu_terms', icon: 'ri-file-text-line' },
   ];
 
   const renderItem = (item: MenuItem) => {
@@ -174,6 +176,10 @@ export default function AppMenu() {
           {mainItems.map(renderItem)}
           <div className="h-px bg-background-100 my-2" />
           {secondaryItems.map(renderItem)}
+          <button type="button" className="w-full px-3 py-3 text-left text-[15px] text-foreground-800 underline cursor-pointer"
+            onClick={() => { setOpen(false); setClosing(false); openCookieSettings(); }}>
+            {t('cookie_settings')}
+          </button>
         </nav>
 
         {/* Logout */}

@@ -1,6 +1,8 @@
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
 import { unregisterPush } from '@/lib/pushSubscription';
+import { clearRecentLocations } from '@/lib/cookieConsent';
+import { startSocialSignIn, type SocialProvider } from '@/lib/socialAuth';
 import {
   createContext,
   useContext,
@@ -10,7 +12,7 @@ import {
   useRef,
 } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { User as SupabaseUser, Session, AuthResponse, OAuthResponse } from '@supabase/supabase-js';
+import type { User as SupabaseUser, Session, OAuthResponse } from '@supabase/supabase-js';
 import type { Tables } from '@/lib/database.types';
 
 export interface AppUser {
@@ -30,9 +32,7 @@ interface AuthContextType {
   loading: boolean;
   profileError: string | null;
   refreshProfile: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<AuthResponse>;
-  signInWithOAuth: (provider: 'google' | 'facebook') => Promise<OAuthResponse>;
-  signUp: (email: string, password: string, metadata: Record<string, string>) => Promise<AuthResponse>;
+  signInWithOAuth: (provider: SocialProvider) => Promise<OAuthResponse>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<AppUser>) => Promise<{ data: Tables<'profiles'> | null; error: { message: string } | null }>;
 }
@@ -217,39 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile]);
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      
-      const result = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return result;
-    },
-    [],
-  );
-
   const signInWithOAuth = useCallback(
-    async (provider: 'google' | 'facebook') => {
-      // Register this origin's callback in Supabase Auth's redirect allowlist.
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      
-      return await supabase.auth.signInWithOAuth({provider,options:{redirectTo}});
-    },
-    [],
-  );
-
-  const signUp = useCallback(
-    async (email: string, password: string, metadata: Record<string, string>) => {
-      
-      const result = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: metadata },
-      });
-      
-      return result;
-    },
+    (provider: SocialProvider) => startSocialSignIn(provider),
     [],
   );
 
@@ -261,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    clearRecentLocations();
     queryClient.clear();
     setUser(null);
     setSession(null);
@@ -299,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, profileError, refreshProfile, signIn, signInWithOAuth, signUp, signOut, updateProfile }}
+      value={{ user, session, loading, profileError, refreshProfile, signInWithOAuth, signOut, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

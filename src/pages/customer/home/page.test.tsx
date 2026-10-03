@@ -6,6 +6,7 @@ import '@/i18n';
 import CustomerHome from './page';
 import type { RouteResult } from '@/lib/googleMaps';
 import { calculateFare } from '@/lib/pricing';
+import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(), push: vi.fn(),
@@ -54,6 +55,7 @@ beforeEach(() => {
       destination_latitude: destination.lat, destination_longitude: destination.lng, estimated_price: 5 };
     return { data: fake.active, error: null };
   });
+  saveConsent({ ...defaultConsent(), functional: true });
   localStorage.setItem('leski_recent_locations', JSON.stringify([pickup, destination]));
 });
 afterEach(() => { cleanup(); localStorage.clear(); vi.useRealTimers(); });
