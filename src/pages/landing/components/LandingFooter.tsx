@@ -68,6 +68,11 @@ export default function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <a href="/data-deletion.html" className="text-sm text-foreground-500 hover:text-primary-600 transition-colors">
+                  Изтриване на данни
+                </a>
+              </li>
+              <li>
                 <Link to="/cookies" className="text-sm text-foreground-500 hover:text-primary-600 transition-colors">
                   Бисквитки
                 </Link>

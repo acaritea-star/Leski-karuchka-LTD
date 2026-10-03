@@ -13,5 +13,6 @@ Public pages:
 - https://leskikaruchka.com/contact
 - https://leskikaruchka.com/terms
 - https://leskikaruchka.com/privacy
+- https://leskikaruchka.com/data-deletion.html
 - https://leskikaruchka.com/cookies
 - https://leskikaruchka.com/driver-join

@@ -42,6 +42,7 @@ export default function LegalPage({ title, children }: { title: string; children
       <nav aria-label="Правна информация" className="flex flex-wrap gap-x-5 gap-y-3 mt-6 text-sm text-primary-700">
         <Link className="underline" to="/terms">Общи условия</Link>
         <Link className="underline" to="/privacy">Поверителност</Link>
+        <a className="underline" href="/data-deletion.html">Изтриване на данни</a>
         <Link className="underline" to="/cookies">Бисквитки</Link>
         <button type="button" className="underline cursor-pointer" onClick={openCookieSettings}>Настройки за бисквитки</button>
       </nav>
