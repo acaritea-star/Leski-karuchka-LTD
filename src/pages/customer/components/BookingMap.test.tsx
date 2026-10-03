@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.stubGlobal('google', { maps: {
     Map: class { fitBounds = fitBounds; setZoom = vi.fn(); },
     Marker: class { setMap = clearLayer; }, Polyline: polyline,
-    Size: class {}, Point: class {}, LatLngBounds: class { extend = vi.fn(); },
+    SymbolPath: { FORWARD_CLOSED_ARROW: 1 }, Size: class {}, Point: class {}, LatLngBounds: class { extend = vi.fn(); },
     event: { clearInstanceListeners: vi.fn() },
   } });
   vi.stubGlobal('ResizeObserver', class { observe = vi.fn(); disconnect = vi.fn(); });

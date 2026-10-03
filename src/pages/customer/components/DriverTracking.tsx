@@ -1,4 +1,3 @@
-import { isFreshTimestamp } from '@/lib/driverLocation';
 /* global google */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +6,11 @@ import { supabase } from '@/lib/supabase';
 import { calculateDistance, estimateDuration } from '@/lib/geo';
 import { computeRoute, decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
+import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPosition';
+import { useDrivingRoute } from '@/hooks/useDrivingRoute';
+import { useVehicleMarker } from '@/hooks/useVehicleMarker';
+import { drawRouteLine, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
+import { measureRoute, remainingRoute } from '@/lib/routeGeometry';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
 
@@ -31,14 +35,7 @@ interface DriverInfo {
   vehicle_label: string;
 }
 
-interface DriverLocation {
-  latitude: number;
-  longitude: number;
-  heading: number | null;
-  speed: number | null;
-}
-
-const ROUTE_COLOR = '#315943';
+const NO_ROUTE: import('@/lib/googleMaps').RoutePoint[] = [];
 const CAR_COLORS: Record<string, string> = {
   comfort: '#f59e0b',
   van: '#78716c',
@@ -71,40 +68,6 @@ function playChime() {
   }
 }
 
-function carSymbol(heading: number, vehicleType: string): google.maps.Symbol {
-  return {
-    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-    rotation: heading,
-    scale: 5,
-    fillColor: CAR_COLORS[vehicleType] || CAR_COLORS.standard,
-    fillOpacity: 1,
-    strokeColor: '#ffffff',
-    strokeWeight: 2,
-  };
-}
-
-function pickupIcon(): google.maps.Icon {
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">' +
-    '<circle cx="8" cy="8" r="7" fill="#0ea5a0" stroke="#ffffff" stroke-width="2.5"/></svg>';
-  return {
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new google.maps.Size(16, 16),
-    anchor: new google.maps.Point(8, 8),
-  };
-}
-
-function destIcon(): google.maps.Icon {
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">' +
-    '<rect x="3" y="3" width="10" height="10" fill="#888888" stroke="#ffffff" stroke-width="2" transform="rotate(45 8 8)"/></svg>';
-  return {
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new google.maps.Size(16, 16),
-    anchor: new google.maps.Point(8, 8),
-  };
-}
-
 export default function DriverTracking({
   request,
   onCancel,
@@ -116,16 +79,14 @@ export default function DriverTracking({
   const navigate = useNavigate();
 
   const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
-  const [location, setLocation] = useState<DriverLocation | null>(null);
+  const location = useDriverPosition(request.driver_id);
+  const positionStale = !usePositionFreshness(location);
   const [loadingInfo, setLoadingInfo] = useState(true);
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
-  const [liveRoute, setLiveRoute] = useState<{ distance_km: number; duration_min: number } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError,setCancelError] = useState('');
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [vehicleType, setVehicleType] = useState<string>('standard');
-  const [positionStale, setPositionStale] = useState(false);
-  const [lastUpdateAt, setLastUpdateAt] = useState<number>(0);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
@@ -133,14 +94,11 @@ export default function DriverTracking({
   // Google Maps refs
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const carMarkerRef = useRef<google.maps.Marker | null>(null);
   const pickupMarkerRef = useRef<google.maps.Marker | null>(null);
   const destMarkerRef = useRef<google.maps.Marker | null>(null);
-  const routePolylineRef = useRef<google.maps.Polyline | null>(null);
-  const liveRoutePolylineRef = useRef<google.maps.Polyline | null>(null);
-  const prevPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const activeLineRef = useRef<RouteLine | null>(null);
+  const fittedMapRef = useRef<google.maps.Map | null>(null);
   const lastRecenterRef = useRef(0);
-  const lastRouteFetchRef = useRef({ lat: 0, lng: 0, at: 0 });
 
   const headingToPickup = request.status === 'accepted' || request.status === 'arrived';
   const isWaiting = request.status === 'arrived';
@@ -149,6 +107,12 @@ export default function DriverTracking({
 
   const targetLat = headingToPickup ? request.pickup_latitude : request.destination_latitude;
   const targetLng = headingToPickup ? request.pickup_longitude : request.destination_longitude;
+
+  const { info: liveRoute, path: livePath } = useDrivingRoute(location, targetLat, targetLng);
+  const tripPath = useMemo(() => routeInfo?.polyline ? measureRoute(decodePolyline(routeInfo.polyline)).points : [], [routeInfo]);
+  const motionPath = livePath.length ? livePath : headingToPickup ? NO_ROUTE : tripPath;
+  const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, location, motionPath, CAR_COLORS[vehicleType] || CAR_COLORS.standard,
+    frame => { if (motionPath.length >= 2) activeLineRef.current?.setPath(remainingRoute(motionPath, frame)); });
 
   // ── Initialise Google map (once) ──
   useEffect(() => {
@@ -187,9 +151,6 @@ export default function DriverTracking({
       cancelled = true;
       if (pickupMarkerRef.current) { pickupMarkerRef.current.setMap(null); pickupMarkerRef.current = null; }
       if (destMarkerRef.current) { destMarkerRef.current.setMap(null); destMarkerRef.current = null; }
-      if (carMarkerRef.current) { carMarkerRef.current.setMap(null); carMarkerRef.current = null; }
-      if (routePolylineRef.current) { routePolylineRef.current.setMap(null); routePolylineRef.current = null; }
-      if (liveRoutePolylineRef.current) { liveRoutePolylineRef.current.setMap(null); liveRoutePolylineRef.current = null; }
       if (mapRef.current) {
         google.maps.event.clearInstanceListeners(mapRef.current);
         mapRef.current = null;
@@ -197,6 +158,7 @@ export default function DriverTracking({
     };
   }, [
     mapAttempt,
+    request.id,
     request.pickup_latitude,
     request.pickup_longitude,
     request.destination_latitude,
@@ -206,6 +168,7 @@ export default function DriverTracking({
   // ── Real road route (pickup -> destination) ──
   useEffect(() => {
     let active = true;
+    setRouteInfo(null);
     computeRoute(
       { lat: request.pickup_latitude, lng: request.pickup_longitude },
       { lat: request.destination_latitude, lng: request.destination_longitude },
@@ -227,40 +190,23 @@ export default function DriverTracking({
     request.destination_longitude,
   ]);
 
-  // ── Draw / update route polyline ──
+  // The complete trip is a muted context line while the current leg is active.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-
-    if (routeInfo?.polyline) {
-      let pts: { lat: number; lng: number }[] = [];
-      try {
-        pts = decodePolyline(routeInfo.polyline);
-      } catch {
-        return;
-      }
-      if (pts.length < 2) return;
-
-      const path = pts.map((p) => ({ lat: p.lat, lng: p.lng }));
-
-      if (!routePolylineRef.current) {
-        routePolylineRef.current = new google.maps.Polyline({
-          path,
-          map,
-          strokeColor: ROUTE_COLOR,
-          strokeWeight: 4,
-          strokeOpacity: 0.85,
-        });
-      } else {
-        routePolylineRef.current.setPath(path);
-      }
-    }
-  }, [routeInfo, mapReady]);
+    if (!map || !mapReady) return;
+    const base = tripPath.length >= 2 ? drawRouteLine(map, tripPath, { muted: headingToPickup || livePath.length >= 2 }) : null;
+    const activePath = livePath.length >= 2 ? livePath : headingToPickup ? [] : tripPath;
+    const active = activePath.length >= 2 && (headingToPickup || livePath.length >= 2)
+      ? drawRouteLine(map, activePath, { color: headingToPickup ? MAP_PICKUP_COLOR : undefined, zIndex: 20 }) : null;
+    activeLineRef.current = active ?? base;
+    if (activePath.length >= 2 && vehicleFrame.current) activeLineRef.current?.setPath(remainingRoute(activePath, vehicleFrame.current));
+    return () => { base?.remove(); active?.remove(); activeLineRef.current = null; };
+  }, [tripPath, livePath, headingToPickup, mapReady, vehicleFrame]);
 
   // ── Pickup & destination markers ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReady) return;
 
     const pickupPos = { lat: request.pickup_latitude, lng: request.pickup_longitude };
     const destPos = { lat: request.destination_latitude, lng: request.destination_longitude };
@@ -269,7 +215,9 @@ export default function DriverTracking({
       pickupMarkerRef.current = new google.maps.Marker({
         position: pickupPos,
         map,
-        icon: pickupIcon(),
+        icon: mapPinIcon('pickup'),
+        title: `A · ${request.pickup_address}`,
+        zIndex: 1100,
       });
     } else {
       pickupMarkerRef.current.setPosition(pickupPos);
@@ -279,8 +227,9 @@ export default function DriverTracking({
       destMarkerRef.current = new google.maps.Marker({
         position: destPos,
         map,
-        zIndex: 100,
-        icon: destIcon(),
+        zIndex: 1100,
+        icon: mapPinIcon('destination'),
+        title: `B · ${request.destination_address}`,
       });
     } else {
       destMarkerRef.current.setPosition(destPos);
@@ -290,6 +239,8 @@ export default function DriverTracking({
     request.pickup_longitude,
     request.destination_latitude,
     request.destination_longitude,
+    request.pickup_address,
+    request.destination_address,
     mapReady,
   ]);
 
@@ -313,166 +264,39 @@ export default function DriverTracking({
     routeInfo && straightTripKm > 0 ? Math.max(1, routeInfo.distance_km / straightTripKm) : 1;
 
   const distanceToTarget = location
-    ? calculateDistance(location.latitude, location.longitude, targetLat, targetLng)
+    ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
     : null;
   const roadDistanceToTarget =
     distanceToTarget !== null ? distanceToTarget * roadFactor : null;
   const etaMinutes =
     liveRoute?.duration_min ??
     (roadDistanceToTarget !== null ? estimateDuration(roadDistanceToTarget) : null);
-  const remainingKm = liveRoute?.distance_km ?? roadDistanceToTarget;
 
-  // ── Live road route (driver -> target) ──
+  // Fit once after GPS and Maps have both arrived, then follow only near an edge.
   useEffect(() => {
-    if (!location) return;
-    const now = Date.now();
-    const last = lastRouteFetchRef.current;
-    const movedFar =
-      calculateDistance(location.latitude, location.longitude, last.lat, last.lng) > 0.25;
-    const stale = now - last.at > 45000;
-    if (!movedFar && !stale) return;
-    lastRouteFetchRef.current = { lat: location.latitude, lng: location.longitude, at: now };
-    let active = true;
-    computeRoute(
-      { lat: location.latitude, lng: location.longitude },
-      { lat: targetLat, lng: targetLng },
-      { travelMode: 'DRIVE', language: 'bg', units: 'METRIC' },
-    )
-      .then((res) => {
-        if (active && res?.success) {
-          setLiveRoute({ distance_km: res.distance_km, duration_min: res.duration_min });
-        }
-      })
-      .catch(() => {
-        /* keep heuristic ETA */
-      });
-    return () => {
-      active = false;
-    };
-  }, [location, targetLat, targetLng]);
-
-  // ── Apply location + auto-pan + car marker update ──
-  const applyLocation = useCallback(
-    (lat: number, lng: number, heading: number | null, speed: number | null, updatedAt: string | null) => {
-      const prev = prevPosRef.current;
-      const effHeading =
-        heading && heading > 0
-          ? heading
-          : prev
-            ? (() => {
-                const f1 = (prev.lat * Math.PI) / 180;
-                const f2 = (lat * Math.PI) / 180;
-                const dl = ((lng - prev.lng) * Math.PI) / 180;
-                const y = Math.sin(dl) * Math.cos(f2);
-                const x =
-                  Math.cos(f1) * Math.sin(f2) -
-                  Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
-                return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-              })()
-            : 0;
-
-      prevPosRef.current = { lat, lng };
-      setLocation(previous => previous?.latitude === lat && previous.longitude === lng && previous.heading === effHeading && previous.speed === speed ? previous : { latitude: lat, longitude: lng, heading: effHeading, speed });
-      setLastUpdateAt(Date.parse(updatedAt ?? '') || 0);
-      setPositionStale(!isFreshTimestamp(updatedAt));
-
-      const map = mapRef.current;
-      if (!map) return;
-
-      // Update or create car marker
-      if (!carMarkerRef.current) {
-        carMarkerRef.current = new google.maps.Marker({
-          position: { lat, lng },
-          map,
-          zIndex: 1000,
-          icon: carSymbol(effHeading, vehicleType),
-        });
-        // First fix — fit the driver + pickup + destination into one view
-        const b = new google.maps.LatLngBounds();
-        b.extend({ lat, lng });
-        b.extend({ lat: request.pickup_latitude, lng: request.pickup_longitude });
-        b.extend({ lat: request.destination_latitude, lng: request.destination_longitude });
-        map.fitBounds(b, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
+    const map = mapRef.current;
+    if (!map || !mapReady || !location) return;
+    if (fittedMapRef.current !== map) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(location);
+      bounds.extend({ lat: request.pickup_latitude, lng: request.pickup_longitude });
+      bounds.extend({ lat: request.destination_latitude, lng: request.destination_longitude });
+      map.fitBounds(bounds, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
+      fittedMapRef.current = map;
+      lastRecenterRef.current = Date.now();
+    } else if (!positionStale && Date.now() - lastRecenterRef.current > 6000) {
+      const bounds = map.getBounds();
+      if (!bounds) return;
+      const ne = bounds.getNorthEast(), sw = bounds.getSouthWest();
+      const dy = (ne.lat() - sw.lat()) * 0.12, dx = (ne.lng() - sw.lng()) * 0.12;
+      if (location.lat < sw.lat() + dy || location.lat > ne.lat() - dy || location.lng < sw.lng() + dx || location.lng > ne.lng() - dx) {
         lastRecenterRef.current = Date.now();
-      } else {
-        carMarkerRef.current.setPosition({ lat, lng });
-        carMarkerRef.current.setIcon(carSymbol(effHeading, vehicleType));
+        map.panTo(location);
       }
-
-      // Auto-pan if the car is near the edge of the viewport
-      const now = Date.now();
-      if (now - lastRecenterRef.current > 6000) {
-        const bounds = map.getBounds();
-        if (!bounds) return;
-        const pad = 0.12;
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        const latRange = ne.lat() - sw.lat();
-        const lngRange = ne.lng() - sw.lng();
-        const latMin = sw.lat() + latRange * pad;
-        const latMax = ne.lat() - latRange * pad;
-        const lngMin = sw.lng() + lngRange * pad;
-        const lngMax = ne.lng() - lngRange * pad;
-        if (lat < latMin || lat > latMax || lng < lngMin || lng > lngMax) {
-          lastRecenterRef.current = now;
-          map.panTo({ lat, lng });
-        }
-      }
-    },
-    [
-      vehicleType,
-      request.pickup_latitude,
-      request.pickup_longitude,
-      request.destination_latitude,
-      request.destination_longitude,
-    ],
-  );
-
-  // Re-place the car marker once the map finishes loading (in case a location arrived earlier)
-  useEffect(() => {
-    if (mapReady && location) {
-      applyLocation(location.latitude, location.longitude, location.heading, location.speed, lastUpdateAt ? new Date(lastUpdateAt).toISOString() : null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady]);
+  }, [mapReady, location, positionStale, request.pickup_latitude, request.pickup_longitude, request.destination_latitude, request.destination_longitude]);
 
-  // ── Stale position detection ──
-  useEffect(() => {
-    if (!location) return;
-    const interval = setInterval(() => {
-      const age = Date.now() - lastUpdateAt;
-      setPositionStale(age > 60000);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [location, lastUpdateAt]);
-
-  // ── Polling fallback for driver location ──
-  useEffect(() => {
-    if (!request.driver_id) return;
-    let mounted = true;
-    const poll = async () => {
-      try {
-        const { data } = await supabase
-          .from('driver_locations')
-          .select('latitude, longitude, heading, speed, updated_at')
-          .eq('driver_id', request.driver_id)
-          .maybeSingle();
-        if (data && mounted) {
-          applyLocation(data.latitude, data.longitude, data.heading ?? null, data.speed ?? null, data.updated_at);
-        }
-      } catch {
-        /* silently ignore */
-      }
-    };
-    poll();
-    const interval = setInterval(poll, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [request.driver_id, applyLocation]);
-
-  // ── Load driver profile + vehicle type + subscribe to live location ──
+  // ── Load driver profile + vehicle type ──
   useEffect(() => {
     if (!request.driver_id) return;
     let active = true;
@@ -550,15 +374,6 @@ export default function DriverTracking({
           setVehicleType(vType);
         }
 
-        const { data: loc } = await supabase
-          .from('driver_locations')
-          .select('latitude, longitude, heading, speed, updated_at')
-          .eq('driver_id', request.driver_id)
-          .maybeSingle();
-
-        if (active && loc) {
-          applyLocation(loc.latitude, loc.longitude, loc.heading ?? null, loc.speed ?? null, loc.updated_at);
-        }
       } catch (err) {
         console.error('DriverTracking load error:', err);
       } finally {
@@ -568,63 +383,8 @@ export default function DriverTracking({
 
     load();
 
-    const channel = supabase
-      .channel(`driver-location-${request.driver_id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'driver_locations',
-          filter: `driver_id=eq.${request.driver_id}`,
-        },
-        (payload) => {
-          if (
-            payload.new &&
-            typeof payload.new.latitude === 'number' &&
-            typeof payload.new.longitude === 'number'
-          ) {
-            applyLocation(
-              payload.new.latitude,
-              payload.new.longitude,
-              payload.new.heading ?? null,
-              payload.new.speed ?? null,
-              payload.new.updated_at ?? null,
-            );
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'driver_locations',
-          filter: `driver_id=eq.${request.driver_id}`,
-        },
-        (payload) => {
-          if (
-            payload.new &&
-            typeof payload.new.latitude === 'number' &&
-            typeof payload.new.longitude === 'number'
-          ) {
-            applyLocation(
-              payload.new.latitude,
-              payload.new.longitude,
-              payload.new.heading ?? null,
-              payload.new.speed ?? null,
-              payload.new.updated_at ?? null,
-            );
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
-  }, [request.driver_id, applyLocation, t]);
+    return () => { active = false; };
+  }, [request.driver_id, t]);
 
   // ── Driver-found notification ──
   useEffect(() => {
@@ -644,11 +404,8 @@ export default function DriverTracking({
   const recenter = useCallback(() => {
     const map = mapRef.current;
     if (!map || !location) return;
-    map.panTo({ lat: location.latitude, lng: location.longitude });
+    map.panTo({ lat: location.lat, lng: location.lng });
   }, [location]);
-
-  const speedKmh =
-    location && typeof location.speed === 'number' ? Math.round(location.speed * 3.6) : null;
 
   const handleCancel = async () => {
     if (!onCancel || cancelling) return;
@@ -710,8 +467,8 @@ export default function DriverTracking({
             {driverInfo && driverInfo.total_trips > 0 && <span className="tracking-rating"><i className="ri-star-fill" aria-hidden="true" /> {driverInfo.rating.toFixed(1)}</span>}
           </div>
           <div className="booking-status-route">
-            <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
-            <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
+            <p><span className="route-pin-label" aria-hidden="true">A</span><span title={request.pickup_address}>{request.pickup_address}</span></p>
+            <p><span className="route-pin-label route-pin-label-end" aria-hidden="true">B</span><span title={request.destination_address}>{request.destination_address}</span></p>
           </div>
         </>}
         {cancelError && <p className="booking-error" role="alert">{cancelError}</p>}

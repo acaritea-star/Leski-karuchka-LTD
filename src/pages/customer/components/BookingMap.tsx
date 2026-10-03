@@ -4,13 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { BULGARIA_CENTER } from '@/lib/geo';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
+import { drawRouteLine, mapPinIcon, type RouteLine } from '@/lib/mapLayers';
 import type { BookingLocation } from './BookingCard';
-
-function markerIcon(letter: string, color: string): google.maps.Icon {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="42"><path d="M18 40C14 34 3 27 3 18a15 15 0 1 1 30 0c0 9-11 16-15 22Z" fill="${color}" stroke="white" stroke-width="3"/><text x="18" y="23" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700" fill="white">${letter}</text></svg>`;
-  return { url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(36, 42), anchor: new google.maps.Point(18, 40) };
-}
 
 export default function BookingMap({ pickup, destination, route }: {
   pickup: BookingLocation | null; destination: BookingLocation | null; route: RouteResult | null;
@@ -51,17 +46,17 @@ export default function BookingMap({ pickup, destination, route }: {
     if (!currentMap || state !== 'ready') return;
     const layers: Array<google.maps.Marker | google.maps.Polyline> = [];
     const points: google.maps.LatLngLiteral[] = [];
+    let routeLine: RouteLine | null = null;
     [pickup, destination].forEach((location, index) => {
       if (!location) return;
       points.push(location);
       layers.push(new google.maps.Marker({ map: currentMap, position: location,
-        title: location.address, icon: markerIcon(index === 0 ? 'A' : 'B', index === 0 ? '#bd8129' : '#19382b') }));
+        title: location.address, zIndex: 1100, icon: mapPinIcon(index === 0 ? 'pickup' : 'destination') }));
     });
     if (pickup && destination && route?.polyline) {
       const path = decodePolyline(route.polyline);
       points.push(...path);
-      layers.push(new google.maps.Polyline({ map: currentMap, path, strokeColor: '#ffffff', strokeWeight: 8 }));
-      layers.push(new google.maps.Polyline({ map: currentMap, path, strokeColor: '#315943', strokeWeight: 4 }));
+      if (path.length >= 2) routeLine = drawRouteLine(currentMap, path);
     }
     const fit = () => {
       if (!points.length) return;
@@ -74,7 +69,7 @@ export default function BookingMap({ pickup, destination, route }: {
     fit();
     const resize = new ResizeObserver(fit);
     if (container.current) resize.observe(container.current);
-    return () => { resize.disconnect(); layers.forEach(layer => layer.setMap(null)); };
+    return () => { resize.disconnect(); routeLine?.remove(); layers.forEach(layer => layer.setMap(null)); };
   }, [pickup, destination, route, state]);
 
   return <>

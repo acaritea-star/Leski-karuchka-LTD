@@ -38,6 +38,7 @@ declare namespace google {
       fillOpacity?: number;
       strokeColor?: string;
       strokeWeight?: number;
+      anchor?: Point;
     }
 
     class LatLngBounds {

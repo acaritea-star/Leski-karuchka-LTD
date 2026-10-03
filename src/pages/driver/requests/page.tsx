@@ -448,8 +448,13 @@ export default function DriverRequests() {
                 style={{ height: '360px' }}
               >
                 <DriverRouteMap
+                  key={activeRequest.id}
                   targetLat={navTarget.lat}
                   targetLng={navTarget.lng}
+                  pickup={{ lat: activeRequest.pickup_latitude, lng: activeRequest.pickup_longitude }}
+                  destination={activeRequest.destination_latitude != null && activeRequest.destination_longitude != null
+                    ? { lat: activeRequest.destination_latitude, lng: activeRequest.destination_longitude } : undefined}
+                  targetKind={activeRequest.status === 'accepted' || activeRequest.status === 'arrived' ? 'pickup' : 'destination'}
                   driverId={driver?.id ?? null}
                   onNavInfo={setDriverNavInfo}
                 />

@@ -467,7 +467,7 @@ export default function CustomerHome() {
 
   // Keep the existing live tracking and booking RPC contracts.
   if (isTracking && activeRequest?.driver_id) {
-    return <DriverTracking request={{ ...activeRequest, driver_id: activeRequest.driver_id }} onCancel={resetRequest} />;
+    return <DriverTracking key={activeRequest.id} request={{ ...activeRequest, driver_id: activeRequest.driver_id }} onCancel={resetRequest} />;
   }
 
   const mapPickup = activeRequest
