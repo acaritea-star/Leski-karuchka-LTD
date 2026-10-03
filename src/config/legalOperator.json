@@ -10,7 +10,7 @@
   "vatNumber": "",
   "identityVerified": false,
   "contactsVerified": false,
-  "transportModel": "licensed-carrier-platform-draft",
+  "transportModel": "transport-intermediary",
   "termsVersion": "2026-10-03-draft",
   "updatedAt": "3 октомври 2026 г."
 }

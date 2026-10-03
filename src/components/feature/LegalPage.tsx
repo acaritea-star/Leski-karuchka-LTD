@@ -14,7 +14,7 @@ export function OperatorDetails() {
       {legalOperator.correspondenceAddress && <p><strong>Адрес за кореспонденция:</strong> {legalOperator.correspondenceAddress}</p>}
       {legalOperator.vatNumber && <p><strong>ДДС номер:</strong> {legalOperator.vatNumber}</p>}
     </> : <p role="status" className="rounded-lg bg-amber-50 p-3 text-amber-900">
-      Проект за преглед: данните на оператора и контактите предстои да бъдат потвърдени преди публикуване на тази версия.
+      Данните на оператора и контактите предстои да бъдат потвърдени.
     </p>}
     <p><strong>Контакт:</strong> <a className="underline" href={'mailto:' + legalOperator.email}>{legalOperator.email}</a>
       {' · '}<a className="underline" href={'tel:' + legalOperator.phone}>{legalOperator.phone}</a></p>

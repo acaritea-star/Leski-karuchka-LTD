@@ -2,7 +2,7 @@
 
 Website: https://leskikaruchka.com/
 
-Leski Karuchka is a web application for requesting passenger transport, focused on Levski and the surrounding region in Bulgaria. Availability depends on participating carriers and authorised vehicles. “Karuchka” is a brand name.
+Leski Karuchka is a digital intermediary that connects customers looking for transport with registered drivers and taxi companies in Levski and the surrounding region in Bulgaria. The platform does not carry passengers and is not a party to the transport contract. The relevant carrier provides and is responsible for the transport. Availability depends on participating carriers and authorised vehicles. “Karuchka” is the platform brand. The application is currently in a testing period.
 
 Users select pickup and destination, view an estimated amount and send a request. Sending a request does not guarantee an available driver or a specific arrival time. For taxi transport, the carrier’s displayed tariff, taximeter and fiscal reporting rules determine the final fare. This version uses cash payment to the driver.
 

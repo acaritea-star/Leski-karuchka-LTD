@@ -1,6 +1,6 @@
 # Legal foundation draft — 3 October 2026
 
-This branch is a review draft for a Bulgarian platform working with authorised taxi carriers. It must not be presented as a legal certification or deployed as final terms while operator details and the prerequisites below are unresolved. The public brand, Levski focus and booking design are retained. The legal pages identify the missing company information visibly in this draft rather than inventing an operator.
+The application is in a testing period. Its stated role is a digital intermediary connecting customers with drivers and taxi companies; it does not itself carry passengers or become a party to their transport contract. The legal text remains a review draft while operator details and the prerequisites below are unresolved. A testing-period label is a product status, not a legal certification or an exemption from applicable requirements. The public brand, Levski focus and booking design are retained. The legal pages identify the missing company information rather than inventing an operator.
 
 ## What changed
 
@@ -11,12 +11,14 @@ This branch is a review draft for a Bulgarian platform working with authorised t
 - Replaced forced GDPR consent for contact and driver forms with purpose and privacy notices. Both public login and registration now use the same Google/Facebook screen with a separate unchecked acceptance of terms. The public email/password forms have been removed. This UI gate is not an immutable server agreement register; server-owned evidence remains a release prerequisite.
 - Removed static sample fares, five-minute guarantees, fixed-price claims, unsupported driver/partner counts and public trip statistics that have not been verified as genuine customer activity. Preserved three product cards: booking steps, tracking, cash payment.
 - Added Google Maps attribution to the custom autocomplete results, public Google terms/privacy links and honest website structured data.
+- Restored the login page's original warm background, brand heading, contact link and outlined buttons, while keeping only Google and Facebook. Public screens identify the application as being in a testing period.
+- Aligned public marketing, booking notices, legal terms and metadata with the intermediary role. The transport contract and transport duties belong to the relevant carrier; mandatory obligations for the platform's own conduct remain intact.
 
-## Confirm the operating model before publication
+## Intermediary model and carrier responsibilities
 
-The proposed model uses already authorised carriers and vehicles. Company administrators enter carrier tariffs; the application provides requests, estimates and tracking. The carrier remains responsible for lawful transport, taximeter use, fiscal receipts, insurance and its staff.
+The platform connects a customer looking for transport with registered providers. It supplies requests, communication, estimates and status information. The customer enters the transport contract with the relevant carrier. Company administrators enter carrier tariffs. The carrier remains responsible for lawful transport, its drivers and vehicles, taximeter use, fiscal receipts and insurance. Registration in the platform does not replace the provider's required licences and permits.
 
-This does not automatically make the operator an exempt intermediary. Actual control over price, driver selection, service organisation, sanctions and essential conditions matters. Obtain a Bulgarian assessment of the final contracts and operating flow. The CJEU Uber judgment and Star Taxi judgment have different facts; a sentence saying “we only connect people” cannot change what the system actually does.
+The CJEU Star Taxi judgment recognises that connecting passengers directly with taxi drivers can be an information-society service. The assessment depends on the actual operating flow, including influence over tariffs, provider selection and essential transport conditions. The CJEU Uber judgment concerns a different model with decisive influence over the transport service. Review the final contracts and implementation against those facts; public descriptions alone do not complete that assessment. Keep the platform's own consumer and data-protection duties separate from the carrier's transport duties.
 
 Private drivers may not provide regulated paid taxi services merely by checking a box or agreeing to a waiver. A driver profile marked `is_verified` is not itself a municipal permit or taxi-driver certificate. An empty `driver_documents` table does not prove that there are no documents elsewhere, but it does not establish their validity either.
 

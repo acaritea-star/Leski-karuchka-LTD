@@ -11,7 +11,7 @@ if (!operator.identityVerified) missing.push('identityVerified');
 if (!operator.contactsVerified) missing.push('contactsVerified');
 if (!/^\d{9}(\d{4})?$/.test(operator.registrationNumber)) missing.push('valid Bulgarian registration number');
 if (operator.termsVersion.includes('draft')) missing.push('final terms version');
-if (operator.transportModel !== 'licensed-carrier-platform') missing.push('confirmed transport model');
+if (operator.transportModel !== 'transport-intermediary') missing.push('confirmed intermediary model');
 for (const [field, value] of Object.entries(reviewed)) {
   if (value !== true) missing.push(field);
 }

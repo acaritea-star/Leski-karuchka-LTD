@@ -29,6 +29,7 @@ export default function LandingFooter() {
               {t('landing.footer_tagline')}
             </p>
             <p className="text-sm text-foreground-600">{t('service_area_label')}</p>
+            <p className="text-xs text-foreground-500 mt-3">{t('service_testing_period')}</p>
           </div>
 
           {/* Company */}
