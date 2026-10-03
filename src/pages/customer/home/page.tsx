@@ -19,6 +19,7 @@ import { broadcastPushToDrivers } from '@/lib/push';
 import type { LocationPreset } from '@/lib/geo';
 import { computeRoute, reverseGeocode, type RouteResult } from '@/lib/googleMaps';
 import { LOGO_URL } from '@/lib/logo';
+import { CONSENT_CHANGED_EVENT, CONSENT_STORAGE_KEY, RECENT_LOCATIONS_KEY, readConsent, clearRecentLocations } from '@/lib/cookieConsent';
 
 // Types
 interface Location {
@@ -46,12 +47,12 @@ type RequestStatus = 'idle' | 'creating' | 'created' | 'error';
 
 const TRACKING_STATUSES: Tables<'taxi_requests'>['status'][] = ['accepted', 'arrived', 'in_progress'];
 
-const RECENT_KEY = 'leski_recent_locations';
 const MAX_RECENT = 5;
 
 function loadRecent(): LocationPreset[] {
+  if (!readConsent()?.functional) { clearRecentLocations(); return []; }
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
+    const raw = localStorage.getItem(RECENT_LOCATIONS_KEY);
     return raw ? recentLocations(JSON.parse(raw)) : [];
   } catch {
     return [];
@@ -59,8 +60,9 @@ function loadRecent(): LocationPreset[] {
 }
 
 function persistRecent(list: LocationPreset[]) {
+  if (!readConsent()?.functional) { clearRecentLocations(); return; }
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    localStorage.setItem(RECENT_LOCATIONS_KEY, JSON.stringify(list));
   } catch {
     /* ignore */
   }
@@ -80,6 +82,20 @@ export default function CustomerHome() {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [recent, setRecent] = useState<LocationPreset[]>(() => loadRecent());
+  useEffect(() => {
+    const sync = () => { if (!readConsent()?.functional) setRecent([]); };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === CONSENT_STORAGE_KEY || event.key === null) sync();
+    };
+    window.addEventListener(CONSENT_CHANGED_EVENT, sync);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener(CONSENT_CHANGED_EVENT, sync);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
   // Request state
   const [requestStatus, setRequestStatus] = useState<RequestStatus>('idle');
@@ -156,6 +172,7 @@ export default function CustomerHome() {
 
   // Save a recently used location
   const addRecent = useCallback((preset: LocationPreset) => {
+    if (!readConsent()?.functional) return;
     setRecent((prev) => {
       const next = [preset, ...prev.filter((p) => p.address !== preset.address)].slice(0, MAX_RECENT);
       persistRecent(next);

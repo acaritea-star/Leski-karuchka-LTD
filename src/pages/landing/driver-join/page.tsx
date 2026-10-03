@@ -2,15 +2,12 @@ import { useTranslation } from 'react-i18next';
 import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useFormSubmit } from '@/pages/landing/components/useFormSubmit';
-import { useState } from 'react';
 
 const DRIVER_FORM_URL = 'https://readdy.ai/api/form/d9urfm1kngcel2k3j9eg';
 
 export default function DriverJoinPage() {
   const { t } = useTranslation();
   const { status, errorMsg, submit } = useFormSubmit(DRIVER_FORM_URL, 'website_alt');
-  const [gdprConsent, setGdprConsent] = useState(false);
-  const [gdprError, setGdprError] = useState(false);
 
   const benefits = [
     { icon: 'ri-time-line', title: t('landing.dj_benefit_1_title'), desc: t('landing.dj_benefit_1_desc') },
@@ -28,11 +25,6 @@ export default function DriverJoinPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!gdprConsent) {
-      setGdprError(true);
-      return;
-    }
-    setGdprError(false);
     submit(e.currentTarget);
   };
 
@@ -207,30 +199,13 @@ export default function DriverJoinPage() {
                     />
                   </div>
 
-                  {/* GDPR consent */}
-                  <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={gdprConsent}
-                        onChange={(e) => {
-                          setGdprConsent(e.target.checked);
-                          if (e.target.checked) setGdprError(false);
-                        }}
-                        className="mt-0.5 w-4 h-4 rounded border-background-300 text-primary-600 focus:ring-primary-400"
-                      />
-                      <span className="text-xs text-foreground-600 leading-relaxed">
-                        Съгласен съм с обработката на личните ми данни (име, телефон, имейл, опит)
-                        за целите на кандидатстване за шофьор, съгласно{' '}
-                        <a href="/privacy" className="text-primary-600 hover:text-primary-700 underline">Политиката за поверителност</a>.
-                      </span>
-                    </label>
-                    {gdprError && (
-                      <p className="text-xs text-red-600 mt-1.5">
-                        Моля, поставете отметка, за да продължите.
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-sm text-foreground-700 leading-relaxed">
+                    Използваме данните за разглеждане на кандидатурата. Виж
+                    {' '}<a href="/privacy" className="underline text-primary-700">Политиката за поверителност</a>.
+                    Не изпращай чувствителни или ненужни данни. Това не е абонамент за реклама.
+                  </p>
+
+                  <p className="text-sm text-foreground-700">Кандидатурата не дава право да извършваш превоз. Преди активиране се проверяват документите на превозвача, водача и автомобила.</p>
 
                   <input type="text" name="website_alt" tabIndex={-1} autoComplete="off" aria-hidden="true" readOnly className="form-trap" />
 

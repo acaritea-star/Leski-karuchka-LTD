@@ -446,6 +446,8 @@ button, a {
 
 /* ===== Cookie Consent banner ===== */
 .cookie-banner {
+  max-height: 85dvh;
+  overflow-y: auto;
   position: fixed;
   bottom: 0;
   left: 0;

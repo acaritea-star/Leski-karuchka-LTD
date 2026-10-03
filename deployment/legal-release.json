@@ -1,0 +1,11 @@
+{
+  "transportClassificationReviewed": false,
+  "carrierLicencesAndPermitsVerified": false,
+  "fareAndFiscalFlowVerified": false,
+  "carrierIdentityShownBeforeBooking": false,
+  "providerContractsAndTransfersVerified": false,
+  "retentionAndRightsProcessOperational": false,
+  "serverAgreementEvidenceOperational": false,
+  "googleCloudConfigurationVerified": false,
+  "contentStorageAndAttributionReviewed": false
+}

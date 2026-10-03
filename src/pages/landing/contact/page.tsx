@@ -2,15 +2,12 @@ import { useTranslation } from 'react-i18next';
 import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useFormSubmit } from '@/pages/landing/components/useFormSubmit';
-import { useState } from 'react';
 
 const CONTACT_FORM_URL = 'https://readdy.ai/api/form/d9urfm1kngcel2k3j9e0';
 
 export default function ContactPage() {
   const { t } = useTranslation();
   const { status, errorMsg, submit } = useFormSubmit(CONTACT_FORM_URL, 'company_alt');
-  const [gdprConsent, setGdprConsent] = useState(false);
-  const [gdprError, setGdprError] = useState(false);
 
   const infoCards = [
     { icon: 'ri-phone-line', label: t('landing.contact_phone_label'), value: t('landing.footer_phone'), href: 'tel:+359890005900' },
@@ -21,11 +18,6 @@ export default function ContactPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!gdprConsent) {
-      setGdprError(true);
-      return;
-    }
-    setGdprError(false);
     submit(e.currentTarget);
   };
 
@@ -163,30 +155,11 @@ export default function ContactPage() {
                     />
                   </div>
 
-                  {/* GDPR consent */}
-                  <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={gdprConsent}
-                        onChange={(e) => {
-                          setGdprConsent(e.target.checked);
-                          if (e.target.checked) setGdprError(false);
-                        }}
-                        className="mt-0.5 w-4 h-4 rounded border-background-300 text-primary-600 focus:ring-primary-400"
-                      />
-                      <span className="text-xs text-foreground-600 leading-relaxed">
-                        Съгласен съм с обработката на личните ми данни (име, имейл, телефон, съобщение)
-                        с цел отговор на запитването ми, съгласно{' '}
-                        <a href="/privacy" className="text-primary-600 hover:text-primary-700 underline">Политиката за поверителност</a>.
-                      </span>
-                    </label>
-                    {gdprError && (
-                      <p className="text-xs text-red-600 mt-1.5">
-                        Моля, поставете отметка, за да продължите.
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-sm text-foreground-700 leading-relaxed">
+                    Използваме данните за отговор на запитването. Виж
+                    {' '}<a href="/privacy" className="underline text-primary-700">Политиката за поверителност</a>.
+                    Не изпращай чувствителни или ненужни данни. Това не е абонамент за реклама.
+                  </p>
 
                   <input type="text" name="company_alt" tabIndex={-1} autoComplete="off" aria-hidden="true" readOnly className="form-trap" />
 
@@ -214,14 +187,14 @@ export default function ContactPage() {
             {/* Map */}
             <Reveal delay={120}>
               <div className="h-full min-h-[420px] rounded-lg overflow-hidden border border-background-200/70 relative">
-                <iframe
-                  title="Лески Каручка — Левски, област Плевен"
-                  src="https://www.google.com/maps?q=43.3562,25.1404&z=14&output=embed"
-                  className="absolute inset-0 w-full h-full border-0"
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-background-50 p-8 text-center">
+                  <i className="ri-map-pin-2-line text-5xl text-primary-600" aria-hidden="true" />
+                  <h3 className="font-heading font-semibold text-xl text-foreground-950">{t('landing.contact_map_title')}</h3>
+                  <a href="https://www.google.com/maps?q=Levski,+Bulgaria" target="_blank" rel="noopener noreferrer"
+                    className="rounded-full border border-primary-600 px-5 py-3 text-primary-700 font-semibold">
+                    {t('landing.contact_map_open')}
+                  </a>
+                </div>
                 <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
                   <div className="bg-background-50/95 backdrop-blur rounded-lg px-4 py-3 border border-background-200/70">
                     <p className="text-xs font-semibold text-foreground-950">

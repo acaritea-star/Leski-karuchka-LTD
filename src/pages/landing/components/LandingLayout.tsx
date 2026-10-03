@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import LandingFooter from './LandingFooter';
-import CookieConsent from '@/components/feature/CookieConsent';
 import { LOGO_URL } from '@/lib/logo';
 
 function roleHomePath(role?: string): string {
@@ -173,7 +172,6 @@ export default function LandingLayout() {
       </main>
 
       <LandingFooter />
-      <CookieConsent />
     </div>
   );
 }

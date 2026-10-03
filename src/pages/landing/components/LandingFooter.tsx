@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LOGO_URL } from '@/lib/logo';
+import { LIABILITY_NOTICE } from '@/config/legal';
+import { openCookieSettings } from '@/lib/cookieConsent';
 
 export default function LandingFooter() {
   const { t } = useTranslation();
@@ -26,7 +28,7 @@ export default function LandingFooter() {
             <p className="text-sm text-foreground-500 leading-relaxed mb-6">
               {t('landing.footer_tagline')}
             </p>
-            <p className="text-xs text-foreground-400">{t('landing.service_area_label')}</p>
+            <p className="text-sm text-foreground-600">{t('service_area_label')}</p>
           </div>
 
           {/* Company */}
@@ -69,6 +71,11 @@ export default function LandingFooter() {
                   Бисквитки
                 </Link>
               </li>
+              <li>
+                <button type="button" onClick={openCookieSettings} className="text-sm text-foreground-700 hover:text-primary-700 underline cursor-pointer">
+                  Настройки за бисквитки
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -100,6 +107,9 @@ export default function LandingFooter() {
       </div>
 
       <div className="border-t border-background-200">
+        <p className="mx-auto w-full px-4 md:px-6 lg:px-10 pt-5 text-xs text-foreground-700 leading-relaxed">
+          {LIABILITY_NOTICE} <Link to="/terms#liability" className="underline text-primary-700">Виж пълните условия за отговорност.</Link>
+        </p>
         <div className="mx-auto w-full px-4 md:px-6 lg:px-10 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-foreground-400 whitespace-nowrap">
             © 2026 Лески Каручка · Левски 5900

@@ -1,6 +1,7 @@
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
 import { unregisterPush } from '@/lib/pushSubscription';
+import { clearRecentLocations } from '@/lib/cookieConsent';
 import {
   createContext,
   useContext,
@@ -261,6 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    clearRecentLocations();
     queryClient.clear();
     setUser(null);
     setSession(null);

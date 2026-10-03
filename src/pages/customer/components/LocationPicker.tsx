@@ -110,5 +110,8 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
       </>}
       {!query && recent.length === 0 && <p className="booking-hint">{t('booking_address_hint')}</p>}
     </div>
+    {results.length > 0 && <p className="px-4 py-2 text-xs text-[#5E5E5E] bg-white">
+      <span translate="no" className="font-normal not-italic whitespace-nowrap">Google Maps</span>
+    </p>}
   </div>;
 }

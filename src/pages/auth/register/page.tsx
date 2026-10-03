@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { LOGO_URL } from '@/lib/logo';
+import { legalOperator } from '@/config/legal';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -15,9 +16,11 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTerms) { setError('Прочетете и приемете Общите условия, за да създадете акаунт.'); return; }
     setError('');
     setLoading(true);
 
@@ -26,6 +29,8 @@ export default function RegisterPage() {
         first_name: firstName,
         last_name: lastName,
         phone,
+        terms_version: legalOperator.termsVersion,
+        terms_accepted_at: new Date().toISOString(),
       });
 
       if (signUpError) {
@@ -68,6 +73,7 @@ export default function RegisterPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (!acceptedTerms) { setError('Прочетете и приемете Общите условия преди регистрация с Google.'); return; }
     setError('');
     setLoading(true);
     const { error: oauthError } = await signInWithOAuth('google');
@@ -110,6 +116,14 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 shadow-2xl shadow-black/20">
+          <label className="mb-4 flex items-start gap-3 text-sm text-foreground-800">
+            <input type="checkbox" checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)}
+              className="mt-1 h-4 w-4 flex-shrink-0" />
+            <span>Приемам <Link to="/terms" className="underline text-primary-700">Общите условия</Link>.
+              Запознах се с <Link to="/privacy" className="underline text-primary-700">Политиката за поверителност</Link>.
+              Това не включва съгласие за реклама.</span>
+          </label>
+          {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
           {/* Google Sign Up */}
           <button
             type="button"
@@ -145,13 +159,6 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="flex items-center gap-2 bg-red-50 text-red-600 px-3 py-2.5 rounded-lg text-xs">
-                <i className="ri-error-warning-line text-sm" />
-                <span>{error}</span>
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
@@ -230,17 +237,6 @@ export default function RegisterPage() {
                 />
               </div>
             </div>
-
-            <p className="text-xs text-foreground-500">
-              С регистрацията приемам{' '}
-              <Link to="/terms" className="text-primary-600 hover:text-primary-700 underline">
-                Общите условия
-              </Link>{' '}
-              и{' '}
-              <Link to="/privacy" className="text-primary-600 hover:text-primary-700 underline">
-                Политиката за поверителност
-              </Link>.
-            </p>
 
             <button
               type="submit"
