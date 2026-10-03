@@ -25,7 +25,7 @@ vi.mock('@/components/feature/NotificationBell', () => ({ default: () => null })
 vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
 vi.mock('@/lib/places', () => ({ hasPlacesApi: () => false }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc: fake.rpc, removeChannel: vi.fn(),
+  rpc: (...args: unknown[]) => ({ abortSignal: () => fake.rpc(...args) }), removeChannel: vi.fn(),
   channel: () => { const channel = { on: (_event: string, _filter: unknown, callback: typeof fake.notify) => { fake.notify = callback; return channel; }, subscribe: () => channel }; return channel; },
   from: (table: string) => {
     const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? { id: 'company' }
@@ -91,10 +91,10 @@ describe('customer booking integration', () => {
     fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
     expect(screen.getByRole('heading', { name: 'Готови за път.' })).toBeTruthy();
   });
-  it('keeps ordering disabled while offline or after quote expiry', async () => {
+  it('treats browser offline as a hint, but disables ordering after quote expiry', async () => {
     await mount(); await chooseRoute();
     act(() => { window.dispatchEvent(new Event('offline')); });
-    expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(false);
     act(() => { window.dispatchEvent(new Event('online')); });
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
@@ -184,4 +184,22 @@ it('ignores a late reverse-geocoding result after location is turned off', async
   await act(async () => setLocationEnabled('customer', false));
   await act(async () => done({ formatted_address: 'GPS адрес' }));
   expect(screen.queryByText('GPS адрес')).toBeNull();
+});
+
+it('releases a stuck booking button and retries with the same request ID without accepting the late reply', async () => {
+  let done!: (value: unknown) => void;
+  fake.rpc.mockReturnValueOnce(new Promise(resolve => { done = resolve; }));
+  await mount(); await chooseRoute();
+  fireEvent.click(screen.getByRole('button', { name: /Поръчай каручка/ }));
+  await act(async () => {});
+  const first = fake.rpc.mock.calls[0][1];
+  expect(document.querySelector<HTMLButtonElement>('button[aria-busy="true"]')?.disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(15_000));
+  expect(screen.getByRole('alert').textContent).toContain('Провери връзката');
+  fireEvent.click(screen.getByRole('button', { name: /Поръчай каручка/ })); await act(async () => {});
+  expect(fake.rpc).toHaveBeenCalledTimes(2);
+  expect(fake.rpc.mock.calls[1][1].p_request_id).toBe(first.p_request_id);
+  expect(screen.getByRole('heading', { name: 'Търсим твоя шофьор' })).toBeTruthy();
+  await act(async () => done({ data: { ...fake.active, status: 'cancelled' }, error: null }));
+  expect(screen.getByRole('heading', { name: 'Търсим твоя шофьор' })).toBeTruthy();
 });

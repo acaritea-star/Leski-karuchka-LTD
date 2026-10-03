@@ -1,4 +1,5 @@
-import { requestGps, subscribeGps, gpsPermission } from '@/lib/sharedGps';
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import { requestGps, subscribeGps, gpsPermission, gpsErrorMessage } from '@/lib/sharedGps';
 import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference';
 import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
@@ -172,7 +173,7 @@ export default function CustomerHome() {
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
   const canRequest = !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
-    && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError && !offline;
+    && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
     !!activeRequest &&
@@ -227,7 +228,7 @@ export default function CustomerHome() {
       setPickup({ address: geo?.formatted_address || t('current_location'), lat: latitude, lng: longitude });
       setStep(stepAfterSelection('pickup', !!destination)); setSearchQuery('');
     } catch (error) {
-      if (gpsRevision.current === revision) setLocationError(error instanceof Error ? error.message : t('location_denied'));
+      if (gpsRevision.current === revision) setLocationError(gpsErrorMessage(error));
     } finally { if (gpsRevision.current === revision) setLocating(false); }
   }, [t, destination, user?.id]);
 
@@ -279,12 +280,13 @@ export default function CustomerHome() {
   // Create taxi request
   const createRequest = async () => {
     if (!user || !route?.quote_id || !canRequest || bookingInFlight.current) return;
+    const quoteId = route.quote_id;
     bookingInFlight.current = true;
     setRequestStatus('creating'); setRequestError('');
     try {
-      const {data, error} = await supabase.rpc('create_taxi_request', {
-        p_quote_id: route.quote_id, p_request_id: bookingId.current, p_payment_method: 'cash',
-      });
+      const {data, error} = await withRequestTimeout(signal => supabase.rpc('create_taxi_request', {
+        p_quote_id: quoteId, p_request_id: bookingId.current, p_payment_method: 'cash',
+      }).abortSignal(signal), 15_000);
       if (error) throw new Error();
       if (!data) throw new Error();
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
@@ -302,9 +304,9 @@ export default function CustomerHome() {
     setRecoveryError(false);
     const recover = async () => {
       try {
-        const { data, error } = await supabase.from('taxi_requests').select('*')
+        const { data, error } = await withRequestTimeout(signal => supabase.from('taxi_requests').select('*')
           .eq('customer_id', user.id).in('status', ['pending', ...TRACKING_STATUSES])
-          .order('created_at', { ascending: false }).limit(1).abortSignal(AbortSignal.timeout(10_000)).maybeSingle();
+          .order('created_at', { ascending: false }).limit(1).abortSignal(signal).maybeSingle());
         if (!active) return;
         if (error) throw error;
         if (data) {
@@ -328,8 +330,8 @@ export default function CustomerHome() {
       if (!active || inFlight || document.visibilityState === 'hidden') return;
       inFlight = true;
       try {
-        const { data, error } = await supabase.from('taxi_requests').select('*').eq('id', requestId)
-          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])).maybeSingle();
+        const { data, error } = await withRequestTimeout(signal => supabase.from('taxi_requests').select('*').eq('id', requestId)
+          .abortSignal(signal).maybeSingle(), 10_000, controller.signal);
         if (active && !error && data) setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest));
       } catch { /* Realtime and the next bounded poll can recover a missed read. */ }
       finally { inFlight = false; }
@@ -399,7 +401,7 @@ export default function CustomerHome() {
     setCancelling(true);
     setRequestError('');
     try {
-      const { data, error } = await supabase
+      const { data, error } = await withRequestTimeout(signal => supabase
         .from('taxi_requests')
         .update({
           status: 'cancelled',
@@ -410,7 +412,7 @@ export default function CustomerHome() {
         .eq('id', activeRequestId!)
         .eq('status', activeRequest.status)
         .select('id, status')
-        .maybeSingle();
+        .abortSignal(signal).maybeSingle(), 15_000);
 
       if (error) throw error;
 

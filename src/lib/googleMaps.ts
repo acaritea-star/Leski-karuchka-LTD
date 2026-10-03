@@ -1,5 +1,5 @@
 import { isInBulgaria } from './serviceArea';
-import { supabase } from '@/lib/supabase';
+import { invokeEdge } from './edgeRequest';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Google Maps Platform — Frontend wrappers for Supabase Edge Functions
@@ -59,9 +59,8 @@ export async function geocodeAddress(
   opts?: { region?: string; language?: string }
 ): Promise<GeocodeResult | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('google-geocode', {
-      body: { address, region: opts?.region ?? 'bg', language: opts?.language ?? 'bg' },
-    });
+    const { data, error } = await invokeEdge<GeocodeResult>('google-geocode',
+      { address, region: opts?.region ?? 'bg', language: opts?.language ?? 'bg' }, 8000);
     if (error) throw error;
     if (!data?.success) return null;
     return data as GeocodeResult;
@@ -78,9 +77,8 @@ export async function reverseGeocode(
   opts?: { language?: string; result_type?: string }
 ): Promise<GeocodeResult | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('google-geocode', {
-      body: { lat, lng, language: opts?.language ?? 'bg', result_type: opts?.result_type },
-    });
+    const { data, error } = await invokeEdge<GeocodeResult>('google-geocode',
+      { lat, lng, language: opts?.language ?? 'bg', result_type: opts?.result_type }, 8000);
     if (error) throw error;
     if (!data?.success) return null;
     return data as GeocodeResult;
@@ -106,8 +104,7 @@ export async function computeRoute(
   if (!isInBulgaria(origin.lat, origin.lng) || !isInBulgaria(destination.lat, destination.lng)
     || opts?.waypoints?.some(point => !isInBulgaria(point.lat, point.lng))) return null;
   try {
-    const { data, error } = await supabase.functions.invoke('google-routes', {
-      body: {
+    const { data, error } = await invokeEdge<RouteResult>('google-routes', {
         origin,
         destination,
         quote: opts?.quote,
@@ -116,8 +113,7 @@ export async function computeRoute(
         units: opts?.units ?? 'METRIC',
         alternatives: opts?.alternatives ?? false,
         waypoints: opts?.waypoints,
-      },
-    });
+    }, 20_000);
     if (error) throw error;
     if (!data?.success) return null;
     return data as RouteResult;

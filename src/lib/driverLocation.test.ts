@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const { single, upsert, update, updateSingle } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn()}));
 vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update})}}));
 import { stopSharedGps } from './sharedGps';
-import { startDriverGps, stopDriverGps, getGpsStats, isFreshTimestamp, setDriverOnline } from './driverLocation';
+import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
 type PositionCallback = (position: GeolocationPosition) => void;
 let watch: PositionCallback;
@@ -33,11 +33,12 @@ describe('driver GPS writes',()=>{
     watch(fix());await flush();watch(fix(43.3));await flush();
     expect(success).toHaveBeenCalledTimes(1);
   });
-  it('handles Supabase resolved errors and immediately retries the next fix',async()=>{
+  it('backs off resolved errors instead of retrying every GPS callback',async()=>{
     single.mockResolvedValueOnce({data:null,error:{message:'RLS denied'}});
     const success=vi.fn(),error=vi.fn();startDriverGps('driver','company',{onUpdate:success,onError:error});
     watch(fix());await flush();expect(error).toHaveBeenCalledWith('RLS denied');expect(success).not.toHaveBeenCalled();
-    watch(fix());await flush();expect(success).toHaveBeenCalledTimes(1);
+    watch(fix());await flush();expect(success).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5000);expect(success).toHaveBeenCalledTimes(1);
   });
   it('does not refresh the timestamp with an old GPS fix',async()=>{
     startDriverGps('driver','company');watch({...fix(),timestamp:Date.now()-60000});await flush();
@@ -99,4 +100,70 @@ it('does not confirm an online change rejected by the server', async () => {
   updateSingle.mockResolvedValueOnce({ data:null,error:{message:'Online unavailable'} });
   await expect(setDriverOnline({ id:'driver',company_id:'company' }, true)).rejects.toThrow('Online unavailable');
   expect(upsert).toHaveBeenCalledTimes(1);
+});
+
+it('retains only the latest GPS fix during a slow write and flushes it without overlapping writes', async () => {
+  let done!: (value: unknown) => void;
+  single.mockReturnValueOnce(new Promise(resolve => { done = resolve; }));
+  startDriverGps('driver', 'company'); const first = fix(); watch(first);
+  await vi.advanceTimersByTimeAsync(1000); watch(fix(43.3));
+  await vi.advanceTimersByTimeAsync(1000); const latest = fix(43.4); watch(latest);
+  expect(single).toHaveBeenCalledOnce();
+  done({ data: { updated_at: new Date().toISOString() }, error: null }); await flush();
+  expect(single).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(single).toHaveBeenCalledTimes(2);
+  expect(upsert).toHaveBeenLastCalledWith(expect.objectContaining({ latitude: 43.4, position_at: new Date(latest.timestamp).toISOString() }), expect.anything());
+  expect(getGpsStats().lastConfirmedFixAgeMs).toBe(3000);
+});
+it('recovers after a transport that ignores abort and keeps the newest fix during backoff', async () => {
+  single.mockReturnValueOnce(new Promise(() => {}));
+  const success = vi.fn(); startDriverGps('driver', 'company', { onUpdate: success }); watch(fix());
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(getGpsStats().error).toContain('забави'); expect(success).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  const newer = fix(43.4); watch(newer);
+  await vi.advanceTimersByTimeAsync(4999);
+  expect(single).toHaveBeenCalledTimes(2); expect(success).toHaveBeenCalledOnce();
+  expect(upsert).toHaveBeenLastCalledWith(expect.objectContaining({ latitude: 43.4 }), expect.anything());
+});
+it('backs off repeated network failures instead of writing for every new native fix', async () => {
+  single.mockResolvedValue({ data: null, error: { message: 'No connection' } });
+  startDriverGps('driver', 'company'); watch(fix()); await flush();
+  for (let second = 1; second <= 14; second++) { await vi.advanceTimersByTimeAsync(1000); watch(fix()); await flush(); }
+  expect(single).toHaveBeenCalledTimes(2); // Initial attempt, then after 5 seconds.
+  await vi.advanceTimersByTimeAsync(1000); expect(single).toHaveBeenCalledTimes(3);
+});
+it('aborts an in-flight write on stop and never uploads a queued location later', async () => {
+  let signal!: AbortSignal;
+  upsert.mockReturnValue({ select: () => ({ abortSignal: (abort: AbortSignal) => { signal = abort; return { single }; } }) });
+  single.mockReturnValueOnce(new Promise(() => {}));
+  startDriverGps('driver', 'company'); watch(fix());
+  await vi.advanceTimersByTimeAsync(1000); watch(fix(43.3));
+  stopDriverGps(); expect(signal.aborted).toBe(true);
+  await vi.advanceTimersByTimeAsync(60_000); expect(single).toHaveBeenCalledOnce();
+});
+it('requires a fresh GPS source as well as a fresh server acknowledgement', async () => {
+  let done!: (value: unknown) => void;
+  single.mockReturnValueOnce(new Promise(resolve => { done = resolve; }));
+  startDriverGps('driver', 'company'); watch({ ...fix(), timestamp: Date.now() - 29_000 });
+  await vi.advanceTimersByTimeAsync(14_000);
+  done({ data: { updated_at: new Date().toISOString() }, error: null }); await flush();
+  expect(getGpsStats().lastWriteAgeMs).toBe(0);
+  expect(getGpsStats().lastConfirmedFixAgeMs).toBe(43_000);
+  Object.assign(document, { visibilityState: 'hidden' });
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(getGpsStats().lastConfirmedFixAgeMs).toBeGreaterThan(GPS_STALE_MS);
+  expect(getGpsStats().lastWriteAgeMs).toBe(3000);
+});
+it('discards queued stale fixes rather than replaying an offline journey', async () => {
+  single.mockResolvedValue({ data: null, error: { message: 'offline' } });
+  startDriverGps('driver', 'company'); watch(fix()); await flush();
+  Object.assign(document, { visibilityState: 'hidden' });
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(single).toHaveBeenCalledOnce();
+  single.mockImplementation(async () => ({ data: { updated_at: new Date().toISOString() }, error: null }));
+  Object.assign(document, { visibilityState: 'visible' }); window.dispatchEvent(new Event('pageshow'));
+  await flush(); expect(single).toHaveBeenCalledTimes(2);
+  expect(upsert).toHaveBeenLastCalledWith(expect.objectContaining({ position_at: new Date().toISOString() }), expect.anything());
 });

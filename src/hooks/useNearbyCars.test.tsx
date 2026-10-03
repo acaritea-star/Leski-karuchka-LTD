@@ -32,7 +32,7 @@ it('expires original GPS positions after an error and never preserves fake avail
 it('prevents overlapping requests and discards replies after owner/type changes',async()=>{
  let done!:(v:unknown)=>void;vi.mocked(supabase.rpc).mockReturnValue({abortSignal:()=>new Promise(resolve=>{done=resolve;})} as never);
  const view=renderHook(({type})=>useNearbyCars(point,'customer',type),{initialProps:{type:'old'}});
- await act(async()=>vi.advanceTimersByTime(30000));expect(supabase.rpc).toHaveBeenCalledOnce();
+ await act(async()=>vi.advanceTimersByTime(9000));expect(supabase.rpc).toHaveBeenCalledOnce();
  respond(data());const oldDone=done;view.rerender({type:'new'});await act(async()=>{});
  const snapshot=view.result.current;await act(async()=>oldDone({data:{cars:[]},error:null}));expect(view.result.current).toBe(snapshot);
  view.unmount();await act(async()=>vi.advanceTimersByTime(60000));expect(supabase.rpc).toHaveBeenCalledTimes(2);
@@ -40,4 +40,24 @@ it('prevents overlapping requests and discards replies after owner/type changes'
 it('rejects invalid tokens, foreign or stale positions and caps the preview at 12',()=>{
  const car=data().cars[0];expect(parseNearbyCars({cars:[{...car,token:'driver-id'},{...car,lat:48,lng:2},{...car,position_at:'2020-01-01'},car,car]})).toHaveLength(1);
  expect(parseNearbyCars({cars:Array.from({length:20},(_,n)=>({...car,token:n.toString(16).padStart(32,'0')}))})).toHaveLength(12);
+});
+
+it('recovers a stuck preview read after its deadline without polling every GPS update', async () => {
+  vi.mocked(supabase.rpc).mockReturnValueOnce({ abortSignal: () => new Promise(() => {}) } as never);
+  const view = renderHook(() => useNearbyCars(point, 'customer'));
+  await act(async () => vi.advanceTimersByTimeAsync(15_000));
+  expect(supabase.rpc).toHaveBeenCalledOnce();
+  respond(data());
+  await act(async () => vi.advanceTimersByTimeAsync(15_000));
+  expect(supabase.rpc).toHaveBeenCalledTimes(2); expect(view.result.current).toHaveLength(1);
+});
+it('resumes nearby availability on pageshow but keeps the 15-second minimum', async () => {
+  const view = renderHook(() => useNearbyCars(point, 'customer')); await act(async () => {});
+  window.dispatchEvent(new Event('pageshow')); await act(async () => {});
+  expect(supabase.rpc).toHaveBeenCalledOnce();
+  visibility = 'hidden'; await act(async () => vi.advanceTimersByTimeAsync(30_000));
+  expect(supabase.rpc).toHaveBeenCalledOnce();
+  visibility = 'visible'; respond(data());
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  expect(supabase.rpc).toHaveBeenCalledTimes(2); expect(view.result.current).toHaveLength(1);
 });

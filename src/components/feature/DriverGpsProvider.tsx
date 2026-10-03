@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { isInBulgaria } from '@/lib/serviceArea';
 import { queryKeys } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS } from '@/lib/driverLocation';
 
 type GpsState = { status: 'idle' | 'tracking' | 'stale' | 'error'; error: string };
@@ -21,8 +22,8 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
   const isDriver = user?.role === 'DRIVER';
   const { data: driver } = useQuery({
     queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers','none'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').eq('user_id', user!.id).maybeSingle();
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase.from('drivers').select('*').eq('user_id', user!.id).abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
       return data;
     },
@@ -49,13 +50,13 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     startDriverGps(driver.id, driver.company_id, {
       onUpdate: () => {
         if (user?.id && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
-        setState({ status: 'tracking', error: '' });
+        setState(getGpsStats().lastConfirmedFixAgeMs < GPS_STALE_MS ? { status: 'tracking', error: '' } : { status: 'stale', error: 'Изчакване на актуална локация…' });
       },
       onError: error => setState({ status: 'error', error }),
     }, user?.id);
     const timer = setInterval(() => {
       const stats = getGpsStats();
-      if (stats.lastWriteAgeMs > GPS_STALE_MS) setState({ status: 'stale', error: stats.error || 'Локацията не се обновява. Провери GPS и интернета.' });
+      if (stats.lastWriteAgeMs >= GPS_STALE_MS || stats.lastConfirmedFixAgeMs >= GPS_STALE_MS) setState({ status: 'stale', error: stats.error || 'Локацията не се обновява. Провери GPS и интернета.' });
     }, 5000);
     let lock: WakeLockSentinel | null = null;
     let alive = true;
@@ -71,10 +72,10 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       } catch { /* The OS may deny Wake Lock; GPS health remains independently visible. */ }
       finally { acquiring = false; }
     };
-    void wake(); document.addEventListener('visibilitychange', wake);
+    void wake(); document.addEventListener('visibilitychange', wake); window.addEventListener('pageshow', wake);
     return () => {
       alive = false; stopDriverGps(); clearInterval(timer);
-      document.removeEventListener('visibilitychange', wake); void lock?.release();
+      document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
   }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation]);
   return <Context.Provider value={state}>{children}</Context.Provider>;

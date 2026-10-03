@@ -1,4 +1,5 @@
 import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
+import { withRequestTimeout } from './requestTimeout';
 
 export type SocialProvider = 'google' | 'facebook';
 
@@ -6,13 +7,14 @@ export async function startSocialSignIn(provider: SocialProvider) {
   if (provider === 'facebook') {
     // The SDK builds an OAuth URL even if the provider is disabled. Check the
     // public Auth settings first so we can keep the user on a useful screen.
-    const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
-      headers: { apikey: supabaseAnonKey, Accept: 'application/json' },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(10000),
+    const settings = await withRequestTimeout(async signal => {
+      const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+        headers: { apikey: supabaseAnonKey, Accept: 'application/json' },
+        cache: 'no-store', signal,
+      });
+      if (!response.ok) throw new Error('provider_check_failed');
+      return response.json();
     });
-    if (!response.ok) throw new Error('provider_check_failed');
-    const settings = await response.json();
     if (settings?.external?.facebook !== true) throw new Error('provider_disabled');
   }
 

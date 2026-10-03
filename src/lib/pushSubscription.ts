@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { withRequestTimeout } from './requestTimeout';
 
 const OWNER_KEY = 'leski_push_owner';
 const preferenceKey = (userId: string) => `leski_push_enabled:${userId}`;
@@ -58,10 +59,11 @@ export function registerPush(userId: string): Promise<boolean> {
     if (current.session?.user.id !== userId) return false;
     const json = subscription.toJSON();
     if (!json.endpoint || !json.keys) throw new Error('Invalid browser subscription');
-    const { error } = await supabase.rpc('register_push_subscription', {
+    const body = {
       p_endpoint: json.endpoint, p_p256dh: json.keys.p256dh, p_auth: json.keys.auth,
       p_user_agent: navigator.userAgent,
-    }).abortSignal(AbortSignal.timeout(10000));
+    };
+    const { error } = await withRequestTimeout(signal => supabase.rpc('register_push_subscription', body).abortSignal(signal));
     if (error) throw error;
     localStorage.setItem(OWNER_KEY, userId);
     if (!allowed(userId)) return false;
@@ -81,8 +83,8 @@ export function unregisterPush(userId: string): Promise<void> {
     const subscription = await bounded(registration.pushManager.getSubscription());
     if (!subscription) return;
     const unsubscribed = await bounded(subscription.unsubscribe()).catch(() => false);
-    const { error } = await supabase.from('push_subscriptions').delete()
-      .eq('user_id', userId).eq('endpoint', subscription.endpoint).abortSignal(AbortSignal.timeout(10000));
+    const { error } = await withRequestTimeout(signal => supabase.from('push_subscriptions').delete()
+      .eq('user_id', userId).eq('endpoint', subscription.endpoint).abortSignal(signal));
     if (error && !unsubscribed) { setOwner(userId); throw error; }
     localStorage.removeItem(OWNER_KEY);
   });

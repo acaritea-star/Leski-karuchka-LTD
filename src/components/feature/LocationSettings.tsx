@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { setLocationEnabled } from '@/lib/locationPreference';
-import { getGpsPosition, requestGps, subscribeGpsState } from '@/lib/sharedGps';
+import { getGpsPosition, gpsErrorMessage, requestGps, subscribeGpsState } from '@/lib/sharedGps';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import { GPS_STALE_MS, setDriverOnline, stopDriverGps } from '@/lib/driverLocation';
 import { queryKeys } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
@@ -20,8 +21,8 @@ export default function LocationSettings({ driver = false, onOffline }: { driver
   const client = useQueryClient();
   const { data: record } = useQuery({
     queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').eq('user_id', user!.id).maybeSingle();
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase.from('drivers').select('*').eq('user_id', user!.id).abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
       return data;
     }, enabled: driver && !!user?.id,
@@ -40,8 +41,8 @@ export default function LocationSettings({ driver = false, onOffline }: { driver
   const offline = async () => {
     if (!user || !driver) return;
     // Read authoritative status even if the profile query is still loading.
-    const { data, error: readError } = await supabase.from('drivers').select('*').eq('user_id', user.id)
-      .abortSignal(AbortSignal.timeout(10_000)).maybeSingle();
+    const { data, error: readError } = await withRequestTimeout(signal => supabase.from('drivers').select('*').eq('user_id', user.id)
+      .abortSignal(signal).maybeSingle());
     if (readError) throw new Error(readError.message);
     if (data?.is_online) {
       const confirmed = await setDriverOnline(data, false);
@@ -63,7 +64,7 @@ export default function LocationSettings({ driver = false, onOffline }: { driver
         if (alive.current) setLocationEnabled(user.id, true);
       }
     } catch (cause) {
-      if (alive.current) setError(cause instanceof Error ? cause.message : en ? 'Allow location access in your browser settings.' : 'Разреши местоположението от настройките на браузъра.');
+      if (alive.current) setError(gpsErrorMessage(cause, en));
     } finally { if (alive.current) setBusy(false); }
   };
   const fresh = position && Date.now() - position.timestamp < GPS_STALE_MS && position.timestamp <= Date.now() + 30_000;

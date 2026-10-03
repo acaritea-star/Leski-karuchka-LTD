@@ -1,3 +1,4 @@
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
@@ -118,15 +119,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Make sure the client actually holds a session before querying —
           // without it the request goes out unauthenticated and RLS returns
           // zero rows with no error.
-          const { data: sessionData } = await supabase.auth.getSession();
+          const { data: sessionData } = await withRequestTimeout(() => supabase.auth.getSession());
           const hasToken = Boolean(sessionData.session?.access_token);
 
-          const { data, error } = await supabase
+          const { data, error } = await withRequestTimeout(signal => supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
-            .abortSignal(AbortSignal.timeout(10_000))
-            .maybeSingle();
+            .abortSignal(signal)
+            .maybeSingle());
 
           if (error) {
             // A rejected request (401 / missing table / clock-skewed JWT) is a

@@ -1,5 +1,6 @@
 import type { RoutePoint } from './googleMaps';
 import { RoadNetwork, type RoadWay } from './roadNetwork';
+import { withRequestTimeout } from './requestTimeout';
 const snapshots = new Map<string, Promise<RoadNetwork | null>>();
 const regions = [
   {path:'/roads/levski.json',south:43.325,north:43.375,west:25.095,east:25.165},
@@ -12,12 +13,13 @@ export async function loadRoadSnapshot(point: RoutePoint): Promise<RoadNetwork |
   if (!region) return null;
   let snapshot = snapshots.get(region.path);
   if (!snapshot) {
-    snapshot = fetch(region.path, {signal: AbortSignal.timeout(5000)}).then(async response => {
+    snapshot = withRequestTimeout(async signal => {
+      const response = await fetch(region.path, { signal });
       if (!response.ok) throw new Error('Road snapshot unavailable');
       const data = await response.json();
       if (!Array.isArray(data.roads) || !data.roads.length) throw new Error('Empty road snapshot');
       return new RoadNetwork(data.roads as RoadWay[]);
-    }).catch(() => { snapshots.delete(region.path); return null; });
+    }, 5000).catch(() => { snapshots.delete(region.path); return null; });
     snapshots.set(region.path, snapshot);
   }
   return snapshot;
