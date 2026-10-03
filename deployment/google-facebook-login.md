@@ -1,6 +1,6 @@
 # Google and Facebook login
 
-The public `/auth/login` and `/auth/register` pages offer exactly two authentication methods: Google and Facebook. They share one component and no longer contain email/password fields. Both paths require an unchecked terms checkbox before starting OAuth; this is a UI acceptance action, not immutable server evidence.
+The public `/auth/login` and `/auth/register` pages offer exactly two authentication methods: Google and Facebook. They share one component and no longer contain email/password fields. Selecting either Continue button starts OAuth directly. A visible notice beside the buttons states that continuing accepts the Terms and links separately to privacy information. There is no extra checkbox or advertising consent bundled into sign-in. This is a UI acceptance action, not immutable server evidence.
 
 ## Integration
 
@@ -34,6 +34,6 @@ The backend email provider has not been disabled. The older admin driver-creatio
 
 ## Checks
 
-`npm run check` passes locally: lint, 78 tests in 13 files, TypeScript and production build. New tests cover the two public options, terms acceptance on both paths, provider routing, disabled-provider checks, retries, duplicate requests, and query/fragment callback failures under Strict Mode. Full real-account OAuth completion and browser visual review have not been claimed.
+`npm run check` passes locally: lint, 79 tests in 13 files, TypeScript and production build. Tests cover the two public options, direct continuation with visible terms/privacy links on both paths, provider routing, disabled-provider checks, retries, duplicate requests, and query/fragment callback failures under Strict Mode. Full real-account OAuth completion and browser visual review have not been claimed.
 
 References checked: [Supabase Facebook](https://supabase.com/docs/guides/auth/social-login/auth-facebook), [redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [PKCE OAuth](https://supabase.com/docs/reference/javascript/auth-signinwithoauth), [identity linking](https://supabase.com/docs/guides/auth/auth-identity-linking). The current Supabase changelog was checked; no relevant hosted Google/Facebook PKCE migration was identified.

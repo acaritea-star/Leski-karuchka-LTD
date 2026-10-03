@@ -19,7 +19,6 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 const renderLogin = () => render(<MemoryRouter><LoginPage /></MemoryRouter>);
-const acceptTerms = () => fireEvent.click(screen.getByRole('checkbox'));
 
 describe('two social sign-in options', () => {
   it.each([LoginPage, RegisterPage])('shows only Google and Facebook on %p', Page => {
@@ -28,16 +27,23 @@ describe('two social sign-in options', () => {
     expect(screen.getByRole('button', { name: 'Продължи с Google' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Продължи с Facebook' })).toBeTruthy();
     expect(container.querySelector('input[type="email"], input[type="password"]')).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Общи условия' }).getAttribute('href')).toBe('/terms');
     expect(screen.getByRole('link', { name: 'Политиката за поверителност' }).getAttribute('href')).toBe('/privacy');
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.getAttribute('aria-describedby')).toBe('auth-legal-notice');
+    }
   });
-  it('requires explicit terms acceptance on the login path too', async () => {
-    renderLogin();
+  it.each([LoginPage, RegisterPage])('starts OAuth from one click on %p with the terms notice visible', async Page => {
+    render(<MemoryRouter><Page /></MemoryRouter>);
+    expect(screen.getByText(bg.auth_continue_accept_prefix, { exact: false })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Продължи с Facebook' }));
-    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', bg.auth_terms_required);
+    await waitFor(() => expect(auth.signInWithOAuth).toHaveBeenCalledOnce());
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith('facebook');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
   it.each(['Google', 'Facebook'])('starts %s and prevents a second OAuth request', async provider => {
-    renderLogin(); acceptTerms();
+    renderLogin();
     fireEvent.click(screen.getByRole('button', { name: `Продължи с ${provider}` }));
     await waitFor(() => expect(auth.signInWithOAuth).toHaveBeenCalledWith(provider.toLowerCase()));
     for (const button of screen.getAllByRole('button')) expect((button as HTMLButtonElement).disabled).toBe(true);
@@ -46,7 +52,7 @@ describe('two social sign-in options', () => {
   });
   it('offers recovery on an unavailable provider', async () => {
     auth.signInWithOAuth.mockRejectedValue(new Error('provider_disabled'));
-    renderLogin(); acceptTerms();
+    renderLogin();
     fireEvent.click(screen.getByRole('button', { name: 'Продължи с Facebook' }));
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', bg.auth_error_unavailable);
     expect((screen.getByRole('button', { name: 'Продължи с Google' }) as HTMLButtonElement).disabled).toBe(false);
@@ -56,7 +62,7 @@ describe('two social sign-in options', () => {
   });
   it('shows a safe error and unlocks both buttons after an OAuth error response', async () => {
     auth.signInWithOAuth.mockResolvedValue({ data: { url: null }, error: { message: 'raw provider details' } });
-    renderLogin(); acceptTerms();
+    renderLogin();
     fireEvent.click(screen.getByRole('button', { name: 'Продължи с Google' }));
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', bg.auth_error_generic);
     for (const button of screen.getAllByRole('button')) expect((button as HTMLButtonElement).disabled).toBe(false);

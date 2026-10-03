@@ -10,7 +10,6 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { session, loading, signInWithOAuth } = useAuth();
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [pending, setPending] = useState<SocialProvider | null>(null);
   const [error, setError] = useState('');
   const requestInFlight = useRef(false);
@@ -22,10 +21,6 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
 
   const handleSignIn = async (provider: SocialProvider) => {
     if (requestInFlight.current || loading || session) return;
-    if (!acceptedTerms) {
-      setError(t('auth_terms_required'));
-      return;
-    }
     requestInFlight.current = true;
     setPending(provider);
     setError('');
@@ -67,7 +62,7 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
           {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
           <div className="space-y-3">
-            <button type="button" onClick={() => void handleSignIn('google')} disabled={disabled}
+            <button type="button" onClick={() => void handleSignIn('google')} disabled={disabled} aria-describedby="auth-legal-notice"
               className="w-full min-h-12 px-4 py-3 flex items-center justify-center gap-3 bg-white border border-background-200 rounded-xl text-sm font-medium text-foreground-800 hover:bg-background-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-wait">
               <svg className="size-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -77,7 +72,7 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
               </svg>
               {t('auth_continue_google')}
             </button>
-            <button type="button" onClick={() => void handleSignIn('facebook')} disabled={disabled}
+            <button type="button" onClick={() => void handleSignIn('facebook')} disabled={disabled} aria-describedby="auth-legal-notice"
               className="w-full min-h-12 px-4 py-3 flex items-center justify-center gap-3 bg-white border border-background-200 rounded-xl text-sm font-medium text-foreground-800 hover:bg-background-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-wait">
               <svg className="size-5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.026 4.388 11.021 10.125 11.927v-8.437H7.078v-3.49h3.047v-2.66c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.973h-1.513c-1.491 0-1.956.931-1.956 1.887v2.261h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
@@ -90,18 +85,10 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
             <span className="size-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             {pending ? t('auth_redirecting', { provider: pending === 'google' ? 'Google' : 'Facebook' }) : t('loading')}
           </p>}
-          <p className="text-center text-xs text-foreground-500">{t('auth_social_hint')}</p>
-          <label className="flex items-start gap-3 text-sm leading-relaxed text-foreground-700">
-            <input type="checkbox" checked={acceptedTerms} disabled={disabled}
-              onChange={event => { setAcceptedTerms(event.target.checked); setError(''); }}
-              className="mt-1 size-4 shrink-0 accent-primary-600" />
-            <span>
-              {t('auth_accept_prefix')}{' '}<Link className="underline text-primary-700" to="/terms">{t('menu_terms')}</Link>.
-              {' '}{t('auth_privacy_prefix')}{' '}<Link className="underline text-primary-700" to="/privacy">{t('auth_privacy_label')}</Link>.
-            </span>
-          </label>
-          <p className="text-xs text-foreground-500">{t('auth_no_marketing_consent')}</p>
-          <p className="text-center text-xs leading-relaxed text-foreground-500">{t('auth_account_hint')}</p>
+          <p id="auth-legal-notice" className="text-center text-xs leading-relaxed text-foreground-600">
+            {t('auth_continue_accept_prefix')}{' '}<Link className="underline text-primary-700" to="/terms">{t('menu_terms')}</Link>.
+            {' '}{t('auth_data_notice_prefix')}{' '}<Link className="underline text-primary-700" to="/privacy">{t('auth_privacy_label')}</Link>.
+          </p>
 
           <p className="text-center mt-5 text-sm text-foreground-500">
             {t(registering ? 'have_account' : 'no_account')}{' '}
