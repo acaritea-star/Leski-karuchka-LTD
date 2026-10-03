@@ -1,3 +1,4 @@
+import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -214,6 +215,8 @@ export default function CustomerHome() {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const { latitude, longitude } = pos.coords;
+          if (gpsRevision.current !== revision) return;
+          if (!isInBulgaria(latitude, longitude)) { setLocationError(SERVICE_AREA_ERROR); setLocating(false); return; }
           // Resolve a precise street address from the GPS fix; fall back to the
           // generic label only if reverse geocoding is unavailable.
           let address = t('current_location');

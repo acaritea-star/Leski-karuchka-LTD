@@ -28,6 +28,7 @@ export default function DriverHome() {
   const queryClient = useQueryClient();
   const { playDriverSound, unlockAudio } = useNotificationSound();
 
+  const toggleInFlight = useRef(false);
   const [toggleError, setGpsError] = useState('');
   const gps = useDriverGps();
   const gpsError = toggleError || gps.error;
@@ -152,15 +153,17 @@ export default function DriverHome() {
       if (!driver) throw new Error('No driver record');
       const goingOnline = !driver.is_online;
 
-      await setDriverOnline(driver, goingOnline);
-      return goingOnline;
+      return await setDriverOnline(driver, goingOnline);
     },
-    onSuccess: () => {
+    onSuccess: async (confirmed) => {
+      if (user?.id) await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
+      if (user?.id) queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
       setGpsError('');
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverRecord(user.id) });
       }
     },
+    onSettled: () => { toggleInFlight.current = false; },
     onError: (err) => {
       setGpsError(err instanceof Error ? err.message : t('gps_error'));
     },
@@ -464,7 +467,11 @@ export default function DriverHome() {
             <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-background-100 p-4">
               {/* Online / Offline toggle — more prominent */}
               <button
-                onClick={() => toggleMutation.mutate()}
+                onClick={() => {
+                  if (toggleInFlight.current || !driver || !user?.id) return;
+                  toggleInFlight.current = true;
+                  void queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) }).then(() => toggleMutation.mutate());
+                }}
                 disabled={toggling}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all duration-300 whitespace-nowrap cursor-pointer relative overflow-hidden mb-3
                   ${toggling ? 'opacity-70' : 'active:scale-[0.98]'}

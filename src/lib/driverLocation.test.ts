@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-const { single, upsert } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn()}));
-vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert})}}));
-import { startDriverGps, stopDriverGps, getGpsStats, isFreshTimestamp } from './driverLocation';
+const { single, upsert, update, updateSingle } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn()}));
+vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update})}}));
+import { startDriverGps, stopDriverGps, getGpsStats, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
 type PositionCallback = (position: GeolocationPosition) => void;
 let watch: PositionCallback;
@@ -12,6 +12,8 @@ beforeEach(() => {
   const document = Object.assign(new EventTarget(),{visibilityState:'visible'});
   vi.stubGlobal('document',document);vi.stubGlobal('window',new EventTarget());
   vi.stubGlobal('navigator',{geolocation:{watchPosition:vi.fn((cb:PositionCallback)=>{watch=cb;return 1;}),clearWatch:vi.fn(),getCurrentPosition:vi.fn((cb:PositionCallback)=>cb(fix()))}});
+  update.mockReset().mockReturnValue({eq:()=>({select:()=>({abortSignal:()=>({single:updateSingle})})})});
+  updateSingle.mockReset().mockResolvedValue({data:{id:'driver',company_id:'company',is_online:false,status:'offline'},error:null});
   upsert.mockReset().mockReturnValue({select:()=>({abortSignal:()=>({single})})});
   single.mockReset().mockImplementation(async()=>({data:{updated_at:new Date().toISOString()},error:null}));
 });
@@ -77,4 +79,23 @@ describe('location freshness',()=>{
    expect(isFreshTimestamp(null)).toBe(false);expect(isFreshTimestamp('bad')).toBe(false);
    expect(isFreshTimestamp(new Date(Date.now()+120000).toISOString())).toBe(false);
  });
+});
+
+it('rejects GPS outside Bulgaria without writing to the database', async () => {
+  const onError=vi.fn();startDriverGps('driver','company',{onError});
+  watch({...fix(),coords:{...fix().coords,latitude:51.507,longitude:-.128}});await flush();
+  expect(upsert).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledWith(expect.stringContaining('България'));
+});
+
+it('allows going offline without a GPS prompt and returns the confirmed status immediately', async () => {
+  const confirmed = await setDriverOnline({ id:'driver',company_id:'company' }, false);
+  expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+  expect(upsert).not.toHaveBeenCalled();
+  expect(confirmed).toMatchObject({ is_online:false,status:'offline' });
+});
+it('does not confirm an online change rejected by the server', async () => {
+  updateSingle.mockResolvedValueOnce({ data:null,error:{message:'Online unavailable'} });
+  await expect(setDriverOnline({ id:'driver',company_id:'company' }, true)).rejects.toThrow('Online unavailable');
+  expect(upsert).toHaveBeenCalledTimes(1);
 });

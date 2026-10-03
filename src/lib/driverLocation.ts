@@ -1,3 +1,4 @@
+import { isInBulgaria, SERVICE_AREA_ERROR } from './serviceArea';
 import { supabase } from '@/lib/supabase';
 
 export const GPS_HEARTBEAT_MS = 15_000;
@@ -27,6 +28,7 @@ export function getCurrentPosition(): Promise<GeolocationPosition> {
 export async function saveDriverPosition(id: string, company: string, position: GeolocationPosition): Promise<string> {
   if (Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла.');
   if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy < 0 || position.coords.accuracy > GPS_MAX_ACCURACY_METERS) throw new Error('Неточна GPS позиция. Изчакай по-добър сигнал.');
+  if (!isInBulgaria(position.coords.latitude, position.coords.longitude)) throw new Error(SERVICE_AREA_ERROR);
   const { data, error } = await supabase.from('driver_locations').upsert({
     driver_id: id, company_id: company,
     latitude: position.coords.latitude, longitude: position.coords.longitude,
@@ -40,9 +42,10 @@ export async function saveDriverPosition(id: string, company: string, position: 
 export async function setDriverOnline(driver: { id: string; company_id: string }, online: boolean) {
   if (online) await saveDriverPosition(driver.id, driver.company_id, await getCurrentPosition());
   const { data, error } = await supabase.from('drivers').update({ is_online: online })
-    .eq('id', driver.id).select('id').single();
+    .eq('id', driver.id).select('*').abortSignal(AbortSignal.timeout(10_000)).single();
   if (error || !data) throw new Error(error?.message ?? 'Промяната не е потвърдена.');
   if (!online) stopDriverGps();
+  return data;
 }
 export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}): boolean {
   stopDriverGps();

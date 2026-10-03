@@ -38,6 +38,7 @@ export async function searchPlaces(
     input: query.trim(),
     languageCode: language,
     regionCode: 'BG',
+    includedRegionCodes: ['bg'],
     locationBias: {
       rectangle: {
         low: BG_SOUTH_WEST,

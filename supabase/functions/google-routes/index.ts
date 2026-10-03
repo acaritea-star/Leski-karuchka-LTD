@@ -1,3 +1,4 @@
+import { isInBulgaria, SERVICE_AREA_ERROR } from '../_shared/serviceArea.ts';
 import { admin, authorize, validPoint } from '../_shared/auth.ts';
 import { calculateFare, pricingFromRow, applyVehicleMultiplier } from '../_shared/pricing.ts';
 const API_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY') ?? '';
@@ -53,11 +54,14 @@ Deno.serve(async (req) => {
     return badRequest('Missing/invalid "destination" { lat, lng }');
   }
 
+  if (!isInBulgaria(origin.lat, origin.lng) || !isInBulgaria(destination.lat, destination.lng)) return badRequest(SERVICE_AREA_ERROR);
   const travelMode = 'DRIVE';
   const language = (body.language as string) || 'bg';
   const units = (body.units as string) || 'METRIC';
   const computeAlternativeRoutes = false;
   if (body.waypoints && (!Array.isArray(body.waypoints) || body.waypoints.length > 5 || !body.waypoints.every(validPoint))) return badRequest('Invalid waypoints');
+
+  if (Array.isArray(body.waypoints) && !body.waypoints.every(point => isInBulgaria(point.lat, point.lng))) return badRequest(SERVICE_AREA_ERROR);
 
   const requestBody: Record<string, unknown> = {
     origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },

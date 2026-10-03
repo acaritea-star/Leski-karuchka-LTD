@@ -1,3 +1,4 @@
+import { isInBulgaria } from './serviceArea';
 import { supabase } from '@/lib/supabase';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -102,6 +103,8 @@ export async function computeRoute(
     quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string };
   }
 ): Promise<RouteResult | null> {
+  if (!isInBulgaria(origin.lat, origin.lng) || !isInBulgaria(destination.lat, destination.lng)
+    || opts?.waypoints?.some(point => !isInBulgaria(point.lat, point.lng))) return null;
   try {
     const { data, error } = await supabase.functions.invoke('google-routes', {
       body: {

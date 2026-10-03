@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { LocationPreset } from '@/lib/geo';
 import { hasPlacesApi, searchPlaces, getPlaceDetails, type PlacePrediction } from '@/lib/places';
 
@@ -52,7 +53,7 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
     return () => { ++lifetime.current; };
   }, []);
 
-  const choose = (place: LocationPreset) => { session.current = crypto.randomUUID(); input.current?.blur(); onSelect(place); };
+  const choose = (place: LocationPreset) => { if (!isInBulgaria(place.lat, place.lng)) { setError(SERVICE_AREA_ERROR); return; } session.current = crypto.randomUUID(); input.current?.blur(); onSelect(place); };
   const resolve = async (prediction: PlacePrediction) => {
     if (selection.current || locating || searching || resultQuery !== query) return;
     selection.current = true;
