@@ -1,12 +1,14 @@
 import { isInBulgaria, SERVICE_AREA_ERROR } from './serviceArea';
 import { supabase } from '@/lib/supabase';
+import { requestGps, subscribeGps } from './sharedGps';
+import { getLocationEnabled, setLocationEnabled } from './locationPreference';
 
 export const GPS_HEARTBEAT_MS = 15_000;
 export const GPS_STALE_MS = 45_000;
 export const GPS_MAX_ACCURACY_METERS = 100;
 const MOVING_INTERVAL_MS = 5_000;
 let generation = 0;
-let watchId: number | null = null;
+let unsubscribeGps: (() => void) | null = null;
 let heartbeat: ReturnType<typeof setInterval> | null = null;
 let lastFixAt = 0;
 let lastWriteAt = 0;
@@ -20,10 +22,7 @@ export function isFreshTimestamp(value: string | null | undefined, now = Date.no
   return Number.isFinite(time) && time <= now + 30_000 && now - time < GPS_STALE_MS;
 }
 export function getCurrentPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Браузърът не поддържа GPS.'));
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 });
-  });
+  return requestGps();
 }
 export async function saveDriverPosition(id: string, company: string, position: GeolocationPosition): Promise<string> {
   if (Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла.');
@@ -39,16 +38,21 @@ export async function saveDriverPosition(id: string, company: string, position: 
   if (!data?.updated_at) throw new Error('Локацията не е потвърдена от сървъра.');
   return data.updated_at;
 }
-export async function setDriverOnline(driver: { id: string; company_id: string }, online: boolean) {
-  if (online) await saveDriverPosition(driver.id, driver.company_id, await getCurrentPosition());
+export async function setDriverOnline(driver: { id: string; company_id: string; user_id?: string }, online: boolean) {
+  if (online) {
+    const position = await getCurrentPosition();
+    await saveDriverPosition(driver.id, driver.company_id, position);
+  }
   const { data, error } = await supabase.from('drivers').update({ is_online: online })
     .eq('id', driver.id).select('*').abortSignal(AbortSignal.timeout(10_000)).single();
   if (error || !data) throw new Error(error?.message ?? 'Промяната не е потвърдена.');
+  if (online && driver.user_id) setLocationEnabled(driver.user_id, true);
   if (!online) stopDriverGps();
   return data;
 }
-export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}): boolean {
+export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}, userId?: string): boolean {
   stopDriverGps();
+  if (getLocationEnabled(userId) === false) { callbacks.onError?.('Местоположението е изключено от настройките.'); return false; }
   if (!navigator.geolocation) { callbacks.onError?.('Браузърът не поддържа GPS.'); return false; }
   const run = generation;
   let writing = false;
@@ -81,8 +85,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     catch (error) { fail(error); }
     finally { locating = false; }
   };
-  watchId = navigator.geolocation.watchPosition(position => void push(position), fail,
-    { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 });
+  unsubscribeGps = subscribeGps(position => void push(position), fail);
   heartbeat = setInterval(() => void refresh(), GPS_HEARTBEAT_MS);
   document.addEventListener('visibilitychange', refresh);
   window.addEventListener('online', refresh);
@@ -94,13 +97,13 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
 }
 export function stopDriverGps() {
   generation++;
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  unsubscribeGps?.();
   if (heartbeat) clearInterval(heartbeat);
   stopListeners?.();
-  stopListeners = null; watchId = null; heartbeat = null;
+  stopListeners = null; unsubscribeGps = null; heartbeat = null;
   lastFixAt = 0; lastWriteAt = 0; lastError = '';
 }
-export function isDriverGpsRunning() { return watchId !== null; }
+export function isDriverGpsRunning() { return unsubscribeGps !== null; }
 export function getGpsStats() {
   return { running: isDriverGpsRunning(), lastFixAgeMs: Date.now() - lastFixAt,
     lastWriteAgeMs: Date.now() - lastWriteAt, error: lastError };

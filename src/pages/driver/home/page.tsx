@@ -1,3 +1,4 @@
+import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 /* global google */
@@ -255,6 +256,8 @@ export default function DriverHome() {
     if (!el) return;
     let cancelled = false;
     let mapInstance: google.maps.Map | null = null;
+    let marker: google.maps.Marker | null = null;
+    let unsubscribe = () => {};
 
     loadGoogleMaps()
       .then(() => {
@@ -270,46 +273,32 @@ export default function DriverHome() {
           fullscreenControl: false,
         });
 
-        // Center the background on the driver's own location when available
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              if (cancelled || !mapInstance) return;
-              const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-              mapInstance.setCenter(here);
-              mapInstance.setZoom(16);
-
-              const svg =
-                '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22">' +
-                '<circle cx="11" cy="11" r="10" fill="#2563eb" fill-opacity="0.22"/>' +
-                '<circle cx="11" cy="11" r="5.5" fill="#2563eb" stroke="#ffffff" stroke-width="2.5"/></svg>';
-              new google.maps.Marker({
-                position: here,
-                map: mapInstance,
-                icon: {
-                  url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-                  scaledSize: new google.maps.Size(22, 22),
-                  anchor: new google.maps.Point(11, 11),
-                },
-              });
-            },
-            () => {
-              /* ignore */
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
-          );
-        }
+        // Observe the shared fix; this decorative map never asks for GPS itself.
+        const center = () => {
+          const pos = getGpsPosition();
+          if (cancelled || !mapInstance) return;
+          if (!pos) { marker?.setMap(null); marker = null; return; }
+          if (Date.now() - pos.timestamp > 45_000) return;
+          const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          if (marker) { marker.setPosition(here); return; }
+          mapInstance.setCenter(here); mapInstance.setZoom(16);
+          const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="10" fill="#2563eb" fill-opacity="0.22"/><circle cx="11" cy="11" r="5.5" fill="#2563eb" stroke="#ffffff" stroke-width="2.5"/></svg>';
+          marker = new google.maps.Marker({ position: here, map: mapInstance,
+            icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+              scaledSize: new google.maps.Size(22, 22), anchor: new google.maps.Point(11, 11) } });
+        };
+        center(); unsubscribe = subscribeGpsState(center);
       })
       .catch(() => {
         /* decorative — ignore load failures */
       });
     return () => {
-      cancelled = true;
+      cancelled = true; unsubscribe(); marker?.setMap(null);
       if (mapInstance) {
         google.maps.event.clearInstanceListeners(mapInstance);
       }
     };
-  }, []);
+  }, [authLoading, driverQuery.isLoading]);
 
   if (authLoading || driverQuery.isLoading) {
     return (

@@ -1,3 +1,6 @@
+import { subscribeGps } from '@/lib/sharedGps';
+import { useAuth } from '@/hooks/useAuth';
+import { useLocationPreference } from '@/hooks/useLocationPreference';
 /* global google */
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +35,8 @@ function stripHtml(input: string): string {
 export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup, destination,
   targetKind = 'destination', onNavInfo }: DriverRouteMapProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const locationEnabled = useLocationPreference(user?.id);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const targetRef = useRef({ lat: targetLat, lng: targetLng });
@@ -45,8 +50,8 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   const [retry, setRetry] = useState(0);
   const [localFix, setLocalFix] = useState<VehicleFix | null>(null);
   const localFresh = usePositionFreshness(localFix);
-  const serverFix = useDriverPosition(driverId, !localFresh);
-  const pos = localFresh ? localFix : serverFix ?? localFix;
+  const serverFix = useDriverPosition(driverId, locationEnabled !== false && !localFresh);
+  const pos = locationEnabled === false ? null : localFresh ? localFix : serverFix ?? localFix;
   const positionFresh = usePositionFreshness(pos);
   const { info: routeInfo, path: routePath, error: routeError } = useDrivingRoute(pos, targetLat, targetLng);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, pos, routePath, undefined,
@@ -78,18 +83,17 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   }, [targetLat, targetLng]);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition(position => {
+    setLocalFix(null);
+    if (!navigator.geolocation || locationEnabled === false) return;
+    return subscribeGps(position => {
       const { latitude: lat, longitude: lng, heading, speed, accuracy } = position.coords;
       const next: VehicleFix = { lat, lng, heading, speed, accuracy, timestamp: position.timestamp };
       if (!freshFix(next)) return;
       // Small fixes still accumulate in the route refresh gate. Comparing each
       // step to 50 m used to discard a whole trip made of smaller GPS updates.
       setLocalFix(previous => previous && previous.timestamp >= next.timestamp ? previous : next);
-    }, () => { /* The server fix is used if the local GPS becomes stale. */ },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 });
-    return () => navigator.geolocation.clearWatch(id);
-  }, []);
+    }, () => { /* The server fix is used if the local GPS becomes stale. */ });
+  }, [locationEnabled]);
 
   const pickupLat = pickup?.lat, pickupLng = pickup?.lng;
   const destinationLat = destination?.lat, destinationLng = destination?.lng;
@@ -170,7 +174,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
             </div>
           </div>
           <p className="text-xs text-foreground-500 mt-2">{navInfo.distance_km.toFixed(1)} км · ~{navInfo.duration_min} {t('min')}</p>
-        </> : <p className="text-sm text-foreground-600">{!positionFresh ? t(pos ? 'position_not_updating' : 'booking_waiting_location') : routeError ? 'Маршрутът не се зареди. Опитваме отново…' : 'Изчисляване на маршрута…'}</p>}
+        </> : <p className="text-sm text-foreground-600">{locationEnabled === false ? 'Местоположението е изключено.' : !positionFresh ? t(pos ? 'position_not_updating' : 'booking_waiting_location') : routeError ? 'Маршрутът не се зареди. Опитваме отново…' : 'Изчисляване на маршрута…'}</p>}
       </div>
       <div className="absolute bottom-7 right-3 flex flex-col gap-2">
         <button type="button" className="w-10 h-10 bg-white rounded-lg shadow flex items-center justify-center" aria-label={t('recenter_map')}

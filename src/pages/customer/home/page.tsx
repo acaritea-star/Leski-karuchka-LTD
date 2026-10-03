@@ -1,3 +1,6 @@
+import { requestGps, subscribeGps, gpsPermission } from '@/lib/sharedGps';
+import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference';
+import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
@@ -74,6 +77,8 @@ export default function CustomerHome() {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const locationEnabled = useLocationPreference(user?.id);
+  const autoAttempted = useRef<string | null>(null);
   const { register: registerPush } = usePushNotifications();
 
   // Location state
@@ -204,45 +209,55 @@ export default function CustomerHome() {
     [step, pickup, destination, addRecent],
   );
 
-  // Detect user's current location via GPS
-  const detectLocation = useCallback(
-    () => {
-      if (!('geolocation' in navigator)) {
-        setLocationError(t('location_denied'));
-        return;
-      }
-      setLocating(true);
-      setLocationError('');
-      const revision = ++gpsRevision.current;
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          if (gpsRevision.current !== revision) return;
-          if (!isInBulgaria(latitude, longitude)) { setLocationError(SERVICE_AREA_ERROR); setLocating(false); return; }
-          // Resolve a precise street address from the GPS fix; fall back to the
-          // generic label only if reverse geocoding is unavailable.
-          let address = t('current_location');
-          const geo = await reverseGeocode(latitude, longitude);
-          if (gpsRevision.current !== revision) return;
-          if (geo?.formatted_address) {
-            address = geo.formatted_address;
-          }
-          const loc: Location = { address, lat: latitude, lng: longitude };
-          setPickup(loc);
-          setStep(stepAfterSelection('pickup', !!destination));
-          setSearchQuery('');
-          setLocating(false);
-        },
-        () => {
-          if (gpsRevision.current !== revision) return;
-          setLocating(false);
-          setLocationError(t('location_denied'));
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
-      );
-    },
-    [t, destination],
-  );
+  // Apply GPS to pickup once. Subsequent fixes never move chosen addresses.
+  const detectLocation = useCallback(async (automatic = false) => {
+    if (automatic && getLocationEnabled(user?.id) === false) return;
+    setLocating(true); setLocationError('');
+    const revision = ++gpsRevision.current;
+    try {
+      const pos = await requestGps();
+      if (gpsRevision.current !== revision) return;
+      if (!Number.isFinite(pos.timestamp) || Date.now() - pos.timestamp > 30_000 || pos.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла. Опитай отново.');
+      if (!Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy < 0 || pos.coords.accuracy > 100) throw new Error('Неточна GPS позиция. Избери адрес или изчакай по-добър сигнал.');
+      const { latitude, longitude } = pos.coords;
+      if (!isInBulgaria(latitude, longitude)) throw new Error(SERVICE_AREA_ERROR);
+      if (!automatic && user?.id) setLocationEnabled(user.id, true);
+      const geo = await reverseGeocode(latitude, longitude);
+      if (gpsRevision.current !== revision) return;
+      setPickup({ address: geo?.formatted_address || t('current_location'), lat: latitude, lng: longitude });
+      setStep(stepAfterSelection('pickup', !!destination)); setSearchQuery('');
+    } catch (error) {
+      if (gpsRevision.current === revision) setLocationError(error instanceof Error ? error.message : t('location_denied'));
+    } finally { if (gpsRevision.current === revision) setLocating(false); }
+  }, [t, destination, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || recovering || activeRequest || pickup || locationEnabled === false || autoAttempted.current === user.id || gpsRevision.current !== 0) return;
+    let active = true;
+    const revision = gpsRevision.current;
+    void gpsPermission().then(permission => {
+      if (!active || revision !== gpsRevision.current || getLocationEnabled(user.id) === false) return;
+      if (permission === 'denied' || (permission !== 'granted' && getLocationEnabled(user.id) !== true)) return;
+      autoAttempted.current = user.id;
+      if (permission === 'granted' && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
+      void detectLocation(true);
+    });
+    return () => { active = false; };
+  }, [user?.id, recovering, activeRequest, pickup, locationEnabled, detectLocation]);
+
+  useEffect(() => {
+    if (locationEnabled !== true || !user?.id) return;
+    let active = true;
+    let unsubscribe = () => {};
+    void gpsPermission().then(permission => {
+      if (active && permission !== 'denied') unsubscribe = subscribeGps(() => {});
+    });
+    return () => { active = false; unsubscribe(); };
+  }, [locationEnabled, user?.id]);
+
+  useEffect(() => {
+    if (locationEnabled === false) { ++gpsRevision.current; setLocating(false); }
+  }, [locationEnabled]);
 
   // Handle field click
   const handleFieldClick = (field: BookingStep) => {
@@ -520,7 +535,7 @@ export default function CustomerHome() {
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}
-            onUseCurrent={detectLocation} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
+            onUseCurrent={() => void detectLocation()} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
       </>}
   </CustomerLayout>;
 }

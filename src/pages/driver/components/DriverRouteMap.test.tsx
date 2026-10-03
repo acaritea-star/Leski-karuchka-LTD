@@ -2,10 +2,12 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import '@/i18n';
+import { stopSharedGps } from '@/lib/sharedGps';
 import DriverRouteMap from './DriverRouteMap';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { computeRoute, type RouteResult } from '@/lib/googleMaps';
 import { CAR_PATH } from '@/lib/mapLayers';
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'driver-user' } }) }));
 vi.mock('@/lib/googleMapsLoader', () => ({ loadGoogleMaps: vi.fn() }));
 vi.mock('@/lib/googleMaps', () => ({ computeRoute: vi.fn(), decodePolyline: () => [{ lat: 43, lng: 25 }, { lat: 43.005, lng: 25 }] }));
 vi.mock('@/hooks/useDriverPosition', async importOriginal => ({ ...await importOriginal<typeof import('@/hooks/useDriverPosition')>(), useDriverPosition: () => null }));
@@ -32,7 +34,7 @@ beforeEach(() => {
     event: { clearInstanceListeners: vi.fn() },
   } });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); stopSharedGps(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const props = { targetLat: 43.005, targetLng: 25, pickup: { lat: 43.001, lng: 25 }, destination: { lat: 43.005, lng: 25 } };
 it('draws both pins, a car and a directional route when GPS and the route arrive before Maps', async () => {
   let ready!: () => void;

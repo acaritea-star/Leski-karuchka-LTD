@@ -1,3 +1,4 @@
+import LocationSettings from '@/components/feature/LocationSettings';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -157,6 +158,8 @@ export default function DriverProfile() {
                 )}
               </div>
             </div>
+
+            <LocationSettings driver onOffline={() => void fetchProfile()} />
 
             {/* Vehicle Card */}
             <div className="bg-white rounded-2xl p-5 mb-4">

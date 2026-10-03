@@ -1,3 +1,4 @@
+import LocationSettings from '@/components/feature/LocationSettings';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -125,6 +126,8 @@ export default function CustomerSettings() {
               </button>
             </div>
           </div>
+
+          <LocationSettings />
 
           {/* Notifications */}
           <div className="bg-white rounded-2xl p-4 mt-3">

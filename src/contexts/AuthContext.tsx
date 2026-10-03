@@ -1,3 +1,4 @@
+import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
 import { unregisterPush } from '@/lib/pushSubscription';
@@ -183,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const current = ++revision;
       const identityChanged = lastUserId !== next?.user.id;
       if (identityChanged) {
-        queryClient.clear(); stopDriverGps(); setUser(null); setProfileError(null);
+        queryClient.clear(); stopDriverGps(); stopSharedGps(); setUser(null); setProfileError(null);
         currentUser.current = null;
         if (lastUserId) clearRecentLocations();
         profileFetchRef.current = null;
@@ -238,7 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    stopDriverGps();
+    stopDriverGps(); stopSharedGps();
     if (session?.user.id) {
       try { await unregisterPush(session.user.id); }
       catch { console.warn('Push cleanup failed; notification permission can be revoked in browser settings.'); }

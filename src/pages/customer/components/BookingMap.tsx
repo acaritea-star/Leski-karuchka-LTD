@@ -1,3 +1,5 @@
+import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
+import { isInBulgaria } from '@/lib/serviceArea';
 /* global google */
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +32,7 @@ function BookingMap({ pickup, destination, route, initialCenter }: {
 
   useEffect(() => {
     let active = true;
+    let unsubscribe = () => {};
     setState('loading');
     loadGoogleMaps().then(() => {
       if (!active || !container.current) return;
@@ -44,21 +47,21 @@ function BookingMap({ pickup, destination, route, initialCenter }: {
         ],
       });
       setState('ready');
-      // Quietly use an already granted location; never open a permission prompt on entry.
-      if (navigator.permissions && navigator.geolocation) {
-        navigator.permissions.query({ name: 'geolocation' }).then(permission => {
-          if (!active || permission.state !== 'granted') return;
-          navigator.geolocation.getCurrentPosition(position => {
-            const { latitude: lat, longitude: lng, accuracy } = position.coords;
-            if (active && !interaction.current && !endpointsSelected.current && accuracy <= 100
-              && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
-              && Math.abs(Date.now() - position.timestamp) <= 60_000) map.current?.panTo({ lat, lng });
-          }, () => {}, { maximumAge: 30_000, timeout: 8_000, enableHighAccuracy: false });
-        }).catch(() => {});
-      }
+      // Observe the shared GPS. Acquisition and preference belong to the page.
+      let centered = false;
+      const center = () => {
+        const position = getGpsPosition();
+        if (!active || centered || interaction.current || endpointsSelected.current || !position) return;
+        const { latitude: lat, longitude: lng, accuracy } = position.coords;
+        if (accuracy <= 100 && accuracy >= 0 && isInBulgaria(lat, lng)
+          && Math.abs(Date.now() - position.timestamp) <= 30_000) {
+          centered = true; map.current?.panTo({ lat, lng });
+        }
+      };
+      center(); unsubscribe = subscribeGpsState(center);
     }).catch(() => { if (active) setState('error'); });
     return () => {
-      active = false;
+      active = false; unsubscribe();
       pins.current.forEach(pin => pin?.setMap(null));
       pins.current = [null, null];
       road.current?.remove(); road.current = null;

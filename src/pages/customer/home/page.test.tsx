@@ -6,6 +6,8 @@ import '@/i18n';
 import CustomerHome from './page';
 import type { RouteResult } from '@/lib/googleMaps';
 import { calculateFare } from '@/lib/pricing';
+import { setLocationEnabled } from '@/lib/locationPreference';
+import { stopSharedGps } from '@/lib/sharedGps';
 import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
@@ -61,7 +63,7 @@ beforeEach(() => {
   saveConsent({ ...defaultConsent(), functional: true });
   localStorage.setItem('leski_recent_locations', JSON.stringify([pickup, destination]));
 });
-afterEach(() => { cleanup(); localStorage.clear(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); stopSharedGps(); localStorage.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('customer booking integration', () => {
   it('moves through three steps and sends one cash-only RPC on a double click', async () => {
@@ -130,4 +132,56 @@ it('keeps the accepted Realtime status when a slow earlier poll returns pending,
   expect(screen.getByText('Tracking')).toBeTruthy();
   await act(async () => finish({ data:pending,error:null }));
   expect(screen.getByText('Tracking')).toBeTruthy();
+});
+
+const gpsFix = (latitude = pickup.lat) => ({ timestamp: Date.now(), coords: { latitude, longitude: pickup.lng, accuracy: 10, heading: null, speed: 0 } } as GeolocationPosition);
+const gpsBrowser = (permission: 'granted' | 'denied' | 'prompt' = 'granted') => {
+  let receive!: (position: GeolocationPosition) => void;
+  const get = vi.fn((cb: (position: GeolocationPosition) => void) => cb(gpsFix()));
+  const watch = vi.fn((cb: typeof receive) => { receive = cb; return 9; });
+  const query = vi.fn().mockResolvedValue({ state: permission });
+  vi.stubGlobal('navigator', { onLine: true, geolocation: { getCurrentPosition: get, watchPosition: watch, clearWatch: vi.fn() }, permissions: { query } });
+  return { get, watch, query, move: (position: GeolocationPosition) => receive(position) };
+};
+it('uses remembered browser permission on opening and never moves chosen addresses on subsequent fixes', async () => {
+  const browser = gpsBrowser(); fake.reverse.mockResolvedValue({ formatted_address: 'GPS адрес' });
+  await mount();
+  expect(browser.get).toHaveBeenCalledTimes(1);
+  expect(browser.watch).toHaveBeenCalledTimes(1);
+  expect(localStorage.getItem('leski:auto-location:customer')).toBe('on');
+  expect(screen.getByRole('heading', { name: 'Накъде отиваш?' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /Край/ }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).toHaveBeenCalledTimes(1);
+  await act(async () => browser.move(gpsFix(pickup.lat + .01)));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).toHaveBeenCalledTimes(1); expect(fake.reverse).toHaveBeenCalledTimes(1);
+  expect(screen.getAllByText('GPS адрес').length).toBeGreaterThan(0);
+});
+it('respects remembered off even if the browser still grants permission', async () => {
+  const browser = gpsBrowser(); setLocationEnabled('customer', false);
+  await mount();
+  expect(browser.get).not.toHaveBeenCalled(); expect(browser.watch).not.toHaveBeenCalled();
+});
+it('does not ask for permission automatically on a first visit', async () => {
+  const browser = gpsBrowser('prompt'); await mount();
+  expect(browser.get).not.toHaveBeenCalled(); expect(browser.watch).not.toHaveBeenCalled();
+});
+it('cannot replace a manual pickup chosen while permission lookup was pending', async () => {
+  const browser = gpsBrowser();
+  let done!: (value: unknown) => void;
+  browser.query.mockReturnValue(new Promise(resolve => { done = resolve; }));
+  await mount(); fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
+  await act(async () => done({ state: 'granted' }));
+  expect(browser.get).not.toHaveBeenCalled();
+  expect(screen.getAllByText(pickup.address).length).toBeGreaterThan(0);
+});
+it('ignores a late reverse-geocoding result after location is turned off', async () => {
+  gpsBrowser();
+  let done!: (value: unknown) => void;
+  fake.reverse.mockReturnValueOnce(new Promise(resolve => { done = resolve; }));
+  await mount();
+  await act(async () => setLocationEnabled('customer', false));
+  await act(async () => done({ formatted_address: 'GPS адрес' }));
+  expect(screen.queryByText('GPS адрес')).toBeNull();
 });

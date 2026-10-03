@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const { single, upsert, update, updateSingle } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn()}));
 vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update})}}));
+import { stopSharedGps } from './sharedGps';
 import { startDriverGps, stopDriverGps, getGpsStats, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
 type PositionCallback = (position: GeolocationPosition) => void;
@@ -17,7 +18,7 @@ beforeEach(() => {
   upsert.mockReset().mockReturnValue({select:()=>({abortSignal:()=>({single})})});
   single.mockReset().mockImplementation(async()=>({data:{updated_at:new Date().toISOString()},error:null}));
 });
-afterEach(()=>{stopDriverGps();vi.unstubAllGlobals();vi.useRealTimers();});
+afterEach(()=>{stopDriverGps();stopSharedGps();vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('driver GPS writes',()=>{
   it('writes an idle heartbeat after 15 seconds even with identical coordinates',async()=>{
