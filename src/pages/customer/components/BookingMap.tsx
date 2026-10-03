@@ -5,6 +5,7 @@ import { decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { LEVSKI_CENTER } from '@/lib/geo';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { drawRouteLine, mapPinIcon, type RouteLine } from '@/lib/mapLayers';
+import { frameMapPoints } from '@/lib/mapCamera';
 import type { BookingLocation } from './BookingCard';
 
 export default function BookingMap({ pickup, destination, route, initialCenter }: {
@@ -98,15 +99,9 @@ export default function BookingMap({ pickup, destination, route, initialCenter }
     points.push(...path);
     const fit = () => {
       if (!points.length) return;
-      const bounds = new google.maps.LatLngBounds();
-      points.forEach(point => bounds.extend(point));
-      // A single bounded view avoids fitBounds' maximum zoom followed by a second zoom jump.
-      if (points.length === 1) {
-        bounds.extend({ lat: points[0].lat - .003, lng: points[0].lng - .003 });
-        bounds.extend({ lat: points[0].lat + .003, lng: points[0].lng + .003 });
-      }
-      currentMap.fitBounds(bounds, { top: 94, bottom: 38,
-        left: window.matchMedia('(min-width: 768px)').matches ? 462 : 38, right: 38 });
+      frameMapPoints(currentMap, points, {
+        width: container.current?.clientWidth ?? 0, height: container.current?.clientHeight ?? 0,
+      }, { top: 94, bottom: 38, left: window.matchMedia('(min-width: 768px)').matches ? 462 : 38, right: 38 });
     };
     fit();
     let width = container.current?.clientWidth;

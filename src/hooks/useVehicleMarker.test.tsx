@@ -71,3 +71,14 @@ it('honours reduced motion and removes the car if its data source is cleared', (
   view.rerender({ gps: null });
   expect(setMap).toHaveBeenLastCalledWith(null);
 });
+
+it('moves the car at frame speed without rebuilding its icon on a straight road', () => {
+  const straight = route.slice(0, 2);
+  const view = renderHook(({ gps }) => useVehicleMarker(map, gps, straight), { initialProps: { gps: fix() } });
+  act(() => vi.advanceTimersByTime(5000));
+  view.rerender({ gps: fix(1) });
+  act(() => vi.advanceTimersByTime(4000));
+  expect(setPosition.mock.calls.length).toBeGreaterThan(100);
+  expect(setIcon.mock.calls.length).toBeLessThan(3);
+  expect(marker).toHaveBeenCalledTimes(1);
+});

@@ -6,7 +6,7 @@ import type { RoutePoint } from '@/lib/googleMaps';
 import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPosition';
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
-import { drawRouteLine, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
+import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
 import { matchRoute, measureRoute } from '@/lib/routeGeometry';
 import { freshFix, type VehicleFix } from '@/lib/vehicleMotion';
 
@@ -34,7 +34,10 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const targetRef = useRef({ lat: targetLat, lng: targetLng });
+  targetRef.current = { lat: targetLat, lng: targetLng };
   const activeLineRef = useRef<RouteLine | null>(null);
+  const roadLayers = useRef<{ base: RouteLayerState | null; active: RouteLayerState | null }>({ base: null, active: null });
   const lastPanRef = useRef(0);
   const fittedMapRef = useRef<google.maps.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -55,7 +58,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
     loadGoogleMaps().then(() => {
       if (!active || !containerRef.current) return;
       mapRef.current = new google.maps.Map(containerRef.current, {
-        center: { lat: targetLat, lng: targetLng }, zoom: 15, disableDefaultUI: true,
+        center: targetRef.current, zoom: 15, disableDefaultUI: true,
         gestureHandling: 'greedy', zoomControl: false, clickableIcons: false,
       });
       lastPanRef.current = 0;
@@ -63,10 +66,16 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
     }).catch(() => { if (active) setMapError(true); });
     return () => {
       active = false;
+      roadLayers.current.base?.line.remove(); roadLayers.current.active?.line.remove();
+      roadLayers.current = { base: null, active: null }; activeLineRef.current = null;
       if (mapRef.current) google.maps.event.clearInstanceListeners(mapRef.current);
       mapRef.current = null;
     };
-  }, [retry, targetLat, targetLng]);
+  }, [retry]);
+
+  useEffect(() => {
+    fittedMapRef.current = null; lastPanRef.current = 0;
+  }, [targetLat, targetLng]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -99,13 +108,13 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!mapReady || !map || routePath.length < 2) return;
+    if (!mapReady || !map) return;
     const color = targetKind === 'pickup' ? MAP_PICKUP_COLOR : undefined;
-    const base = drawRouteLine(map, routePath, { color, muted: true });
-    const active = drawRouteLine(map, routePath, { color, zIndex: 20 });
-    activeLineRef.current = active;
-    if (vehicleFrame.current) active.follow(vehicleFrame.current);
-    return () => { base.remove(); active.remove(); activeLineRef.current = null; };
+    const layers = roadLayers.current;
+    layers.base = updateRouteLayer(layers.base, map, routePath, { color, muted: true });
+    layers.active = updateRouteLayer(layers.active, map, routePath, { color, zIndex: 20 });
+    activeLineRef.current = layers.active?.line ?? null;
+    if (vehicleFrame.current) activeLineRef.current?.follow(vehicleFrame.current);
   }, [mapReady, routePath, targetKind, vehicleFrame]);
 
   useEffect(() => {

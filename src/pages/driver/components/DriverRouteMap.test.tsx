@@ -10,6 +10,7 @@ vi.mock('@/lib/googleMapsLoader', () => ({ loadGoogleMaps: vi.fn() }));
 vi.mock('@/lib/googleMaps', () => ({ computeRoute: vi.fn(), decodePolyline: () => [{ lat: 43, lng: 25 }, { lat: 43.005, lng: 25 }] }));
 vi.mock('@/hooks/useDriverPosition', async importOriginal => ({ ...await importOriginal<typeof import('@/hooks/useDriverPosition')>(), useDriverPosition: () => null }));
 const setMap = vi.fn(), setPath = vi.fn();
+const mapCreated = vi.fn();
 const marker = vi.fn(function () { return { setMap, setPosition: vi.fn(), setIcon: vi.fn() }; });
 const polyline = vi.fn(function () { return { setMap, setPath }; });
 const result: RouteResult = { success: true, polyline: 'road', distance_km: .56, duration_min: 3, duration_sec: 180,
@@ -25,7 +26,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: watch, clearWatch } });
   vi.stubGlobal('matchMedia', () => Object.assign(new EventTarget(), { matches: false }));
   vi.stubGlobal('google', { maps: {
-    Map: class { fitBounds = vi.fn(); panTo = vi.fn(); getBounds = () => undefined; },
+    Map: class { constructor() { mapCreated(); } fitBounds = vi.fn(); panTo = vi.fn(); getBounds = () => undefined; },
     Marker: marker, Polyline: polyline, Point: class {}, Size: class {},
     SymbolPath: { FORWARD_CLOSED_ARROW: 1 }, LatLngBounds: class { extend = vi.fn(); },
     event: { clearInstanceListeners: vi.fn() },
@@ -54,6 +55,8 @@ it('accepts consecutive GPS steps under 50 metres, updates progress and refreshe
     await act(async () => receiveGps(gps(43 + n * .0002)));
   }
   expect(computeRoute).toHaveBeenCalledTimes(2);
+  expect(polyline).toHaveBeenCalledTimes(4); // Two persistent layers for each line.
+  expect(setMap).not.toHaveBeenCalledWith(null);
   expect(computeRoute).toHaveBeenLastCalledWith(expect.objectContaining({ lat: 43.0018 }), expect.anything(), expect.anything());
   expect(nav.mock.lastCall?.[0].distance_km).toBeLessThan(result.distance_km);
 });
@@ -67,4 +70,14 @@ it('hides live ETA when GPS expires and releases the native GPS watch and layers
   view.unmount();
   expect(clearWatch).toHaveBeenLastCalledWith(7);
   expect(setMap).toHaveBeenCalledWith(null);
+});
+
+it('keeps the map alive when navigation changes from pickup to destination', async () => {
+  const view = render(<DriverRouteMap {...props} targetKind="pickup" targetLat={43.001} />);
+  await act(async () => receiveGps(gps()));
+  expect(mapCreated).toHaveBeenCalledTimes(1);
+  view.rerender(<DriverRouteMap {...props} targetKind="destination" />);
+  await act(async () => {});
+  expect(mapCreated).toHaveBeenCalledTimes(1);
+  expect(loadGoogleMaps).toHaveBeenCalledTimes(1);
 });

@@ -9,7 +9,7 @@ import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPosition';
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
-import { drawRouteLine, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
+import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
 import { measureRoute } from '@/lib/routeGeometry';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
@@ -97,6 +97,7 @@ export default function DriverTracking({
   const pickupMarkerRef = useRef<google.maps.Marker | null>(null);
   const destMarkerRef = useRef<google.maps.Marker | null>(null);
   const activeLineRef = useRef<RouteLine | null>(null);
+  const roadLayers = useRef<{ base: RouteLayerState | null; active: RouteLayerState | null }>({ base: null, active: null });
   const fittedMapRef = useRef<google.maps.Map | null>(null);
   const lastRecenterRef = useRef(0);
 
@@ -151,6 +152,8 @@ export default function DriverTracking({
       cancelled = true;
       if (pickupMarkerRef.current) { pickupMarkerRef.current.setMap(null); pickupMarkerRef.current = null; }
       if (destMarkerRef.current) { destMarkerRef.current.setMap(null); destMarkerRef.current = null; }
+      roadLayers.current.base?.line.remove(); roadLayers.current.active?.line.remove();
+      roadLayers.current = { base: null, active: null }; activeLineRef.current = null;
       if (mapRef.current) {
         google.maps.event.clearInstanceListeners(mapRef.current);
         mapRef.current = null;
@@ -194,13 +197,14 @@ export default function DriverTracking({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
-    const base = tripPath.length >= 2 ? drawRouteLine(map, tripPath, { muted: headingToPickup || livePath.length >= 2 }) : null;
-    const activePath = livePath.length >= 2 ? livePath : headingToPickup ? [] : tripPath;
-    const active = activePath.length >= 2 && (headingToPickup || livePath.length >= 2)
-      ? drawRouteLine(map, activePath, { color: headingToPickup ? MAP_PICKUP_COLOR : undefined, zIndex: 20 }) : null;
-    activeLineRef.current = active ?? base;
+    const layers = roadLayers.current;
+    const activePath = livePath.length >= 2 ? livePath : headingToPickup ? NO_ROUTE : tripPath;
+    layers.base = updateRouteLayer(layers.base, map, tripPath, { muted: headingToPickup || livePath.length >= 2 });
+    layers.active = updateRouteLayer(layers.active, map,
+      headingToPickup || livePath.length >= 2 ? activePath : NO_ROUTE,
+      { color: headingToPickup ? MAP_PICKUP_COLOR : undefined, zIndex: 20 });
+    activeLineRef.current = layers.active?.line ?? layers.base?.line ?? null;
     if (activePath.length >= 2 && vehicleFrame.current) activeLineRef.current?.follow(vehicleFrame.current);
-    return () => { base?.remove(); active?.remove(); activeLineRef.current = null; };
   }, [tripPath, livePath, headingToPickup, mapReady, vehicleFrame]);
 
   // ── Pickup & destination markers ──

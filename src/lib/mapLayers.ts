@@ -36,11 +36,11 @@ export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options:
     icons: options.muted ? [] : [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
       fillColor: '#ffffff', fillOpacity: 1, strokeColor: color, strokeWeight: 1, scale: 2 },
       offset: '60px', repeat: '120px', fixedRotation: false }] });
-  const measured = measureRoute(path);
+  let measured = measureRoute(path);
   let lastUpdate = -Infinity;
   let progress: number | undefined;
   const setPath = (next: RoutePoint[]) => { casing.setPath(next); line.setPath(next); };
-  return { setPath, follow: position => {
+  return { setPath: next => { measured = measureRoute(next); progress = undefined; lastUpdate = -Infinity; setPath(next); }, follow: position => {
     const now = performance.now();
     // Keep the car at animation-frame speed; redraw the road at most ten times per second.
     if (now - lastUpdate < 100) return;
@@ -51,4 +51,18 @@ export function drawRouteLine(map: google.maps.Map, path: RoutePoint[], options:
     setPath(routeSection(measured, progress, measured.length));
   },
     remove: () => { casing.setMap(null); line.setMap(null); } };
+}
+
+// A road refresh changes geometry without detaching its visible map layers.
+export type RouteLayerState = { map: google.maps.Map; line: RouteLine; path: RoutePoint[]; style: string };
+export function updateRouteLayer(previous: RouteLayerState | null, map: google.maps.Map,
+  path: RoutePoint[], options: { color?: string; muted?: boolean; zIndex?: number } = {}): RouteLayerState | null {
+  const style = JSON.stringify([options.color, !!options.muted, options.zIndex]);
+  if (path.length < 2) { previous?.line.remove(); return null; }
+  if (previous && previous.map === map && previous.style === style) {
+    if (previous.path !== path) previous.line.setPath(path);
+    return { ...previous, path };
+  }
+  previous?.line.remove();
+  return { map, path, style, line: drawRouteLine(map, path, options) };
 }

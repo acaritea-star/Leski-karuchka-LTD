@@ -21,6 +21,8 @@ export function useVehicleMarker(map: google.maps.Map | null, fix: VehicleFix | 
     motion.current.setRoute(latest.current.path);
     let marker: google.maps.Marker | null = null;
     let animation: number | null = null;
+    let paintedHeading: number | null = null;
+    let paintedColor: string | null = null;
     let clock = { epoch: Date.now(), frame: performance.now() };
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const cancel = () => { if (animation !== null) cancelAnimationFrame(animation); animation = null; };
@@ -29,9 +31,18 @@ export function useVehicleMarker(map: google.maps.Map | null, fix: VehicleFix | 
       if (!frame) return;
       frameRef.current = frame;
       const position = { lat: frame.lat, lng: frame.lng };
-      const icon = mapCarSymbol(frame.heading, latest.current.color);
-      if (!marker) marker = new google.maps.Marker({ map, position, icon, zIndex: 1000, title: 'Шофьор' });
-      else { marker.setPosition(position); marker.setIcon(icon); }
+      const color = latest.current.color;
+      if (!marker) {
+        marker = new google.maps.Marker({ map, position, icon: mapCarSymbol(frame.heading, color), zIndex: 1000, title: 'Шофьор' });
+        paintedHeading = frame.heading; paintedColor = color;
+      } else {
+        marker.setPosition(position);
+        const turn = paintedHeading == null ? Infinity : Math.abs(((frame.heading - paintedHeading + 540) % 360) - 180);
+        if (turn >= .5 || color !== paintedColor) {
+          marker.setIcon(mapCarSymbol(frame.heading, color));
+          paintedHeading = frame.heading; paintedColor = color;
+        }
+      }
       latest.current.onFrame?.(frame);
       if (frame.moving && document.visibilityState !== 'hidden' && !media.matches) animation = requestAnimationFrame(paint);
       else animation = null;
