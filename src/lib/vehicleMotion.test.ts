@@ -119,3 +119,36 @@ it('shows a real GPS fix beyond the destination rather than hiding it at the end
   expect(motion.sample(11000)).toMatchObject({ ...beyond, moving: false });
   expect(motion.sample(90000)).toMatchObject({ ...beyond, moving: false });
 });
+
+it('holds position and heading through stopped GPS jitter, but accumulates real movement', () => {
+  const motion = new VehicleMotion(); motion.setRoute(path);
+  const stopped = { ...fix(a, 1000, 120), speed: 0, accuracy: 12 };
+  motion.update(stopped, 1000);
+  expect(motion.sample(1000)?.heading).toBe(0); // Road, not compass noise.
+  for (let n=1;n<=5;n++) motion.update({...stopped,lat:a.lat+n*.000008,heading:n*70,timestamp:1000+n*1000},1000+n*1000);
+  expect(motion.sample(7000)).toMatchObject({...a,heading:0,moving:false});
+  motion.update({...stopped,lat:a.lat+.00015,timestamp:8000},8000);
+  expect(motion.sample(9000)!.lat).toBeGreaterThan(a.lat);
+});
+it('allows a genuine short reverse when GPS reports driving speed', () => {
+  const motion = new VehicleMotion(); motion.setRoute(path);
+  motion.update(fix(turn,1000),1000);
+  const reversed = {...turn,lat:turn.lat-.00005};
+  motion.update(fix(reversed,6000),6000);
+  expect(motion.sample(11000)).toMatchObject({...reversed,heading:180});
+});
+it('settles an in-flight movement when the next stopped fix confirms its endpoint', () => {
+  const motion = new VehicleMotion(); motion.setRoute(path);
+  motion.update(fix(a,1000),1000);motion.update(fix(turn,6000),6000);
+  motion.update({...fix(turn,7000),speed:0},7000);
+  expect(motion.sample(7000)).toMatchObject({...turn,moving:false});
+});
+
+it('spreads preview movement over its 15-second sampling cadence without predicting past the received fix', () => {
+  const motion = new VehicleMotion(15000); motion.setRoute(path);
+  motion.update(fix(a,1000),1000); motion.update(fix(b,16000),16000);
+  expect(motion.sample(21000)?.moving).toBe(true);
+  expect(motion.sample(30999)?.moving).toBe(true);
+  expect(motion.sample(31000)).toMatchObject({...b,moving:false});
+  expect(motion.sample(99000)).toMatchObject({...b,moving:false});
+});

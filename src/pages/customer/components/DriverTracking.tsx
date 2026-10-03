@@ -8,6 +8,8 @@ import { computeRoute, decodePolyline, type RouteResult } from '@/lib/googleMaps
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPosition';
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
+import { useRoadNetwork } from '@/hooks/useRoadNetwork';
+import { RoadAttribution } from '@/pages/customer/components/NearbyCars';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
 import { measureRoute } from '@/lib/routeGeometry';
@@ -112,8 +114,9 @@ export default function DriverTracking({
   const { info: liveRoute, path: livePath } = useDrivingRoute(location, targetLat, targetLng);
   const tripPath = useMemo(() => routeInfo?.polyline ? measureRoute(decodePolyline(routeInfo.polyline)).points : [], [routeInfo]);
   const motionPath = livePath.length ? livePath : headingToPickup ? NO_ROUTE : tripPath;
+  const roadNetwork = useRoadNetwork(location);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, location, motionPath, CAR_COLORS[vehicleType] || CAR_COLORS.standard,
-    frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); });
+    frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, true);
 
   // ── Initialise Google map (once) ──
   useEffect(() => {
@@ -431,6 +434,7 @@ export default function DriverTracking({
           <button type="button" className="booking-secondary" onClick={() => setMapAttempt(n => n + 1)}>{t('booking_retry')}</button></>
           : <><span className="booking-spinner" /><p>{t('booking_map_loading')}</p></>}
       </div>}
+      {mapReady && roadNetwork && <RoadAttribution />}
       {mapReady && <div className="tracking-map-controls">
         <button type="button" className="booking-icon-button" onClick={() => changeZoom(1)} aria-label={t('zoom_in')}><i className="ri-add-line" /></button>
         <button type="button" className="booking-icon-button" onClick={() => changeZoom(-1)} aria-label={t('zoom_out')}><i className="ri-subtract-line" /></button>

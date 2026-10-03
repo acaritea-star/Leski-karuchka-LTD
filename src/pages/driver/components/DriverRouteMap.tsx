@@ -8,6 +8,8 @@ import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import type { RoutePoint } from '@/lib/googleMaps';
 import { useDriverPosition, usePositionFreshness } from '@/hooks/useDriverPosition';
 import { useDrivingRoute } from '@/hooks/useDrivingRoute';
+import { useRoadNetwork } from '@/hooks/useRoadNetwork';
+import { RoadAttribution } from '@/pages/customer/components/NearbyCars';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
 import { matchRoute, measureRoute } from '@/lib/routeGeometry';
@@ -54,8 +56,9 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   const pos = locationEnabled === false ? null : localFresh ? localFix : serverFix ?? localFix;
   const positionFresh = usePositionFreshness(pos);
   const { info: routeInfo, path: routePath, error: routeError } = useDrivingRoute(pos, targetLat, targetLng);
+  const roadNetwork = useRoadNetwork(pos);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, pos, routePath, undefined,
-    frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); });
+    frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, true);
 
   useEffect(() => {
     let active = true;
@@ -164,6 +167,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
       <p className="text-sm text-foreground-600">{t(mapError ? 'booking_map_error' : 'booking_map_loading')}</p>
       {mapError && <button type="button" className="px-4 py-2 rounded-lg bg-white shadow text-sm" onClick={() => setRetry(value => value + 1)}>{t('booking_retry')}</button>}
     </div>}
+    {mapReady && roadNetwork && <RoadAttribution />}
     {mapReady && <>
       <div className="absolute top-3 left-3 right-3 bg-white rounded-xl shadow-lg px-4 py-3 pointer-events-none" role="status">
         {navInfo ? <>

@@ -28,7 +28,7 @@ export function useDrivingRoute(origin: VehicleFix | null, targetLat: number, ta
       // retry Google in a loop at the pin or change the request's trip status.
       if (distanceMetres(fix, target) <= 10 && (fix.accuracy ?? 0) <= 35) {
         if (!nearTarget) {
-          nearTarget = true; path = [];
+          nearTarget = true;
           setRoute({ info: { success: true, distance_km: 0, duration_min: 0, duration_sec: 0,
             polyline: '', legs: [], alternatives_count: 0 }, path, error: false });
         }

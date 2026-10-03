@@ -93,3 +93,13 @@ it('keeps the existing route while parked instead of making timer-only API calls
   }
   expect(computeRoute).toHaveBeenCalledOnce();
 });
+
+it('retains the last known road at arrival without another Google request',async()=>{
+ vi.mocked(computeRoute).mockResolvedValue(result);
+ const view=renderHook(({gps})=>useDrivingRoute(gps,43.001,25),{initialProps:{gps:fix()}});
+ await act(async()=>{});
+ const path=view.result.current.path;
+ act(()=>vi.advanceTimersByTime(5000));view.rerender({gps:fix(43.001)});
+ expect(view.result.current.path).toBe(path);expect(view.result.current.info?.distance_km).toBe(0);
+ expect(computeRoute).toHaveBeenCalledOnce();
+});

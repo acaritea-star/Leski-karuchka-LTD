@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useVehicleMarker } from './useVehicleMarker';
+import { RoadNetwork } from '@/lib/roadNetwork';
 import { CAR_PATH } from '@/lib/mapLayers';
 import type { VehicleFix } from '@/lib/vehicleMotion';
 
@@ -81,4 +82,36 @@ it('moves the car at frame speed without rebuilding its icon on a straight road'
   expect(setPosition.mock.calls.length).toBeGreaterThan(100);
   expect(setIcon.mock.calls.length).toBeLessThan(3);
   expect(marker).toHaveBeenCalledTimes(1);
+});
+
+it('waits for a reliable road then places the same GPS fix on it without an apartment marker', () => {
+  const gps={...fix(),lng:25.0001};
+  const roads=new RoadNetwork([{points:route.map(p=>[p.lat,p.lng]),oneway:0}]);
+  const view=renderHook(({network})=>useVehicleMarker(map,gps,[],undefined,undefined,network,true),{initialProps:{network:null as RoadNetwork|null}});
+  expect(marker).not.toHaveBeenCalled();
+  view.rerender({network:roads});
+  expect(marker).toHaveBeenCalledWith(expect.objectContaining({position:route[0]}));
+});
+it('uses navigation geometry before a competing parallel street', () => {
+  const roads=new RoadNetwork([{points:[[43,25.0002],[43.0005,25.0002]],oneway:0}]);
+  const gps={...fix(),lng:25.00015};
+  renderHook(()=>useVehicleMarker(map,gps,route,undefined,undefined,roads,true));
+  expect(marker).toHaveBeenCalledWith(expect.objectContaining({position:route[0]}));
+});
+it('resnaps a delayed calculated route with the existing source timestamp', () => {
+  const gps={...fix(),lng:25.0001};
+  const view=renderHook(({path})=>useVehicleMarker(map,gps,path),{initialProps:{path:[] as typeof route}});
+  expect(marker).toHaveBeenCalledWith(expect.objectContaining({position:expect.objectContaining({lng:gps.lng})}));
+  view.rerender({path:route});
+  expect(setPosition).toHaveBeenLastCalledWith(route[0]);
+});
+it('never animates across buildings between unconnected streets', () => {
+  const roads=new RoadNetwork([{points:[[43,25],[43.0005,25]],oneway:0},{points:[[43.0005,25.001],[43.0005,25.0015]],oneway:0}]);
+  const empty:typeof route=[];
+  const view=renderHook(({gps})=>useVehicleMarker(map,gps,empty,undefined,undefined,roads,true),{initialProps:{gps:fix()}});
+  act(()=>vi.advanceTimersByTime(15000));
+  const next={...fix(),lat:43.0005,lng:25.0012,heading:90};
+  view.rerender({gps:next});
+  expect(setPosition).toHaveBeenLastCalledWith({lat:next.lat,lng:next.lng});
+  expect(requestAnimationFrame).not.toHaveBeenCalled();
 });

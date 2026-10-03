@@ -500,7 +500,7 @@ export default function CustomerHome() {
     : destination;
 
   return <CustomerLayout
-    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} />}
+    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={vehicleType || undefined} />}
     header={<>
       <div className="customer-brand">
         <img src={LOGO_URL} alt="" />

@@ -19,11 +19,14 @@ export function freshFix(fix: VehicleFix | null, now = Date.now()): boolean {
 // Animate towards a received fix. There is no extrapolation beyond that fix:
 // distance travelled on screen never becomes a source of GPS/ETA/billing data.
 export class VehicleMotion {
+  private readonly animationWindowMs: number;
+  constructor(animationWindowMs = 5000) { this.animationWindowMs = animationWindowMs; }
   private route = measureRoute([]);
   private confirmed: VehicleFix | null = null;
   private frame: VehicleFrame | null = null;
   private transition: Transition | null = null;
   private progress: number | undefined;
+  private anchor: VehicleFix | null = null;
 
   setRoute(points: readonly RoutePoint[]) {
     const next = measureRoute(points);
@@ -45,18 +48,27 @@ export class VehicleMotion {
     const previous = this.confirmed;
     const previousProgress = this.progress;
     const current = this.sample(now);
-    const snapLimit = Math.min(35, Math.max(12, (fix.accuracy ?? 10) * 1.5));
+    const snapLimit = Math.min(65, Math.max(25, (fix.accuracy ?? 10) * 1.5));
     const end = matchRoute(fix, this.route, this.progress);
     const onRoad = !!end && end.distance <= snapLimit;
     const point = onRoad ? end.point : { lat: fix.lat, lng: fix.lng };
     const movement = current ? distanceMetres(current, point) : 0;
     const roadHeading = onRoad ? (routeHeading(this.route, end.progress) +
       (previousProgress != null && end.progress < previousProgress ? 180 : 0)) % 360 : null;
-    const heading = typeof fix.heading === 'number' && Number.isFinite(fix.heading) && fix.heading >= 0
+    const heading = roadHeading ?? (typeof fix.heading === 'number' && Number.isFinite(fix.heading) && fix.heading >= 0
       ? fix.heading % 360 : roadHeading ?? (current && movement > 1
-        ? bearing(current.lat, current.lng, point.lat, point.lng) : current?.heading ?? 0);
+        ? bearing(current.lat, current.lng, point.lat, point.lng) : current?.heading ?? 0));
     const gap = previous ? fix.timestamp - previous.timestamp : Infinity;
     this.confirmed = { ...fix };
+    const drift = this.anchor ? distanceMetres(this.anchor, fix) : Infinity;
+    const idle = !!current && drift < Math.min(15, Math.max(4, (fix.accuracy ?? 10) * .6)) && (fix.speed == null || fix.speed < 1.5);
+    const backwardsJitter = !!current && onRoad && previousProgress != null && end.progress < previousProgress && previousProgress-end.progress < 12 && (fix.speed == null || fix.speed < 1.5);
+    if (idle || backwardsJitter) {
+      // GPS/course noise at a stop never rotates or walks the icon into a building.
+      this.frame = { ...(this.transition ? this.settle()! : current!), moving: false }; this.transition = null;
+      return true;
+    }
+    this.anchor = { ...fix };
     this.progress = onRoad ? end.progress : undefined;
 
     // Resync on first fix, reconnect, large jump or reduced motion. Do not
@@ -75,9 +87,9 @@ export class VehicleMotion {
     const followsRoad = onRoad && !!from && from.distance <= snapLimit &&
       Math.abs(end.progress - from.progress) <= Math.max(60, movement * 2.5);
     const vertices = followsRoad
-      ? [current, ...routeSection(this.route, from!.progress, end.progress)] : [current, point];
+      ? routeSection(this.route, from!.progress, end.progress) : [current, point];
     const path = measureRoute(vertices);
-    this.transition = { path, start: now, duration: Math.min(5000, Math.max(300, gap), TRACKING_STALE_MS - (now - fix.timestamp)),
+    this.transition = { path, start: now, duration: Math.min(this.animationWindowMs, Math.max(300, gap), TRACKING_STALE_MS - (now - fix.timestamp)),
       fromHeading: current.heading, toHeading: heading, followsRoad };
     return true;
   }

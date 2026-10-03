@@ -1,20 +1,25 @@
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { isInBulgaria } from '@/lib/serviceArea';
 /* global google */
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { LEVSKI_CENTER } from '@/lib/geo';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { drawRouteLine, mapPinIcon, type RouteLine } from '@/lib/mapLayers';
 import { frameMapPoints } from '@/lib/mapCamera';
+import NearbyCars from './NearbyCars';
 import type { BookingLocation } from './BookingCard';
 
-function BookingMap({ pickup, destination, route, initialCenter }: {
+function BookingMap({ pickup, destination, route, initialCenter, previewOwner, vehicleType }: {
   pickup: BookingLocation | null; destination: BookingLocation | null; route: RouteResult | null;
-  initialCenter?: google.maps.LatLngLiteral;
+  initialCenter?: google.maps.LatLngLiteral; previewOwner?: string; vehicleType?: string;
 }) {
   const { t } = useTranslation();
+  const gps = useSyncExternalStore(subscribeGpsState, getGpsPosition, () => null);
+  const gpsOrigin = gps && Date.now()-gps.timestamp < 30_000 && gps.timestamp <= Date.now()+30_000 && gps.coords.accuracy <= 100
+    ? {lat: gps.coords.latitude, lng: gps.coords.longitude} : null;
+  const nearbyOrigin = pickup ?? gpsOrigin;
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -119,6 +124,7 @@ function BookingMap({ pickup, destination, route, initialCenter }: {
 
   return <>
     <div ref={container} onPointerDown={() => { interaction.current = true; }} className="absolute inset-0" aria-label={t('trip_route')} />
+    {state === 'ready' && map.current && previewOwner && <NearbyCars map={map.current} origin={nearbyOrigin} owner={previewOwner} vehicleType={vehicleType} />}
     {state !== 'ready' && <div className="booking-map-state" role="status">
       {state === 'loading' ? <><span className="booking-spinner" /><p>{t('booking_map_loading')}</p></>
         : <><i className="ri-map-2-line" aria-hidden="true" /><p>{t('booking_map_error')}</p>
@@ -134,4 +140,5 @@ export default memo(BookingMap, (previous, next) =>
   && previous.destination?.lat === next.destination?.lat && previous.destination?.lng === next.destination?.lng
   && previous.destination?.address === next.destination?.address
   && previous.route?.polyline === next.route?.polyline
+  && previous.previewOwner === next.previewOwner && previous.vehicleType === next.vehicleType
   && previous.initialCenter?.lat === next.initialCenter?.lat && previous.initialCenter?.lng === next.initialCenter?.lng);
