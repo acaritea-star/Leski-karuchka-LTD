@@ -415,7 +415,7 @@ export default function DriverTracking({
     if (!onCancel || cancelling) return;
     setCancelError(''); setCancelling(true);
     try {
-      const {data,error} = await supabase.from('taxi_requests').update({status:'cancelled'})
+      const {data,error} = await supabase.from('taxi_requests').update({status:'cancelled',cancel_reason:'customer_requested'})
         .eq('id',request.id).eq('status',request.status).select('id').single();
       if (error || !data) throw new Error(error?.message ?? 'Заявката вече е променена.');
       onCancel();

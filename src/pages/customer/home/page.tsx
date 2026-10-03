@@ -380,7 +380,7 @@ export default function CustomerHome() {
   }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
 
   const cancelRequest = async () => {
-    if (!activeRequest || cancelling) return;
+    if (!activeRequest || cancelling || !['pending', 'accepted', 'arrived'].includes(activeRequest.status)) return;
     setCancelling(true);
     setRequestError('');
     try {
@@ -390,9 +390,10 @@ export default function CustomerHome() {
           status: 'cancelled',
           cancelled_at: new Date().toISOString(),
           cancelled_by: 'customer',
+          cancel_reason: 'customer_requested',
         })
         .eq('id', activeRequestId!)
-        .eq('status', 'pending')
+        .eq('status', activeRequest.status)
         .select('id, status')
         .maybeSingle();
 

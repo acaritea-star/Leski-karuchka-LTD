@@ -929,6 +929,9 @@ Relationships: [{"columns": ["company_id"], "isOneToOne": false, "foreignKeyName
 "type": string | null;
 }; Relationships: []; };
 }; Functions: {
+accounting_report: { Args: { p_from: string; p_until: string; p_company_id?: string; p_driver_id?: string; p_page?: number }; Returns: Json };
+record_driver_money: { Args: { p_id: string; p_kind: string; p_amount: number; p_note: string; p_request_id?: string; p_reference_id?: string }; Returns: string };
+
 create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 accept_taxi_request: { Args: { p_request_id: string }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
