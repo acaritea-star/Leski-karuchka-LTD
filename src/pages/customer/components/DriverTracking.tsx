@@ -13,6 +13,7 @@ import { RoadAttribution } from '@/pages/customer/components/NearbyCars';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
 import { measureRoute } from '@/lib/routeGeometry';
+import { remainingRouteEstimate } from '@/lib/routeProgress';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
 
@@ -111,7 +112,8 @@ export default function DriverTracking({
   const targetLat = headingToPickup ? request.pickup_latitude : request.destination_latitude;
   const targetLng = headingToPickup ? request.pickup_longitude : request.destination_longitude;
 
-  const { info: liveRoute, path: livePath } = useDrivingRoute(location, targetLat, targetLng);
+  const { info: liveRoute, path: livePath } = useDrivingRoute(location, targetLat, targetLng,
+    { requestId: request.id, purpose: headingToPickup ? 'pickup' : 'destination' });
   const tripPath = useMemo(() => routeInfo?.polyline ? measureRoute(decodePolyline(routeInfo.polyline)).points : [], [routeInfo]);
   const motionPath = livePath.length ? livePath : headingToPickup ? NO_ROUTE : tripPath;
   const roadNetwork = useRoadNetwork(location);
@@ -178,7 +180,7 @@ export default function DriverTracking({
     computeRoute(
       { lat: request.pickup_latitude, lng: request.pickup_longitude },
       { lat: request.destination_latitude, lng: request.destination_longitude },
-      { travelMode: 'DRIVE', language: 'bg', units: 'METRIC' },
+      { travelMode: 'DRIVE', language: 'bg', units: 'METRIC', requestId: request.id, purpose: 'context' },
     )
       .then((res) => {
         if (active && res?.success) setRouteInfo(res);
@@ -190,6 +192,7 @@ export default function DriverTracking({
       active = false;
     };
   }, [
+    request.id,
     request.pickup_latitude,
     request.pickup_longitude,
     request.destination_latitude,
@@ -275,9 +278,11 @@ export default function DriverTracking({
     : null;
   const roadDistanceToTarget =
     distanceToTarget !== null ? distanceToTarget * roadFactor : null;
-  const etaMinutes =
-    liveRoute?.duration_min ??
-    (roadDistanceToTarget !== null ? estimateDuration(roadDistanceToTarget) : null);
+  const measuredLive = useMemo(() => measureRoute(livePath), [livePath]);
+  const liveEstimate = remainingRouteEstimate(liveRoute, measuredLive, location);
+  const etaMinutes = liveRoute
+    ? liveEstimate?.durationMinutes ?? null
+    : roadDistanceToTarget !== null ? estimateDuration(roadDistanceToTarget) : null;
 
   // Fit once after GPS and Maps have both arrived, then follow only near an edge.
   useEffect(() => {

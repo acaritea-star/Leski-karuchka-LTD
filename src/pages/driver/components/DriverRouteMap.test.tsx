@@ -48,7 +48,7 @@ it('draws both pins, a car and a directional route when GPS and the route arrive
   expect(marker).toHaveBeenCalledWith(expect.objectContaining({ position: props.destination, title: 'B · Край' }));
   expect(polyline).toHaveBeenCalledWith(expect.objectContaining({ icons: [expect.objectContaining({ repeat: '120px' })] }));
 });
-it('accepts consecutive GPS steps under 50 metres, updates progress and refreshes the route', async () => {
+it('accepts consecutive GPS steps under 50 metres and updates navigation without buying a new route', async () => {
   const nav = vi.fn();
   render(<DriverRouteMap {...props} onNavInfo={nav} />);
   await act(async () => receiveGps(gps()));
@@ -56,10 +56,10 @@ it('accepts consecutive GPS steps under 50 metres, updates progress and refreshe
     act(() => vi.advanceTimersByTime(1000));
     await act(async () => receiveGps(gps(43 + n * .0002)));
   }
-  expect(computeRoute).toHaveBeenCalledTimes(2);
+  expect(computeRoute).toHaveBeenCalledTimes(1);
   expect(polyline).toHaveBeenCalledTimes(4); // Two persistent layers for each line.
   expect(setMap).not.toHaveBeenCalledWith(null);
-  expect(computeRoute).toHaveBeenLastCalledWith(expect.objectContaining({ lat: 43.0018 }), expect.anything(), expect.anything());
+  expect(computeRoute).toHaveBeenLastCalledWith(expect.objectContaining({ lat: 43 }), expect.anything(), expect.anything());
   expect(nav.mock.lastCall?.[0].distance_km).toBeLessThan(result.distance_km);
 });
 it('hides live ETA when GPS expires and releases the native GPS watch and layers', async () => {
@@ -72,6 +72,19 @@ it('hides live ETA when GPS expires and releases the native GPS watch and layers
   view.unmount();
   expect(clearWatch).toHaveBeenLastCalledWith(7);
   expect(setMap).toHaveBeenCalledWith(null);
+});
+
+it('advances the turn instruction and ETA locally while preserving the same route layers',async()=>{
+ const nav=vi.fn();
+ render(<DriverRouteMap {...props} onNavInfo={nav} />);
+ await act(async()=>receiveGps(gps()));
+ await act(async()=>vi.advanceTimersByTime(30000));
+ await act(async()=>receiveGps(gps(43.004)));
+ expect(nav.mock.lastCall?.[0]).toMatchObject({instruction:'Завийте надясно',duration_min:1});
+ expect(nav.mock.lastCall?.[0].distance_km).toBeLessThan(.12);
+ expect(computeRoute).toHaveBeenCalledOnce();
+ expect(polyline).toHaveBeenCalledTimes(4);
+ expect(mapCreated).toHaveBeenCalledOnce();
 });
 
 it('keeps the map alive when navigation changes from pickup to destination', async () => {

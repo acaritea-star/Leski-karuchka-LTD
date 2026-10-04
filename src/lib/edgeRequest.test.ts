@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const session = vi.hoisted(() => vi.fn());
 vi.mock('./supabase', () => ({ supabase: { auth: { getSession: session } }, supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'public-key' }));
-import { invokeEdge } from './edgeRequest';
+import { EdgeRequestError, invokeEdge } from './edgeRequest';
 beforeEach(() => { vi.useFakeTimers(); session.mockReset().mockResolvedValue({ data: { session: { access_token: 'session-token' } }, error: null }); vi.stubGlobal('fetch', vi.fn()); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+it('preserves quota status and retry delay without another request', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'ROUTE_BUDGET_EXCEEDED' }), { status: 429, headers: { 'Retry-After': '3600' } }));
+  const result = await invokeEdge('google-routes', {}, 1000);
+  expect(result.error).toBeInstanceOf(EdgeRequestError);
+  expect(result.error).toMatchObject({ status: 429, retryAfterSeconds: 3600, code: 'ROUTE_BUDGET_EXCEEDED' });
+  expect(fetch).toHaveBeenCalledOnce();
+});
 it('sends one authenticated JSON request and reads the result within the same deadline', async () => {
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true })));
   await expect(invokeEdge('google-routes', { origin: { lat: 43, lng: 25 } }, 1000)).resolves.toMatchObject({ data: { success: true }, error: null });

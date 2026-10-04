@@ -474,6 +474,7 @@ export default function DriverRequests() {
               >
                 <DriverRouteMap
                   key={activeRequest.id}
+                  requestId={activeRequest.id}
                   targetLat={navTarget.lat}
                   targetLng={navTarget.lng}
                   pickup={{ lat: activeRequest.pickup_latitude, lng: activeRequest.pickup_longitude }}

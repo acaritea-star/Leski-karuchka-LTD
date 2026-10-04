@@ -12,7 +12,8 @@ import { useRoadNetwork } from '@/hooks/useRoadNetwork';
 import { RoadAttribution } from '@/pages/customer/components/NearbyCars';
 import { useVehicleMarker } from '@/hooks/useVehicleMarker';
 import { updateRouteLayer, type RouteLayerState, mapPinIcon, MAP_PICKUP_COLOR, type RouteLine } from '@/lib/mapLayers';
-import { matchRoute, measureRoute } from '@/lib/routeGeometry';
+import { measureRoute } from '@/lib/routeGeometry';
+import { remainingRouteEstimate } from '@/lib/routeProgress';
 import { freshFix, type VehicleFix } from '@/lib/vehicleMotion';
 
 export interface NavInfo {
@@ -25,6 +26,7 @@ interface DriverRouteMapProps {
   targetLat: number;
   targetLng: number;
   driverId?: string | null;
+  requestId?: string;
   pickup?: RoutePoint;
   destination?: RoutePoint;
   targetKind?: 'pickup' | 'destination';
@@ -34,7 +36,7 @@ function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup, destination,
+export default function DriverRouteMap({ targetLat, targetLng, driverId, requestId, pickup, destination,
   targetKind = 'destination', onNavInfo }: DriverRouteMapProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -55,7 +57,8 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
   const serverFix = useDriverPosition(driverId, locationEnabled !== false && !localFresh);
   const pos = locationEnabled === false ? null : localFresh ? localFix : serverFix ?? localFix;
   const positionFresh = usePositionFreshness(pos);
-  const { info: routeInfo, path: routePath, error: routeError } = useDrivingRoute(pos, targetLat, targetLng);
+  const { info: routeInfo, path: routePath, error: routeError, blocked: routeBlocked } = useDrivingRoute(pos, targetLat, targetLng,
+    { requestId, purpose: targetKind });
   const roadNetwork = useRoadNetwork(pos);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, pos, routePath, undefined,
     frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, true);
@@ -142,10 +145,12 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
     }
   }, [mapReady, pos, positionFresh, targetLat, targetLng]);
 
+  const measuredPath = useMemo(() => measureRoute(routePath), [routePath]);
   const navInfo = useMemo<NavInfo | null>(() => {
     if (!routeInfo || !positionFresh) return null;
-    const measured = measureRoute(routePath), match = pos ? matchRoute(pos, measured) : null;
-    const ratio = match && match.distance <= 35 && measured.length > 0 ? Math.min(1, match.progress / measured.length) : 0;
+    const estimate = remainingRouteEstimate(routeInfo, measuredPath, pos);
+    if (!estimate) return null;
+    const { ratio } = estimate;
     let travelled = routeInfo.distance_km * 1000 * ratio;
     const steps = routeInfo.legs.flatMap(leg => leg.steps);
     let step = steps[0];
@@ -154,11 +159,11 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
       if (!candidate.distance_meters || travelled < candidate.distance_meters) break;
       travelled -= candidate.distance_meters;
     }
-    return { distance_km: Math.max(0, routeInfo.distance_km * (1 - ratio)),
-      duration_min: Math.max(0, Math.ceil(routeInfo.duration_min * (1 - ratio))),
+    return { distance_km: estimate.distanceKm,
+      duration_min: estimate.durationMinutes,
       instruction: step?.instruction ? stripHtml(step.instruction) : null,
       next_step_meters: step?.distance_meters != null ? Math.max(0, Math.round(step.distance_meters - travelled)) : null };
-  }, [routeInfo, routePath, pos, positionFresh]);
+  }, [routeInfo, measuredPath, pos, positionFresh]);
   useEffect(() => { onNavInfo?.(navInfo); }, [onNavInfo, navInfo]);
 
   return <div className="relative w-full h-full" aria-label={t('trip_route')}>
@@ -178,7 +183,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, pickup,
             </div>
           </div>
           <p className="text-xs text-foreground-500 mt-2">{navInfo.distance_km.toFixed(1)} км · ~{navInfo.duration_min} {t('min')}</p>
-        </> : <p className="text-sm text-foreground-600">{locationEnabled === false ? 'Местоположението е изключено.' : !positionFresh ? t(pos ? 'position_not_updating' : 'booking_waiting_location') : routeError ? 'Маршрутът не се зареди. Опитваме отново…' : 'Изчисляване на маршрута…'}</p>}
+        </> : <p className="text-sm text-foreground-600">{locationEnabled === false ? 'Местоположението е изключено.' : !positionFresh ? t(pos ? 'position_not_updating' : 'booking_waiting_location') : routeBlocked ? 'Маршрутът временно не се обновява.' : routeError ? 'Маршрутът не се зареди. Опитваме отново…' : 'Изчисляване на маршрута…'}</p>}
       </div>
       <div className="absolute bottom-7 right-3 flex flex-col gap-2">
         <button type="button" className="w-10 h-10 bg-white rounded-lg shadow flex items-center justify-center" aria-label={t('recenter_map')}

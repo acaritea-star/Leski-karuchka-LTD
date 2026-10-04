@@ -1,5 +1,5 @@
 import { isInBulgaria } from './serviceArea';
-import { invokeEdge } from './edgeRequest';
+import { EdgeRequestError, invokeEdge } from './edgeRequest';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Google Maps Platform — Frontend wrappers for Supabase Edge Functions
@@ -46,6 +46,9 @@ export interface RouteResult {
   }>;
   alternatives_count: number;
   error?: string;
+  status?: number;
+  retry_after_sec?: number;
+  code?: string;
 }
 
 export interface RoutePoint {
@@ -98,6 +101,8 @@ export async function computeRoute(
     units?: string;
     alternatives?: boolean;
     waypoints?: RoutePoint[];
+    requestId?: string;
+    purpose?: 'pickup' | 'destination' | 'context';
     quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string };
   }
 ): Promise<RouteResult | null> {
@@ -108,6 +113,8 @@ export async function computeRoute(
         origin,
         destination,
         quote: opts?.quote,
+        request_id: opts?.requestId,
+        purpose: opts?.purpose,
         travelMode: opts?.travelMode ?? 'DRIVE',
         language: opts?.language ?? 'bg',
         units: opts?.units ?? 'METRIC',
@@ -119,6 +126,10 @@ export async function computeRoute(
     return data as RouteResult;
   } catch (err) {
     console.error('computeRoute error:', err);
+    if (err instanceof EdgeRequestError) return {
+      success: false, distance_km: 0, duration_min: 0, duration_sec: 0, polyline: '', legs: [], alternatives_count: 0,
+      status: err.status, retry_after_sec: err.retryAfterSeconds, code: err.code, error: err.message,
+    };
     return null;
   }
 }
