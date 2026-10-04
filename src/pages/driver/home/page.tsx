@@ -1,3 +1,5 @@
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
@@ -30,11 +32,12 @@ export default function DriverHome() {
   const { playDriverSound, unlockAudio } = useNotificationSound();
 
   const toggleInFlight = useRef(false);
+  const acceptInFlight = useRef(false);
   const [toggleError, setGpsError] = useState('');
   const gps = useDriverGps();
   const gpsError = toggleError || gps.error;
   const gpsStatus = gps.status;
-  const requestChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [requestsRealtime, setRequestsRealtime] = useState(false);
 
   // Unlock audio on first user interaction (browsers block AudioContext until then)
   useEffect(() => {
@@ -50,12 +53,12 @@ export default function DriverHome() {
   // ── Driver record ──
   const driverQuery = useQuery({
     queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'me', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('drivers')
         .select('*')
         .eq('user_id', user!.id)
-        .maybeSingle();
+        .abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
       return data;
     },
@@ -67,35 +70,38 @@ export default function DriverHome() {
   // ── Active request ──
   const activeRequestQuery = useQuery({
     queryKey: driver?.id ? queryKeys.driverActiveRequest(driver.id) : ['taxi_requests', 'driver', 'none', 'active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const key = queryKeys.driverActiveRequest(driver!.id);
+      const started = queryClient.getQueryData<TaxiRequest | null>(key);
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
         .eq('driver_id', driver!.id)
         .in('status', ['accepted', 'arrived', 'in_progress'])
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
-      return data;
+      return mergeDriverActiveRead(started, queryClient.getQueryData<TaxiRequest | null>(key), data);
     },
     enabled: !!driver?.id,
+    refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
 
   // ── Today stats ──
   const todayStatsQuery = useQuery({
     queryKey: driver?.id ? queryKeys.driverTodayStats(driver.id) : ['taxi_requests', 'driver', 'none', 'today'],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const { data, error } = await supabase
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('estimated_price, final_price, status')
         .eq('driver_id', driver!.id)
         .eq('status', 'completed')
         .gte('completed_at', today.toISOString())
-        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
+        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString()).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       const trips = data?.length ?? 0;
       const earnings = (data ?? []).reduce(
@@ -108,40 +114,25 @@ export default function DriverHome() {
   });
   const todayStats = todayStatsQuery.data ?? { trips: 0, earnings: 0 };
 
-  // ── Pending count ──
-  const pendingCountQuery = useQuery({
-    queryKey: user?.company_id ? queryKeys.driverPendingCount(user.company_id) : ['taxi_requests', 'company', 'none', 'pending-count'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('taxi_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', user!.company_id!)
-        .eq('status', 'pending');
-      if (error) throw error;
-      return count ?? 0;
-    },
-    enabled: !!user?.company_id && !!driver?.is_online,
-    refetchInterval: driver?.is_online ? 8000 : false,
-  });
-  const pendingRequests = pendingCountQuery.data ?? 0;
-
   // ── Pending list (to surface the next non-declined request) ──
   const pendingListQuery = useQuery({
     queryKey: user?.company_id ? queryKeys.driverPendingList(user.company_id) : ['taxi_requests', 'company', 'none', 'pending-list'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
         .eq('company_id', user!.company_id!)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(10).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!user?.company_id && !!driver?.is_online,
-    refetchInterval: driver?.is_online ? 8000 : false,
+    enabled: !!user?.company_id && !!driver?.is_online && !activeRequest,
+    refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
+  // The badge renders 9+ beyond nine; the existing ten-row snapshot is enough.
+  const pendingRequests = driver?.is_online && !activeRequest ? pendingListQuery.data?.length ?? 0 : 0;
 
   const latestRequest = useMemo(() => {
     const list = pendingListQuery.data ?? [];
@@ -173,10 +164,11 @@ export default function DriverHome() {
   const acceptMutation = useMutation({
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error } = await supabase.rpc('accept_taxi_request', { p_request_id: requestId });
+      const { data, error } = await withRequestTimeout(signal => supabase.rpc('accept_taxi_request', { p_request_id: requestId }).abortSignal(signal), 15_000);
       if (error) throw error;
       return data;
     },
+    onSettled: () => { acceptInFlight.current = false; },
     onSuccess: () => {
       if (driver?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
@@ -196,6 +188,10 @@ export default function DriverHome() {
       }
     },
   });
+  const acceptRequest = (id: string) => {
+    if (acceptInFlight.current) return;
+    acceptInFlight.current = true; acceptMutation.mutate(id);
+  };
 
   const declineRequest = () => {
     if (latestRequest) decline(latestRequest.id);
@@ -205,17 +201,17 @@ export default function DriverHome() {
   useEffect(() => {
     if (!driver?.id || !user?.company_id) return;
     const companyId = user.company_id;
+    setRequestsRealtime(false);
 
     const channel = supabase
       .channel(`driver-requests-${driver.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: 'status=eq.pending' },
+        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` },
         (payload) => {
           const newRow = payload.new as TaxiRequest;
           if (driver.is_online && newRow.company_id === companyId && newRow.status === 'pending') {
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(companyId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
             playDriverSound();
           }
         },
@@ -233,17 +229,20 @@ export default function DriverHome() {
           }
         },
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests' }, (payload) => {
-        const oldRow = payload.old as Partial<TaxiRequest> | undefined;
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` }, (payload) => {
         const newRow = payload.new as TaxiRequest;
-        if (oldRow?.status === 'pending' && newRow.status !== 'pending' && newRow.company_id === companyId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(companyId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) });
+        // RLS may omit old.status. Reconcile the small list on company changes.
+        if (driver.is_online && newRow.company_id === companyId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
         }
       })
-      .subscribe();
-
-    requestChannelRef.current = channel;
+      .subscribe(status => {
+        setRequestsRealtime(status === 'SUBSCRIBED');
+        if (status === 'SUBSCRIBED') {
+          queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) }, { cancelRefetch: false });
+          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };
@@ -402,7 +401,7 @@ export default function DriverHome() {
                     {t('reject')}
                   </button>
                   <button
-                    onClick={() => acceptMutation.mutate(latestRequest.id)}
+                    onClick={() => acceptRequest(latestRequest.id)}
                     disabled={accepting}
                     className="py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-1"
                   >

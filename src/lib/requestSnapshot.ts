@@ -11,3 +11,11 @@ export function mergeRequestSnapshot<T extends Snapshot>(current: T | null, inco
   if (Object.keys(incoming).every(key => incoming[key as keyof T] === current[key as keyof T])) return current;
   return { ...current, ...incoming };
 }
+// Reconcile an active-driver query with changes received while its HTTP read
+// was in flight. A terminal null/new ride in the cache wins over that old read.
+export function mergeDriverActiveRead<T extends Snapshot>(started: T | null | undefined,
+  current: T | null | undefined, incoming: T | null): T | null {
+  if (current && incoming && current.id === incoming.id) return mergeRequestSnapshot(current, incoming);
+  if (current !== started) return current ?? null;
+  return incoming;
+}

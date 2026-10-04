@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { freshFix, validFix, type VehicleFix } from '@/lib/vehicleMotion';
-import { withRequestTimeout } from '@/lib/requestTimeout';
+import { createRealtimePoll } from '@/lib/realtimePoll';
 
 export function driverPosition(row: Record<string, unknown>): VehicleFix | null {
   if (typeof row.latitude !== 'number' || typeof row.longitude !== 'number') return null;
@@ -20,8 +20,7 @@ export function useDriverPosition(driverId: string | null | undefined, enabled =
   useEffect(() => {
     setFix(null);
     if (!driverId || !enabled) return;
-    let active = true, reading = false, failures = 0, nextAttempt = 0;
-    const controller = new AbortController();
+    let active = true;
     const apply = (row: Record<string, unknown>) => {
       const next = driverPosition(row);
       if (!active || !next) return;
@@ -29,39 +28,19 @@ export function useDriverPosition(driverId: string | null | undefined, enabled =
       // heartbeat with the same position_at also cannot restart the animation.
       setFix(previous => previous && previous.timestamp >= next.timestamp ? previous : next);
     };
-    const poll = async () => {
-      if (!active || reading || Date.now() < nextAttempt || document.visibilityState === 'hidden') return;
-      reading = true;
-      try {
-        const { data, error } = await withRequestTimeout(signal => supabase.from('driver_locations')
+    const poll = createRealtimePoll(async signal => {
+        const { data, error } = await supabase.from('driver_locations')
           .select('latitude, longitude, heading, speed, accuracy, position_at, updated_at')
-          .eq('driver_id', driverId).abortSignal(signal).maybeSingle(), 10_000, controller.signal);
+          .eq('driver_id', driverId).abortSignal(signal).maybeSingle();
         if (error) throw error;
-        failures = 0; nextAttempt = 0;
-        if (data) apply(data);
-      } catch {
-        // Retain the last fix until its original timestamp expires. A failed
-        // connection must not turn the fallback poll into a retry storm.
-        nextAttempt = Date.now() + Math.min(30_000, 5000 * 2 ** Math.min(failures++, 3));
-      }
-      finally { reading = false; }
-    };
-    const run = () => { void poll(); };
-    const resume = () => { if (document.visibilityState !== 'hidden') { nextAttempt = 0; run(); } };
-    run();
+        return data;
+    }, data => { if (data) apply(data); });
     const channel = supabase.channel(`map-position-${driverId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${driverId}` },
         payload => apply(payload.new as Record<string, unknown>))
-      .subscribe(status => { if (status === 'SUBSCRIBED') resume(); });
-    const timer = setInterval(run, 5000);
-    document.addEventListener('visibilitychange', resume);
-    window.addEventListener('online', resume);
-    window.addEventListener('pageshow', resume);
+      .subscribe(poll.setStatus);
     return () => {
-      active = false; controller.abort(); clearInterval(timer);
-      document.removeEventListener('visibilitychange', resume);
-      window.removeEventListener('online', resume);
-      window.removeEventListener('pageshow', resume);
+      active = false; poll.stop();
       void supabase.removeChannel(channel);
     };
   }, [driverId, enabled]);

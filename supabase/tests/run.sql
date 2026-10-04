@@ -3,6 +3,7 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
 \ir core.sql
+\ir scale_security.sql
 \ir nearby_cars.sql
 \ir quote_service_role.sql
 \ir request_accounting.sql

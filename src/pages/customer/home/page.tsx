@@ -1,4 +1,5 @@
 import { withRequestTimeout } from '@/lib/requestTimeout';
+import { createRealtimePoll } from '@/lib/realtimePoll';
 import { requestGps, subscribeGps, gpsPermission, gpsErrorMessage } from '@/lib/sharedGps';
 import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference';
 import { useLocationPreference } from '@/hooks/useLocationPreference';
@@ -139,6 +140,7 @@ export default function CustomerHome() {
   );
 
   const activeRequestId = activeRequest?.id;
+  const liveRequestId = activeRequest && !['completed', 'cancelled'].includes(activeRequest.status) ? activeRequest.id : null;
 
   useEffect(() => {
     if (!route?.quote_expires_at) return;
@@ -147,7 +149,6 @@ export default function CustomerHome() {
   },[route?.quote_expires_at]);
 
   // Realtime subscription ref
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   useEffect(() => () => { ++gpsRevision.current; }, []);
 
   // Register for push notifications
@@ -320,32 +321,16 @@ export default function CustomerHome() {
     return () => { active = false; };
   }, [user?.id, recoveryAttempt]);
 
-  // Polling fallback
+  // Realtime plus bounded reconciliation. Closed requests stop reading.
   useEffect(() => {
-    if (!activeRequestId) return;
-    const requestId = activeRequestId;
-    let active = true, inFlight = false;
-    const controller = new AbortController();
-    const poll = async () => {
-      if (!active || inFlight || document.visibilityState === 'hidden') return;
-      inFlight = true;
-      try {
-        const { data, error } = await withRequestTimeout(signal => supabase.from('taxi_requests').select('*').eq('id', requestId)
-          .abortSignal(signal).maybeSingle(), 10_000, controller.signal);
-        if (active && !error && data) setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest));
-      } catch { /* Realtime and the next bounded poll can recover a missed read. */ }
-      finally { inFlight = false; }
-    };
-    void poll();
-    const id = setInterval(() => void poll(), 5000);
-    return () => { active = false; controller.abort(); clearInterval(id); };
-  }, [activeRequestId]);
-
-  // Realtime subscription
-  useEffect(() => {
-    if (!activeRequestId) return;
-
-    const requestId = activeRequestId;
+    if (!liveRequestId) return;
+    const requestId = liveRequestId;
+    const poll = createRealtimePoll(async signal => {
+      const { data, error } = await supabase.from('taxi_requests').select('*').eq('id', requestId)
+        .abortSignal(signal).maybeSingle();
+      if (error) throw error;
+      return data;
+    }, data => { if (data) setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest)); });
     const channel = supabase
       .channel(`request-${requestId}`)
       .on(
@@ -362,14 +347,13 @@ export default function CustomerHome() {
           );
         },
       )
-      .subscribe();
-
-    channelRef.current = channel;
+      .subscribe(poll.setStatus);
 
     return () => {
+      poll.stop();
       supabase.removeChannel(channel);
     };
-  }, [activeRequestId]);
+  }, [liveRequestId]);
 
   // Only a server-created quote can be booked. A failed route never becomes a guessed fare.
   useEffect(() => {

@@ -13,9 +13,10 @@ const row = (offset = 0) => ({ latitude: 43, longitude: 25 + offset / 100_000, h
   position_at: new Date(Date.now() + offset).toISOString(), updated_at: new Date(Date.now() + offset).toISOString() });
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z')); vi.clearAllMocks(); mocks.signals.length = 0;
+  vi.spyOn(Math, 'random').mockReturnValue(0);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 it('uses position_at instead of treating a fresh heartbeat as fresh GPS', () => {
   const old = driverPosition({ ...row(), position_at: new Date(Date.now() - 60_000).toISOString() });
   expect(freshFix(old)).toBe(false);

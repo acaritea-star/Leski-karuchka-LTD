@@ -1,3 +1,5 @@
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 import { useState, useEffect, useRef } from 'react';
@@ -28,6 +30,7 @@ function routeStats(r: Pick<TaxiRequest, 'pickup_latitude' | 'pickup_longitude' 
 export default function DriverRequests() {
   const { t } = useTranslation();
   const toggleInFlight = useRef(false);
+  const acceptInFlight = useRef(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -38,6 +41,7 @@ export default function DriverRequests() {
   const gps = useDriverGps();
   const gpsError = toggleError || gps.error;
   const [error, setError] = useState('');
+  const [requestsRealtime, setRequestsRealtime] = useState(false);
   const [driverNavInfo, setDriverNavInfo] = useState<NavInfo | null>(null);
 
   // Unlock audio on first user interaction (required by browsers)
@@ -63,12 +67,12 @@ export default function DriverRequests() {
   // ── Driver record ──
   const driverQuery = useQuery({
     queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'me', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('drivers')
         .select('*')
         .eq('user_id', user!.id)
-        .maybeSingle();
+        .abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
       return data;
     },
@@ -87,19 +91,22 @@ export default function DriverRequests() {
   // ── Active request ──
   const activeRequestQuery = useQuery({
     queryKey: driver?.id ? queryKeys.driverActiveRequest(driver.id) : ['taxi_requests', 'driver', 'none', 'active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const key = queryKeys.driverActiveRequest(driver!.id);
+      const started = queryClient.getQueryData<TaxiRequest | null>(key);
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
         .eq('driver_id', driver!.id)
         .in('status', ['accepted', 'arrived', 'in_progress'])
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
-      return data;
+      return mergeDriverActiveRead(started, queryClient.getQueryData<TaxiRequest | null>(key), data);
     },
     enabled: !!driver?.id,
+    refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
 
@@ -112,18 +119,18 @@ export default function DriverRequests() {
   // ── Incoming requests ──
   const incomingQuery = useQuery({
     queryKey: user?.company_id ? queryKeys.driverIncomingRequests(user.company_id) : ['taxi_requests', 'company', 'none', 'incoming'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
         .eq('company_id', user!.company_id!)
         .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).limit(50).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!user?.company_id && isOnline && !!driver?.id,
-    refetchInterval: isOnline ? 8000 : false,
+    enabled: !!user?.company_id && isOnline && !!driver?.id && !activeRequest,
+    refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
   const incomingRequests = (incomingQuery.data ?? []).filter((r) => !declinedIds.has(r.id));
 
@@ -161,10 +168,11 @@ export default function DriverRequests() {
   const acceptMutation = useMutation({
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error: updateError } = await supabase.rpc('accept_taxi_request', { p_request_id: requestId });
+      const { data, error: updateError } = await withRequestTimeout(signal => supabase.rpc('accept_taxi_request', { p_request_id: requestId }).abortSignal(signal), 15_000);
       if (updateError) throw updateError;
       return data;
     },
+    onSettled: () => { acceptInFlight.current = false; },
     onSuccess: () => {
       setError('');
       if (driver?.id) {
@@ -182,14 +190,18 @@ export default function DriverRequests() {
       }
     },
   });
+  const acceptRequest = (id: string) => {
+    if (acceptInFlight.current) return;
+    acceptInFlight.current = true; acceptMutation.mutate(id);
+  };
 
   // ── Arrived action ──
   const arrivedMutation = useMutation({
     mutationFn: async (request: TaxiRequest) => {
-      const { error } = await supabase
+      const { error } = await withRequestTimeout(signal => supabase
         .from('taxi_requests')
         .update({ status: 'arrived', arrived_at: new Date().toISOString() })
-        .eq('id', request.id).eq('status', request.status).select('id').single();
+        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
       if (error) throw error;
       return { ...request, status: 'arrived' as const };
     },
@@ -208,10 +220,10 @@ export default function DriverRequests() {
   // ── Start trip action ──
   const startMutation = useMutation({
     mutationFn: async (request: TaxiRequest) => {
-      const { error } = await supabase
+      const { error } = await withRequestTimeout(signal => supabase
         .from('taxi_requests')
         .update({ status: 'in_progress', started_at: new Date().toISOString() })
-        .eq('id', request.id).eq('status', request.status).select('id').single();
+        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
       if (error) throw error;
       return { ...request, status: 'in_progress' as const };
     },
@@ -230,10 +242,10 @@ export default function DriverRequests() {
   // ── End trip action ──
   const endMutation = useMutation({
     mutationFn: async (request: TaxiRequest) => {
-      const { error } = await supabase
+      const { error } = await withRequestTimeout(signal => supabase
         .from('taxi_requests')
         .update({ status: 'completed', completed_at: new Date().toISOString(), final_price: request.estimated_price })
-        .eq('id', request.id).eq('status', request.status).select('id').single();
+        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
       if (error) throw error;
       return { ...request, status: 'completed' as const };
     },
@@ -253,18 +265,19 @@ export default function DriverRequests() {
   useEffect(() => {
     if (!user?.company_id || !driver?.id) return;
     const companyId = user.company_id;
+    setRequestsRealtime(false);
     let subscribed = false;
 
     const channel = supabase
       .channel(`driver-requests-panel-${driver.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: 'status=eq.pending' },
+        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` },
         (payload) => {
           const newRow = payload.new as TaxiRequest;
           if (newRow.company_id === companyId && newRow.status === 'pending' && isOnline) {
             playDriverSound();
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) }, { cancelRefetch: false });
           }
         },
       )
@@ -281,13 +294,14 @@ export default function DriverRequests() {
           }
         },
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` }, (payload) => {
         const newRow = payload.new as TaxiRequest;
         if (newRow.company_id === companyId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) }, { cancelRefetch: false });
         }
       })
       .subscribe(status => {
+        setRequestsRealtime(status === 'SUBSCRIBED');
         if (status === 'SUBSCRIBED') {
           if (subscribed) {
             queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
@@ -650,7 +664,7 @@ export default function DriverRequests() {
                             {t('reject')}
                           </button>
                           <button
-                            onClick={() => acceptMutation.mutate(req.id)}
+                            onClick={() => acceptRequest(req.id)}
                             disabled={isAccepting}
                             className="px-5 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer active:scale-[0.97] disabled:opacity-60 shadow-md shadow-primary-500/15"
                           >
