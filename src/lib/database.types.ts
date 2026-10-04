@@ -929,6 +929,8 @@ Relationships: [{"columns": ["company_id"], "isOneToOne": false, "foreignKeyName
 "type": string | null;
 }; Relationships: []; };
 }; Functions: {
+company_dashboard: { Args: { p_company_id: string; p_day?: string }; Returns: Json };
+driver_day_summary: { Args: { p_driver_id: string; p_day?: string }; Returns: Json };
 nearby_cars: { Args: { p_lat: number; p_lng: number; p_type?: string }; Returns: Json };
 accounting_report: { Args: { p_from: string; p_until: string; p_company_id?: string; p_driver_id?: string; p_page?: number }; Returns: Json };
 record_driver_money: { Args: { p_id: string; p_kind: string; p_amount: number; p_note: string; p_request_id?: string; p_reference_id?: string }; Returns: string };

@@ -1,3 +1,6 @@
+import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
+import { cacheDriverRequest } from '@/lib/driverRequestCache';
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { setDriverOnline } from '@/lib/driverLocation';
@@ -65,19 +68,7 @@ export default function DriverRequests() {
   }, [user?.id, user?.role, registerPush]);
 
   // ── Driver record ──
-  const driverQuery = useQuery({
-    queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'me', 'none'],
-    queryFn: async ({ signal }) => {
-      const { data, error } = await withRequestTimeout(abort => supabase
-        .from('drivers')
-        .select('*')
-        .eq('user_id', user!.id)
-        .abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
   const isOnline = driver?.is_online ?? false;
   const { declinedIds, decline, declineError, isDeclining } = useDriverDeclines(driver?.id);
@@ -136,6 +127,7 @@ export default function DriverRequests() {
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
+    retry: false,
     mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
 
@@ -166,17 +158,16 @@ export default function DriverRequests() {
 
   // ── Accept request ──
   const acceptMutation = useMutation({
+    retry: false,
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error: updateError } = await withRequestTimeout(signal => supabase.rpc('accept_taxi_request', { p_request_id: requestId }).abortSignal(signal), 15_000);
-      if (updateError) throw updateError;
-      return data;
+      return acceptTaxiRequest(requestId, driver.id);
     },
     onSettled: () => { acceptInFlight.current = false; },
-    onSuccess: () => {
+    onSuccess: (confirmed) => {
       setError('');
       if (driver?.id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
+        cacheDriverRequest(queryClient, driver.id, confirmed);
       }
       if (user?.company_id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.company_id) });
@@ -197,18 +188,12 @@ export default function DriverRequests() {
 
   // ── Arrived action ──
   const arrivedMutation = useMutation({
-    mutationFn: async (request: TaxiRequest) => {
-      const { error } = await withRequestTimeout(signal => supabase
-        .from('taxi_requests')
-        .update({ status: 'arrived', arrived_at: new Date().toISOString() })
-        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
-      if (error) throw error;
-      return { ...request, status: 'arrived' as const };
-    },
+    retry: false,
+    mutationFn: (request: TaxiRequest) => transitionTaxiRequest(request, 'arrived'),
     onSuccess: (updated) => {
       setError('');
       if (driver?.id) {
-        queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), updated);
+        cacheDriverRequest(queryClient, driver.id, updated);
       }
     },
     onError: (err) => {
@@ -219,18 +204,12 @@ export default function DriverRequests() {
 
   // ── Start trip action ──
   const startMutation = useMutation({
-    mutationFn: async (request: TaxiRequest) => {
-      const { error } = await withRequestTimeout(signal => supabase
-        .from('taxi_requests')
-        .update({ status: 'in_progress', started_at: new Date().toISOString() })
-        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
-      if (error) throw error;
-      return { ...request, status: 'in_progress' as const };
-    },
+    retry: false,
+    mutationFn: (request: TaxiRequest) => transitionTaxiRequest(request, 'in_progress'),
     onSuccess: (updated) => {
       setError('');
       if (driver?.id) {
-        queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), updated);
+        cacheDriverRequest(queryClient, driver.id, updated);
       }
     },
     onError: (err) => {
@@ -241,18 +220,12 @@ export default function DriverRequests() {
 
   // ── End trip action ──
   const endMutation = useMutation({
-    mutationFn: async (request: TaxiRequest) => {
-      const { error } = await withRequestTimeout(signal => supabase
-        .from('taxi_requests')
-        .update({ status: 'completed', completed_at: new Date().toISOString(), final_price: request.estimated_price })
-        .eq('id', request.id).eq('status', request.status).select('id').abortSignal(signal).single(), 15_000);
-      if (error) throw error;
-      return { ...request, status: 'completed' as const };
-    },
-    onSuccess: () => {
+    retry: false,
+    mutationFn: (request: TaxiRequest) => transitionTaxiRequest(request, 'completed'),
+    onSuccess: (updated) => {
       setError('');
       if (driver?.id) {
-        queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), null);
+        cacheDriverRequest(queryClient, driver.id, updated);
       }
     },
     onError: (err) => {
@@ -287,10 +260,10 @@ export default function DriverRequests() {
         (payload) => {
           const newRow = payload.new as TaxiRequest;
           if (['accepted', 'arrived', 'in_progress'].includes(newRow.status)) {
-            queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), newRow);
+            cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
-            queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), null);
+            cacheDriverRequest(queryClient, driver.id, newRow);
           }
         },
       )

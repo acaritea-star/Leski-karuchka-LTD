@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { gpsErrorMessage, isGpsPermissionDenied, requestGps, subscribeGps } from './sharedGps';
 import { getLocationEnabled, setLocationEnabled } from './locationPreference';
 import { withRequestTimeout } from './requestTimeout';
+import { isAmbiguousWrite } from './rideOperations';
+import type { Tables } from './database.types';
+import { distanceMetres } from './routeGeometry';
 
 export const GPS_HEARTBEAT_MS = 15_000;
 export const GPS_STALE_MS = 45_000;
@@ -37,7 +40,7 @@ export async function saveDriverPosition(id: string, company: string, position: 
     speed: typeof speed === 'number' && Number.isFinite(speed) && speed >= 0 ? speed : null,
     accuracy: position.coords.accuracy,
     position_at: new Date(position.timestamp).toISOString(),
-  }, { onConflict: 'driver_id' }).select('updated_at').abortSignal(abort).single(), 15_000, signal);
+  }, { onConflict: 'driver_id' }).select('updated_at').abortSignal(abort).single(), 15_000, signal, 'gps.write');
   if (error) throw new Error(error.message);
   if (!isFreshTimestamp(data?.updated_at)) throw new Error('Локацията не е потвърдена от сървъра.');
   return data!.updated_at;
@@ -47,12 +50,27 @@ export async function setDriverOnline(driver: { id: string; company_id: string; 
     const position = await getCurrentPosition();
     await saveDriverPosition(driver.id, driver.company_id, position);
   }
-  const { data, error } = await withRequestTimeout(signal => supabase.from('drivers').update({ is_online: online })
-    .eq('id', driver.id).select('*').abortSignal(signal).single(), 15_000);
-  if (error || !data) throw new Error(error?.message ?? 'Промяната не е потвърдена.');
+  let confirmed: Tables<'drivers'> | null = null;
+  try {
+    const { data, error } = await withRequestTimeout(signal => supabase.from('drivers').update({ is_online: online })
+      .eq('id', driver.id).select('*').abortSignal(signal).single(), 15_000, undefined, 'driver.online');
+    if (error) throw error;
+    if (!data || data.is_online !== online) throw new Error('Промяната не е потвърдена.');
+    confirmed = data;
+  } catch (cause) {
+    if (isAmbiguousWrite(cause)) {
+      try {
+        const { data, error } = await withRequestTimeout(signal => supabase.from('drivers').select('*')
+          .eq('id', driver.id).abortSignal(signal).maybeSingle(), 5000, undefined, 'driver.read');
+        if (!error && data?.id === driver.id && data.is_online === online) confirmed = data;
+      } catch { /* A lost acknowledgement does not authorize another write. */ }
+    }
+    if (!confirmed) throw cause instanceof Error ? cause : new Error(cause && typeof cause === 'object' && 'message' in cause
+      ? String(cause.message) : 'Промяната не е потвърдена.');
+  }
   if (online && driver.user_id) setLocationEnabled(driver.user_id, true);
   if (!online) stopDriverGps();
-  return data;
+  return confirmed;
 }
 export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}, userId?: string): boolean {
   stopDriverGps();
@@ -61,10 +79,19 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
   const run = generation;
   let writing: GeolocationPosition | null = null;
   let queued: GeolocationPosition | null = null;
+  let confirmedFix: GeolocationPosition | null = null;
   let locating = false, failures = 0, permissionDenied = false;
   let nextAttempt = 0, lastAttempt = -Infinity, lastRefresh = -Infinity;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let controller: AbortController | null = null;
+  const writeDeadline = () => {
+    if (failures || !queued || !confirmedFix) return nextAttempt;
+    const a = confirmedFix.coords, b = queued.coords;
+    const distance = distanceMetres({ lat: a.latitude, lng: a.longitude }, { lat: b.latitude, lng: b.longitude });
+    const noise = Math.max(8, Math.min(25, Math.max(a.accuracy, b.accuracy)));
+    const moving = b.speed != null && b.speed >= 1.5 || distance >= noise;
+    return Math.max(nextAttempt, lastAttempt + (moving ? MOVING_INTERVAL_MS : GPS_HEARTBEAT_MS));
+  };
   const fail = (error: unknown) => {
     if (run !== generation) return;
     if (isGpsPermissionDenied(error)) {
@@ -76,11 +103,11 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
   };
   const schedule = () => {
     if (retry !== undefined || !queued || writing || run !== generation || document.visibilityState === 'hidden') return;
-    retry = setTimeout(() => { retry = undefined; void drain(); }, Math.max(0, nextAttempt - Date.now()));
+    retry = setTimeout(() => { retry = undefined; void drain(); }, Math.max(0, writeDeadline() - Date.now()));
   };
   const drain = async () => {
     if (run !== generation || writing || !queued || document.visibilityState === 'hidden') return;
-    if (Date.now() < nextAttempt) { schedule(); return; }
+    if (Date.now() < writeDeadline()) { schedule(); return; }
     const position = queued; queued = null;
     try { validatePosition(position); }
     catch (error) { fail(error); return; }
@@ -92,6 +119,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
       if (run !== generation) return;
       lastWriteAt = Date.parse(savedAt);
       lastConfirmedFixAt = position.timestamp;
+      confirmedFix = position;
       failures = 0; lastError = '';
       callbacks.onUpdate?.();
     } catch (error) {
@@ -116,6 +144,9 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     lastFixAt = position.timestamp;
     if (position.timestamp <= lastConfirmedFixAt || writing && position.timestamp <= writing.timestamp) return;
     queued = position;
+    // Motion can shorten an idle deadline. Recompute from the latest fix,
+    // while keeping the absolute throttle/backoff and one in-flight write.
+    if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
     void drain();
   };
   const refresh = async () => {

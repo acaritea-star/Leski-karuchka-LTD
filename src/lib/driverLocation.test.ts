@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-const { single, upsert, update, updateSingle } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn()}));
-vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update})}}));
+const { single, upsert, update, updateSingle, readDriver } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn(),readDriver:vi.fn()}));
+vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update,select:()=>({eq:()=>({abortSignal:()=>({maybeSingle:readDriver})})})})}}));
 import { stopSharedGps } from './sharedGps';
 import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
@@ -14,6 +14,7 @@ beforeEach(() => {
   vi.stubGlobal('document',document);vi.stubGlobal('window',new EventTarget());
   vi.stubGlobal('navigator',{geolocation:{watchPosition:vi.fn((cb:PositionCallback)=>{watch=cb;return 1;}),clearWatch:vi.fn(),getCurrentPosition:vi.fn((cb:PositionCallback)=>cb(fix()))}});
   update.mockReset().mockReturnValue({eq:()=>({select:()=>({abortSignal:()=>({single:updateSingle})})})});
+  readDriver.mockReset().mockResolvedValue({data:null,error:null});
   updateSingle.mockReset().mockResolvedValue({data:{id:'driver',company_id:'company',is_online:false,status:'offline'},error:null});
   upsert.mockReset().mockReturnValue({select:()=>({abortSignal:()=>({single})})});
   single.mockReset().mockImplementation(async()=>({data:{updated_at:new Date().toISOString()},error:null}));
@@ -166,4 +167,29 @@ it('discards queued stale fixes rather than replaying an offline journey', async
   Object.assign(document, { visibilityState: 'visible' }); window.dispatchEvent(new Event('pageshow'));
   await flush(); expect(single).toHaveBeenCalledTimes(2);
   expect(upsert).toHaveBeenLastCalledWith(expect.objectContaining({ position_at: new Date().toISOString() }), expect.anything());
+});
+
+it('confirms offline after a lost acknowledgement without repeating the write or requesting GPS', async () => {
+  updateSingle.mockRejectedValueOnce(new TypeError('Lost acknowledgement'));
+  readDriver.mockResolvedValueOnce({data:{id:'driver',company_id:'company',is_online:false,status:'offline'},error:null});
+  await expect(setDriverOnline({id:'driver',company_id:'company'},false)).resolves.toMatchObject({is_online:false});
+  expect(update).toHaveBeenCalledOnce();expect(readDriver).toHaveBeenCalledOnce();
+  expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+});
+it('reduces idle GPS noise to a fresh fifteen-second heartbeat', async () => {
+  startDriverGps('driver','company');watch(fix());await flush();
+  for(let second=1;second<=30;second++) {
+    await vi.advanceTimersByTimeAsync(1000);
+    watch(fix(43.2+(second%2)*0.00001));await flush();
+  }
+  expect(single).toHaveBeenCalledTimes(3); // Initial + 15s + 30s, not every 5s.
+  expect(getGpsStats().lastConfirmedFixAgeMs).toBeLessThan(1001);
+});
+it('shortens an idle deadline as soon as real movement resumes', async () => {
+  startDriverGps('driver','company');watch(fix());await flush();
+  await vi.advanceTimersByTimeAsync(4000);watch(fix());await flush();
+  expect(single).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(1000);
+  watch({...fix(43.2003),coords:{...fix(43.2003).coords,speed:8}});await flush();
+  expect(single).toHaveBeenCalledTimes(2);
 });

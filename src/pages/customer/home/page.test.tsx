@@ -54,8 +54,9 @@ beforeEach(() => {
   fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
   fake.notify = null;
   fake.route.mockResolvedValue(quote());
-  fake.rpc.mockImplementation(async () => {
-    fake.active = { id: 'request', company_id: 'company', driver_id: null, status: 'pending', pickup_address: pickup.address,
+  fake.rpc.mockImplementation(async (...args: [string?, { p_request_id: string }?]) => {
+    fake.active = { id: args[1]?.p_request_id ?? 'request', customer_id: fake.user.id,
+      company_id: 'company', driver_id: null, status: 'pending', pickup_address: pickup.address,
       destination_address: destination.address, pickup_latitude: pickup.lat, pickup_longitude: pickup.lng,
       destination_latitude: destination.lat, destination_longitude: destination.lng, estimated_price: 5 };
     return { data: fake.active, error: null };

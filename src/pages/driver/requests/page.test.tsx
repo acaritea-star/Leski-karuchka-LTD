@@ -10,7 +10,7 @@ const fake = vi.hoisted(() => ({
   driver: { id:'driver',user_id:'user',company_id:'company',is_online:false,is_verified:true,status:'offline' },
   change: vi.fn(), declined: new Set<string>(), accept: vi.fn(), incoming: [] as Array<Record<string, unknown>>,
   sound:vi.fn(),unlock:vi.fn(),register:vi.fn(),reads:vi.fn(),
-  statuses:new Map<string,(status:string)=>void>(),filters:[] as Array<{table?:string;filter?:string}>,
+  activeRow:null as Record<string, unknown>|null,statuses:new Map<string,(status:string)=>void>(),filters:[] as Array<{table?:string;filter?:string}>,
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER' } }) }));
 vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
@@ -27,13 +27,13 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
   }; return channel; },
   from:(table:string) => {
     const query={select:()=>query,eq:()=>query,in:()=>query,order:()=>query,limit:()=>query,abortSignal:()=>query,
-      maybeSingle:async()=>{fake.reads(table);return{data:table==='drivers'?fake.driver:null,error:null};},
+      maybeSingle:async()=>{fake.reads(table);return{data:table==='drivers'?fake.driver:fake.activeRow,error:null};},
       then:(resolve:(result:unknown)=>unknown)=>Promise.resolve({data:fake.incoming,error:null}).then(resolve)};
     return query;
   },
 } }));
-afterEach(() => { cleanup();fake.incoming=[];fake.filters=[];fake.statuses.clear();vi.useRealTimers(); });
-it('keeps the original online intent through a retry after the driver cache changes, and blocks duplicate clicks', async () => {
+afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.filters=[];fake.statuses.clear();vi.useRealTimers(); });
+it('blocks duplicate online clicks and does not replay an uncertain write after the driver cache changes', async () => {
   vi.useFakeTimers(); fake.driver={...fake.driver,is_online:false,status:'offline'};fake.change.mockReset();
   fake.change.mockRejectedValueOnce(new Error('Acknowledgement lost')).mockImplementation(async()=>fake.driver);
   const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:1,retryDelay:100}}});
@@ -46,8 +46,8 @@ it('keeps the original online intent through a retry after the driver cache chan
   expect(fake.change).toHaveBeenCalledTimes(1);
   act(()=>{fake.driver={...fake.driver,is_online:true,status:'available'};client.setQueryData(queryKeys.driverRecord('user'),fake.driver);});
   await act(async()=>{await vi.advanceTimersByTimeAsync(500);});
-  expect(fake.change).toHaveBeenCalledTimes(2);
-  expect(fake.change.mock.calls.map(call=>call[1])).toEqual([true,true]);
+  expect(fake.change).toHaveBeenCalledTimes(1);
+  expect(fake.change.mock.calls.map(call=>call[1])).toEqual([true]);
   client.clear();
 });
 it('releases a hung accept after the deadline, blocks duplicate clicks, and ignores its late reply', async () => {
@@ -80,4 +80,21 @@ it('reconciles the active ride slowly on a healthy socket and every eight second
   expect(fake.filters.filter(f=>f.table==='taxi_requests').every(f=>!!f.filter)).toBe(true);
   fake.reads.mockClear();act(()=>fake.statuses.get('driver-requests-panel-driver')?.('CHANNEL_ERROR'));
   await act(async()=>vi.advanceTimersByTimeAsync(8000));expect(fake.reads).toHaveBeenCalledOnce();client.clear();
+});
+
+it('uses confirmed server acceptance immediately after a lost RPC acknowledgement', async () => {
+  vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+  const accepted={id:'request',company_id:'company',driver_id:'driver',status:'accepted',pickup_address:'Начало',destination_address:'Край',
+    pickup_latitude:43.2,pickup_longitude:25.6,destination_latitude:43.21,destination_longitude:25.61,
+    estimated_price:5,estimated_distance_km:2,estimated_duration_min:5,created_at:new Date().toISOString()};
+  fake.incoming=[{...accepted,status:'pending',driver_id:null}];
+  fake.accept.mockReset().mockImplementation(()=>{fake.activeRow=accepted;return Promise.reject(new TypeError('Lost reply'));});
+  const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:1}}});
+  client.setQueryData(queryKeys.driverRecord('user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('driver'),null);
+  render(<QueryClientProvider client={client}><MemoryRouter><DriverRequests /></MemoryRouter></QueryClientProvider>);
+  await act(async()=>vi.advanceTimersByTimeAsync(0));
+  fireEvent.click(screen.getByRole('button',{name:'Приеми'}));
+  await act(async()=>vi.advanceTimersByTimeAsync(0));
+  expect(client.getQueryData(queryKeys.driverActiveRequest('driver'))).toMatchObject({id:'request',status:'accepted',estimated_price:5});
+  expect(fake.accept).toHaveBeenCalledOnce();expect(screen.queryByText('Lost reply')).toBeNull();client.clear();
 });

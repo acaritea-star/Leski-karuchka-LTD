@@ -1,3 +1,4 @@
+import { metricNow, recordRequestMetric } from './requestMetrics';
 /** One native watch for navigation and dispatch; one deduplicated fresh read. */
 type Listener = (position: GeolocationPosition) => void;
 type Failure = (error: unknown) => void;
@@ -137,6 +138,7 @@ export function requestGps(): Promise<GeolocationPosition> {
   if (pending) return pending;
   if (!navigator.geolocation) return Promise.reject(new Error('Браузърът не поддържа GPS.'));
   const run = epoch;
+  const started = metricNow();
   const deadline = Date.now() + 24_000;
   const task = new Promise<GeolocationPosition>((resolve, reject) => {
     let settled = false, attempt = 0;
@@ -182,6 +184,7 @@ export function requestGps(): Promise<GeolocationPosition> {
     read(true);
   });
   pending = task;
+  void task.then(() => recordRequestMetric('gps.read', started, 'ok'), () => recordRequestMetric('gps.read', started, 'error'));
   void task.finally(() => { if (pending === task) { pending = null; cancelPending = null; } }).catch(() => {});
   return task;
 }

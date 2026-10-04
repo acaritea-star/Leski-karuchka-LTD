@@ -1,77 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { loadCompanyDashboard } from '@/lib/serverSummaries';
+import { useSofiaDay } from '@/hooks/useSofiaDay';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 
-interface DashboardStats {
-  totalDrivers: number;
-  onlineDrivers: number;
-  activeOrders: number;
-  completedOrders: number;
-  cancelledOrders: number;
-  totalRevenue: number;
-}
-
-interface DayPoint {
-  label: string;
-  orders: number;
-  revenue: number;
-}
-
-const ACTIVE_STATUSES = ['pending', 'accepted', 'arrived', 'in_progress'];
-
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
+  const day = useSofiaDay();
 
   const dashboardQuery = useQuery({
-    queryKey: companyId ? queryKeys.adminDashboard(companyId) : ['dashboard', 'none'],
-    queryFn: async (): Promise<{ stats: DashboardStats; chartData: DayPoint[] }> => {
-      const { data: drivers, error: driversErr } = await supabase
-        .from('drivers')
-        .select('is_online')
-        .eq('company_id', companyId!);
-      if (driversErr) throw driversErr;
-
-      const { data: requests, error: reqErr } = await supabase
-        .from('taxi_requests')
-        .select('status, final_price, estimated_price, completed_at')
-        .eq('company_id', companyId!);
-      if (reqErr) throw reqErr;
-
-      const allRequests = requests ?? [];
-      const stats: DashboardStats = {
-        totalDrivers: (drivers ?? []).length,
-        onlineDrivers: (drivers ?? []).filter((d) => d.is_online).length,
-        activeOrders: allRequests.filter((r) => ACTIVE_STATUSES.includes(r.status)).length,
-        completedOrders: allRequests.filter((r) => r.status === 'completed').length,
-        cancelledOrders: allRequests.filter((r) => r.status === 'cancelled').length,
-        totalRevenue: allRequests
-          .filter((r) => r.status === 'completed')
-          .reduce((sum, r) => sum + Number(r.final_price ?? r.estimated_price ?? 0), 0),
-      };
-
-      const days: DayPoint[] = [];
-      const now = new Date();
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-        const next = new Date(d.getTime() + 86400000);
-        const dayRequests = allRequests.filter((r) => {
-          if (!r.completed_at) return false;
-          const c = new Date(r.completed_at);
-          return c >= d && c < next;
-        });
-        days.push({
-          label: d.toLocaleDateString('bg-BG', { weekday: 'short' }),
-          orders: dayRequests.length,
-          revenue: dayRequests.reduce((sum, r) => sum + Number(r.final_price ?? r.estimated_price ?? 0), 0),
-        });
-      }
-
-      return { stats, chartData: days };
-    },
+    queryKey: companyId ? queryKeys.adminDashboard(companyId, day) : ['dashboard', 'none'],
+    queryFn: ({ signal }) => loadCompanyDashboard(companyId!, signal),
     enabled: !!companyId,
   });
 

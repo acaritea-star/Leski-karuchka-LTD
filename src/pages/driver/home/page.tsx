@@ -1,3 +1,8 @@
+import { loadDriverDay } from '@/lib/serverSummaries';
+import { useSofiaDay } from '@/hooks/useSofiaDay';
+import { acceptTaxiRequest } from '@/lib/rideOperations';
+import { cacheDriverRequest } from '@/lib/driverRequestCache';
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
@@ -26,6 +31,7 @@ type TaxiRequest = Tables<'taxi_requests'>;
 
 export default function DriverHome() {
   const { t } = useTranslation();
+  const day = useSofiaDay();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -51,19 +57,7 @@ export default function DriverHome() {
   }, [unlockAudio]);
 
   // ── Driver record ──
-  const driverQuery = useQuery({
-    queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'me', 'none'],
-    queryFn: async ({ signal }) => {
-      const { data, error } = await withRequestTimeout(abort => supabase
-        .from('drivers')
-        .select('*')
-        .eq('user_id', user!.id)
-        .abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
   const { declinedIds, decline } = useDriverDeclines(driver?.id);
 
@@ -91,25 +85,8 @@ export default function DriverHome() {
 
   // ── Today stats ──
   const todayStatsQuery = useQuery({
-    queryKey: driver?.id ? queryKeys.driverTodayStats(driver.id) : ['taxi_requests', 'driver', 'none', 'today'],
-    queryFn: async ({ signal }) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { data, error } = await withRequestTimeout(abort => supabase
-        .from('taxi_requests')
-        .select('estimated_price, final_price, status')
-        .eq('driver_id', driver!.id)
-        .eq('status', 'completed')
-        .gte('completed_at', today.toISOString())
-        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString()).abortSignal(abort), 10_000, signal);
-      if (error) throw error;
-      const trips = data?.length ?? 0;
-      const earnings = (data ?? []).reduce(
-        (sum, r) => sum + Number(r.final_price ?? r.estimated_price ?? 0),
-        0,
-      );
-      return { trips, earnings };
-    },
+    queryKey: driver?.id ? queryKeys.driverTodayStats(driver.id, day) : ['taxi_requests', 'driver', 'none', 'today'],
+    queryFn: ({ signal }) => loadDriverDay(driver!.id, signal),
     enabled: !!driver?.id,
   });
   const todayStats = todayStatsQuery.data ?? { trips: 0, earnings: 0 };
@@ -141,6 +118,7 @@ export default function DriverHome() {
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
+    retry: false,
     mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
 
@@ -162,19 +140,17 @@ export default function DriverHome() {
 
   // ── Accept request ──
   const acceptMutation = useMutation({
+    retry: false,
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      const { data, error } = await withRequestTimeout(signal => supabase.rpc('accept_taxi_request', { p_request_id: requestId }).abortSignal(signal), 15_000);
-      if (error) throw error;
-      return data;
+      return acceptTaxiRequest(requestId, driver.id);
     },
     onSettled: () => { acceptInFlight.current = false; },
-    onSuccess: () => {
+    onSuccess: (confirmed) => {
       if (driver?.id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
+        cacheDriverRequest(queryClient, driver.id, confirmed);
       }
       if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(user.company_id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.company_id) });
       }
       navigate('/driver/requests');
@@ -183,7 +159,6 @@ export default function DriverHome() {
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setGpsError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingCount(user.company_id) });
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.company_id) });
       }
     },
@@ -222,9 +197,9 @@ export default function DriverHome() {
         (payload) => {
           const newRow = payload.new as TaxiRequest;
           if (['accepted', 'arrived', 'in_progress'].includes(newRow.status)) {
-            queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), newRow);
+            cacheDriverRequest(queryClient, driver.id, newRow);
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
-            queryClient.setQueryData(queryKeys.driverActiveRequest(driver.id), null);
+            cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverTodayStats(driver.id) });
           }
         },

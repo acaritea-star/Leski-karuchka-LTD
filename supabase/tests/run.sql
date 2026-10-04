@@ -11,4 +11,5 @@ SET LOCAL statement_timeout = '30s';
 \ir reliable_dispatch.sql
 \ir competing_acceptance.sql
 \ir route_budget.sql
+\ir server_summaries.sql
 ROLLBACK;

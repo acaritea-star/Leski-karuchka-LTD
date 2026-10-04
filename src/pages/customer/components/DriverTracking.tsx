@@ -1,8 +1,11 @@
+import { cancelTaxiRequest } from '@/lib/rideOperations';
 /* global google */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { trackingDriverOptions } from '@/lib/trackingDriver';
 import { calculateDistance, estimateDuration } from '@/lib/geo';
 import { computeRoute, decodePolyline, type RouteResult } from '@/lib/googleMaps';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
@@ -27,15 +30,6 @@ export interface TrackingRequest {
   destination_latitude: number;
   destination_longitude: number;
   destination_address: string;
-}
-
-interface DriverInfo {
-  name: string;
-  phone: string;
-  avatar_url: string | null;
-  rating: number;
-  total_trips: number;
-  vehicle_label: string;
 }
 
 const NO_ROUTE: import('@/lib/googleMaps').RoutePoint[] = [];
@@ -81,15 +75,25 @@ export default function DriverTracking({
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
+  const { user } = useAuth();
+  const driverQuery = useQuery(trackingDriverOptions(user?.id, request.id, request.driver_id));
+  const info = driverQuery.data?.info;
+  const driverInfo = info ? { ...info, name: info.name || t('role_driver') } : null;
   const location = useDriverPosition(request.driver_id);
   const positionStale = !usePositionFreshness(location);
-  const [loadingInfo, setLoadingInfo] = useState(true);
+  const loadingInfo = driverQuery.isPending;
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const cancelInFlight = useRef(false);
+  const cancelRevision = useRef(0);
+  useEffect(() => {
+    const run = ++cancelRevision.current;
+    cancelInFlight.current = false; setCancelling(false); setCancelError('');
+    return () => { cancelRevision.current = run + 1; };
+  }, [request.id]);
   const [cancelError,setCancelError] = useState('');
   const [cancelConfirm, setCancelConfirm] = useState(false);
-  const [vehicleType, setVehicleType] = useState<string>('standard');
+  const vehicleType = driverQuery.data?.vehicleType ?? 'standard';
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
@@ -308,96 +312,6 @@ export default function DriverTracking({
     }
   }, [mapReady, location, positionStale, request.pickup_latitude, request.pickup_longitude, request.destination_latitude, request.destination_longitude]);
 
-  // ── Load driver profile + vehicle type ──
-  useEffect(() => {
-    if (!request.driver_id) return;
-    let active = true;
-
-    const load = async () => {
-      try {
-        const { data: driver } = await supabase
-          .from('drivers')
-          .select('user_id, rating, total_trips, vehicle_id')
-          .eq('id', request.driver_id)
-          .maybeSingle();
-
-        let name = '';
-        let phone = '';
-        let avatarUrl: string | null = null;
-        let vehicleLabel = '';
-        let rating = 0;
-        let totalTrips = 0;
-        let vType = 'standard';
-
-        if (driver) {
-          rating = parseFloat(String(driver.rating || 0));
-          totalTrips = driver.total_trips || 0;
-
-          const { data: u } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, phone, avatar_url')
-            .eq('id', driver.user_id)
-            .maybeSingle();
-
-          if (u) {
-            name = `${u.first_name || ''} ${u.last_name || ''}`.trim();
-            phone = u.phone || '';
-            avatarUrl = u.avatar_url || null;
-          }
-
-          if (driver.vehicle_id) {
-            const { data: v } = await supabase
-              .from('vehicles')
-              .select('make, model, color, registration_number, vehicle_type_id')
-              .eq('id', driver.vehicle_id)
-              .maybeSingle();
-
-            if (v) {
-              vehicleLabel = [v.make, v.model, v.color, v.registration_number]
-                .filter(Boolean)
-                .join(' · ');
-
-              if (v.vehicle_type_id) {
-                const { data: vt } = await supabase
-                  .from('vehicle_types')
-                  .select('name')
-                  .eq('id', v.vehicle_type_id)
-                  .maybeSingle();
-                if (vt?.name) {
-                  const normalized = vt.name.toLowerCase();
-                  if (normalized.includes('comfort')) vType = 'comfort';
-                  else if (normalized.includes('van')) vType = 'van';
-                  else if (normalized.includes('eco')) vType = 'standard';
-                }
-              }
-            }
-          }
-        }
-
-        if (active) {
-          setDriverInfo({
-            name: name || t('role_driver'),
-            phone,
-            avatar_url: avatarUrl,
-            rating,
-            total_trips: totalTrips,
-            vehicle_label: vehicleLabel,
-          });
-          setVehicleType(vType);
-        }
-
-      } catch (err) {
-        console.error('DriverTracking load error:', err);
-      } finally {
-        if (active) setLoadingInfo(false);
-      }
-    };
-
-    load();
-
-    return () => { active = false; };
-  }, [request.driver_id, t]);
-
   // ── Driver-found notification ──
   useEffect(() => {
     if (request.status === 'accepted' || request.status === 'arrived') {
@@ -420,15 +334,15 @@ export default function DriverTracking({
   }, [location]);
 
   const handleCancel = async () => {
-    if (!onCancel || cancelling) return;
+    if (!onCancel || cancelInFlight.current) return;
+    cancelInFlight.current = true;
+    const run = cancelRevision.current;
     setCancelError(''); setCancelling(true);
     try {
-      const {data,error} = await supabase.from('taxi_requests').update({status:'cancelled',cancel_reason:'customer_requested'})
-        .eq('id',request.id).eq('status',request.status).select('id').single();
-      if (error || !data) throw new Error(error?.message ?? 'Заявката вече е променена.');
-      onCancel();
-    } catch(error) { setCancelError(error instanceof Error ? error.message : 'Отмяната не е потвърдена.'); }
-    finally { setCancelling(false); }
+      await cancelTaxiRequest(request.id, request.status);
+      if (run === cancelRevision.current) onCancel();
+    } catch(error) { if (run === cancelRevision.current) setCancelError(error instanceof Error ? error.message : 'Отмяната не е потвърдена.'); }
+    finally { if (run === cancelRevision.current) { cancelInFlight.current = false; setCancelling(false); } }
   };
 
   return <CustomerLayout

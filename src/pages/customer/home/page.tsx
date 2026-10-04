@@ -1,3 +1,4 @@
+import { cancelTaxiRequest, createTaxiRequest } from '@/lib/rideOperations';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { createRealtimePoll } from '@/lib/realtimePoll';
 import { requestGps, subscribeGps, gpsPermission, gpsErrorMessage } from '@/lib/sharedGps';
@@ -285,11 +286,7 @@ export default function CustomerHome() {
     bookingInFlight.current = true;
     setRequestStatus('creating'); setRequestError('');
     try {
-      const {data, error} = await withRequestTimeout(signal => supabase.rpc('create_taxi_request', {
-        p_quote_id: quoteId, p_request_id: bookingId.current, p_payment_method: 'cash',
-      }).abortSignal(signal), 15_000);
-      if (error) throw new Error();
-      if (!data) throw new Error();
+      const data = await createTaxiRequest(quoteId, bookingId.current, user.id);
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
     } catch {
       setRequestError(t('request_failed_hint'));
@@ -385,24 +382,10 @@ export default function CustomerHome() {
     setCancelling(true);
     setRequestError('');
     try {
-      const { data, error } = await withRequestTimeout(signal => supabase
-        .from('taxi_requests')
-        .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: 'customer',
-          cancel_reason: 'customer_requested',
-        })
-        .eq('id', activeRequestId!)
-        .eq('status', activeRequest.status)
-        .select('id, status')
-        .abortSignal(signal).maybeSingle(), 15_000);
-
-      if (error) throw error;
-
+      const data = await cancelTaxiRequest(activeRequestId!, activeRequest.status);
       if (data) {
         setConfirmCancel(false);
-        setActiveRequest((prev) => (prev ? { ...prev, status: 'cancelled' } : prev));
+        setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest));
       } else {
         setConfirmCancel(false);
         setRequestError(t('request_already_taken'));

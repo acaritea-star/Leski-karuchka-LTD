@@ -1,3 +1,4 @@
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -21,19 +22,7 @@ export default function DriverHistory() {
 
   const [filter, setFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
 
-  const driverQuery = useQuery({
-    queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'me', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('user_id', user!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driverId = driverQuery.data?.id ?? null;
 
   const tripsQuery = useQuery({

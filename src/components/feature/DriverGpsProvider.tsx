@@ -5,9 +5,7 @@ import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference
 import { gpsPermission, getGpsPosition, requestGps, stopSharedGps } from '@/lib/sharedGps';
 import { useAuth } from '@/hooks/useAuth';
 import { isInBulgaria } from '@/lib/serviceArea';
-import { queryKeys } from '@/lib/queryKeys';
-import { supabase } from '@/lib/supabase';
-import { withRequestTimeout } from '@/lib/requestTimeout';
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS } from '@/lib/driverLocation';
 
 type GpsState = { status: 'idle' | 'tracking' | 'stale' | 'error'; error: string };
@@ -21,12 +19,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
   useEffect(() => () => { stopDriverGps(); stopSharedGps(); }, [user?.id]);
   const isDriver = user?.role === 'DRIVER';
   const { data: driver } = useQuery({
-    queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers','none'],
-    queryFn: async ({ signal }) => {
-      const { data, error } = await withRequestTimeout(abort => supabase.from('drivers').select('*').eq('user_id', user!.id).abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return data;
-    },
+    ...driverRecordOptions(user?.id),
     enabled: isDriver, refetchInterval: isDriver ? 15_000 : false, refetchOnWindowFocus: true,
   });
   const [state, setState] = useState<GpsState>({ status: 'idle', error: '' });

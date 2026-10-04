@@ -17,7 +17,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
     mutations: {
-      retry: 1,
+      // A timeout is not proof that a write failed. Confirm ambiguous writes
+      // against the server; only opt into retries for explicitly safe actions.
+      retry: false,
     },
   },
 });

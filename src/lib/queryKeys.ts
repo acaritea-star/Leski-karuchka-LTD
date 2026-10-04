@@ -12,7 +12,8 @@ export const queryKeys = {
   // ── Driver ──
   driverRecord: (userId: string) => ['drivers', 'me', userId] as const,
   driverActiveRequest: (driverId: string) => ['taxi_requests', 'driver', driverId, 'active'] as const,
-  driverTodayStats: (driverId: string) => ['taxi_requests', 'driver', driverId, 'today'] as const,
+  driverRequestSnapshot: (driverId: string, requestId: string) => ['taxi_requests', 'driver', driverId, 'snapshot', requestId] as const,
+  driverTodayStats: (driverId: string, day?: string) => day ? ['taxi_requests', 'driver', driverId, 'today', day] as const : ['taxi_requests', 'driver', driverId, 'today'] as const,
   driverPendingCount: (companyId: string) => ['taxi_requests', 'company', companyId, 'pending-count'] as const,
   driverPendingList: (companyId: string) => ['taxi_requests', 'company', companyId, 'pending-list'] as const,
   driverIncomingRequests: (companyId: string) => ['taxi_requests', 'company', companyId, 'incoming'] as const,
@@ -24,6 +25,6 @@ export const queryKeys = {
   adminVehicles: (companyId: string) => ['vehicles', 'company', companyId] as const,
   adminOrders: (companyId: string) => ['taxi_requests', 'company', companyId] as const,
   adminCustomers: (companyId: string) => ['profiles', 'company', companyId, 'customers'] as const,
-  adminDashboard: (companyId: string) => ['dashboard', companyId] as const,
+  adminDashboard: (companyId: string, day?: string) => day ? ['dashboard', companyId, day] as const : ['dashboard', companyId] as const,
   driverDocuments: (driverId: string) => ['driver_documents', driverId] as const,
 } as const;

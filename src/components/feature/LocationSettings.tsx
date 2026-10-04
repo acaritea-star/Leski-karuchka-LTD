@@ -1,3 +1,4 @@
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -19,14 +20,7 @@ export default function LocationSettings({ driver = false, onOffline }: { driver
   const position = useSyncExternalStore(subscribeGpsState, getGpsPosition, () => null);
   const gps = useDriverGps();
   const client = useQueryClient();
-  const { data: record } = useQuery({
-    queryKey: user?.id ? queryKeys.driverRecord(user.id) : ['drivers', 'none'],
-    queryFn: async ({ signal }) => {
-      const { data, error } = await withRequestTimeout(abort => supabase.from('drivers').select('*').eq('user_id', user!.id).abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return data;
-    }, enabled: driver && !!user?.id,
-  });
+  const { data: record } = useQuery({ ...driverRecordOptions(user?.id), enabled: driver && !!user?.id });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [retryOffline, setRetryOffline] = useState(false);
