@@ -1,16 +1,21 @@
 {
   "brand": "Лески Каручка",
   "website": "https://leskikaruchka.com",
+  "dataController": {
+    "name": "Владимир Атанасов",
+    "country": "България"
+  },
   "legalName": "",
   "registrationNumber": "",
   "registeredAddress": "",
   "correspondenceAddress": "",
-  "email": "info@leski-karuchka.bg",
+  "email": "vladiata39@gmail.com",
   "phone": "+359890005900",
   "vatNumber": "",
   "identityVerified": false,
   "contactsVerified": false,
   "transportModel": "transport-intermediary",
   "termsVersion": "2026-10-03-draft.2",
-  "updatedAt": "3 октомври 2026 г."
+  "privacyVersion": "2026-10-04.1",
+  "updatedAt": "4 октомври 2026 г."
 }

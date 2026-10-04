@@ -507,7 +507,9 @@ export default {
     footer_service_4: "Връзка с местни водачи",
     footer_address: "Левски, област Плевен",
     footer_phone: '+359 89 000 5900',
-    footer_email: 'info@leski-karuchka.bg',
+    footer_email: 'vladiata39@gmail.com',
+    contact_privacy_label: 'Администратор на личните данни',
+    contact_privacy_email: 'За права и искания за изтриване пишете на',
     footer_rights: 'Всички права запазени.',
 
     about_hero_badge: 'За нас',

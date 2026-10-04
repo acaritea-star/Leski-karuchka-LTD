@@ -507,7 +507,9 @@ export default {
     footer_service_4: "Connect with local drivers",
     footer_address: "Levski, Pleven Province",
     footer_phone: '+359 89 000 5900',
-    footer_email: 'info@leski-karuchka.bg',
+    footer_email: 'vladiata39@gmail.com',
+    contact_privacy_label: 'Personal data controller',
+    contact_privacy_email: 'For privacy rights and deletion requests, email',
     footer_rights: 'All rights reserved.',
 
     about_hero_badge: 'About us',

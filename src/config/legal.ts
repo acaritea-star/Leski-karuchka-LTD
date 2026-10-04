@@ -1,7 +1,9 @@
 import configuration from './legalOperator.json';
 
-// Public operator details. Populate only from verified company information.
+// Public controller and contact details supplied by the responsible person.
+// Company verification and the wider release prerequisites remain separate.
 export const legalOperator = configuration;
+export const dataController = { ...configuration.dataController, email: configuration.email };
 export const LEGAL_IDENTITY_READY = configuration.identityVerified
   && configuration.contactsVerified
   && !!configuration.legalName.trim()
