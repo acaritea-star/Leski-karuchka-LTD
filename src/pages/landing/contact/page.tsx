@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useFormSubmit } from '@/pages/landing/components/useFormSubmit';
+import { dataController, legalOperator } from '@/config/legal';
 
 const CONTACT_FORM_URL = 'https://readdy.ai/api/form/d9urfm1kngcel2k3j9e0';
 
@@ -11,7 +12,7 @@ export default function ContactPage() {
 
   const infoCards = [
     { icon: 'ri-phone-line', label: t('landing.contact_phone_label'), value: t('landing.footer_phone'), href: 'tel:+359890005900' },
-    { icon: 'ri-mail-line', label: t('landing.contact_email_label'), value: t('landing.footer_email'), href: 'mailto:info@leski-karuchka.bg' },
+    { icon: 'ri-mail-line', label: t('landing.contact_email_label'), value: legalOperator.email, href: 'mailto:' + legalOperator.email },
     { icon: 'ri-map-pin-2-line', label: t('landing.contact_address_label'), value: t('landing.footer_address') },
     { icon: 'ri-time-line', label: t('landing.contact_hours_label'), value: t('landing.contact_hours_value') },
   ];
@@ -54,6 +55,11 @@ export default function ContactPage() {
               </Reveal>
             ))}
           </div>
+          <p className="mt-6 text-sm text-foreground-700 leading-relaxed">
+            {t('landing.contact_privacy_label')}: {dataController.name}.
+            {' '}{t('landing.contact_privacy_email')} <a className="underline text-primary-700" href={'mailto:' + dataController.email}>{dataController.email}</a>.
+            {' '}<a className="underline text-primary-700" href="/privacy">{t('auth_privacy_label')}</a>
+          </p>
         </div>
       </section>
 

@@ -1,6 +1,12 @@
 # Legal foundation draft — 3 October 2026
 
-The application is in a testing period. Its stated role is a digital intermediary connecting customers with drivers and taxi companies; it does not itself carry passengers or become a party to their transport contract. The legal text remains a review draft while operator details and the prerequisites below are unresolved. A testing-period label is a product status, not a legal certification or an exemption from applicable requirements. The public brand, Levski focus and booking design are retained. The legal pages identify the missing company information rather than inventing an operator.
+The application is in a testing period. Its stated role is a digital intermediary connecting customers with drivers and taxi companies; it does not itself carry passengers or become a party to their transport contract. The wider legal release remains a review draft while commercial operator details and the prerequisites below are unresolved. A testing-period label is a product status, not a legal certification or an exemption from applicable requirements. The public brand, Levski focus and booking design are retained. The public privacy notice identifies the responsible individual confirmed on 4 October; company information is published only after separate verification.
+
+## Public privacy information — 4 October 2026
+
+The responsible person confirmed the personal data controller as **Владимир Атанасов**, Bulgaria, and the monitored contact as **vladiata39@gmail.com**. These are recorded separately from unverified company identity fields in `src/config/legalOperator.json`. The contact is used by the privacy policy, contact page, footer, Bulgarian/English translations and public deletion instructions. The privacy notice has its own version, `2026-10-04.1`, separate from the draft commercial terms.
+
+Deletion requests are submitted by email and individually reviewed. Sending a message does not automatically erase an account. The public instructions remain available without signing in at `/data-deletion.html`; this is an instructions URL, not a deletion callback endpoint. The controller must handle actual requests; public wording alone does not establish a completed deletion process. Supabase deletion implementation, company verification, contracts and release attestations were not changed in this update.
 
 ## What changed
 

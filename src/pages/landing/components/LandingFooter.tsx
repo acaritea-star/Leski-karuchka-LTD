@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LOGO_URL } from '@/lib/logo';
-import { LIABILITY_NOTICE } from '@/config/legal';
+import { legalOperator, LIABILITY_NOTICE } from '@/config/legal';
 import { openCookieSettings } from '@/lib/cookieConsent';
 
 export default function LandingFooter() {
@@ -103,8 +103,8 @@ export default function LandingFooter() {
               </li>
               <li className="flex items-start gap-2.5">
                 <i className="ri-mail-line text-primary-600 mt-0.5" />
-                <a href="mailto:info@leski-karuchka.bg" className="hover:text-primary-600 transition-colors">
-                  {t('landing.footer_email')}
+                <a href={'mailto:' + legalOperator.email} className="hover:text-primary-600 transition-colors break-all">
+                  {legalOperator.email}
                 </a>
               </li>
             </ul>
