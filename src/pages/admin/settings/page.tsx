@@ -3,23 +3,34 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
+import { useAuth } from '@/hooks/useAuth';
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import PrivacyRequests from '@/components/feature/PrivacyRequests';
 
 interface CompanyProfile {
   name: string;
   phone: string;
   email: string;
   address: string;
+  legal_name: string;
+  registration_id: string;
+  permit_number: string;
+  permit_expires_on: string;
+  document_checks_required: boolean;
+  legal_verified_at: string | null;
 }
 
 export default function AdminSettings() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
+  const { user } = useAuth();
 
   const [profile, setProfile] = useState<CompanyProfile>({
     name: '',
     phone: '',
     email: '',
     address: '',
+    legal_name: '', registration_id: '', permit_number: '', permit_expires_on: '', document_checks_required: false, legal_verified_at: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,11 +42,11 @@ export default function AdminSettings() {
     setLoading(true);
     setError('');
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('name, phone, email, address')
+        .select('name, phone, email, address, legal_name, registration_id, permit_number, permit_expires_on, document_checks_required, legal_verified_at')
         .eq('id', companyId)
-        .maybeSingle();
+        .abortSignal(signal).maybeSingle());
 
       if (err) throw err;
       if (data) {
@@ -44,6 +55,8 @@ export default function AdminSettings() {
           phone: data.phone || '',
           email: data.email || '',
           address: data.address || '',
+          legal_name: data.legal_name || '', registration_id: data.registration_id || '', permit_number: data.permit_number || '',
+          permit_expires_on: data.permit_expires_on || '', document_checks_required: data.document_checks_required, legal_verified_at: data.legal_verified_at,
         });
       }
     } catch (err: unknown) {
@@ -65,17 +78,22 @@ export default function AdminSettings() {
     setError('');
     setSaved(false);
     try {
-      const { error: err } = await supabase
+      const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
         .update({
           name: profile.name.trim(),
           phone: profile.phone.trim(),
           email: profile.email.trim(),
           address: profile.address.trim(),
+          legal_name: profile.legal_name.trim() || null, registration_id: profile.registration_id.trim() || null,
+          permit_number: profile.permit_number.trim() || null, permit_expires_on: profile.permit_expires_on || null,
+          document_checks_required: profile.document_checks_required,
+          ...(user?.role === 'SUPER_ADMIN' ? { legal_verified_at: profile.legal_verified_at } : {}),
         })
-        .eq('id', companyId);
+        .eq('id', companyId).select('legal_verified_at').abortSignal(signal).single());
 
       if (err) throw err;
+      setProfile(prev => ({...prev,legal_verified_at:data?.legal_verified_at ?? null}));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: unknown) {
@@ -86,7 +104,7 @@ export default function AdminSettings() {
     }
   };
 
-  const setField = (key: keyof CompanyProfile, value: string) =>
+  const setField = (key: keyof CompanyProfile, value: string | boolean | null) =>
     setProfile((prev) => ({ ...prev, [key]: value }));
 
   return (
@@ -155,6 +173,10 @@ export default function AdminSettings() {
               />
             </div>
 
+            {(['legal_name','registration_id','permit_number','permit_expires_on'] as const).map(key => <label key={key} className="block text-sm font-medium text-foreground-700">{{legal_name:'Юридическо име на превозвача',registration_id:'ЕИК на превозвача',permit_number:'Разрешение / регистрация за превоз',permit_expires_on:'Валидно до'}[key]}<input type={key === 'permit_expires_on' ? 'date' : 'text'} maxLength={key==='registration_id'?13:200} value={profile[key]} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950"/></label>)}
+            <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={profile.document_checks_required} onChange={e=>setField('document_checks_required',e.target.checked)}/>Изисквай одобрена книжка и застраховка с валиден срок за нови заявки</label>
+            <p className="text-xs text-foreground-500">Известните изтекли срокове се проверяват и без тази настройка. Активен курс може да бъде приключен.</p>
+            {user?.role==='SUPER_ADMIN' && <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={!!profile.legal_verified_at} onChange={e=>setField('legal_verified_at',e.target.checked?new Date().toISOString():null)}/>Проверих идентичността и валидността на посоченото разрешение</label>}
             <button
               onClick={handleSave}
               disabled={saving || !profile.name.trim()}
@@ -165,6 +187,7 @@ export default function AdminSettings() {
           </div>
         </div>
       )}
+      {user?.role==='SUPER_ADMIN' && <PrivacyRequests admin/>}
     </AdminLayout>
   );
 }

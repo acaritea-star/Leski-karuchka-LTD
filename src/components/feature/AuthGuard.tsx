@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
+import LegalAcceptanceNotice from './LegalAcceptanceNotice';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -81,5 +82,5 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
     return null;
   }
 
-  return <>{children}</>;
+  return <><LegalAcceptanceNotice />{children}</>;
 }

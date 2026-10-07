@@ -59,7 +59,7 @@ function scheduleRecovery() {
   }, 15_000 * 2 ** recoveryAttempts);
 }
 function startWatch() {
-  if (watchId !== null || permissionBlocked || !listeners.size) return;
+  if (watchId !== null || permissionBlocked || !listeners.size || document.visibilityState === 'hidden') return;
   if (!navigator.geolocation) { report(new Error('Браузърът не поддържа GPS.')); return; }
   const run = watchEpoch;
   const fail = (error: unknown) => {
@@ -85,8 +85,8 @@ function attachLifecycle() {
   let permission: PermissionStatus | undefined;
   let hiddenAt: number | null = null;
   const resume = () => {
-    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
-    if (permissionBlocked || Date.now() - lastRestart < 5000) return;
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); clearWatch(); return; }
+    if (permissionBlocked || watchId !== null && Date.now() - lastRestart < 5000) return;
     const stale = !latest || Date.now() - latest.timestamp >= 30_000;
     const suspended = hiddenAt !== null && Date.now() - hiddenAt > 5000;
     hiddenAt = null;
@@ -111,12 +111,17 @@ function attachLifecycle() {
     }).catch(() => {});
   } catch { /* Permission querying is an optional enhancement. */ }
   document.addEventListener('visibilitychange', resume);
+  const suspend = () => { hiddenAt = Date.now(); clearWatch(); };
+  document.addEventListener('freeze', suspend);
+  window.addEventListener('pagehide', suspend);
   window.addEventListener('pageshow', resume);
   window.addEventListener('online', resume);
   detachLifecycle = () => {
     active = false;
     permission?.removeEventListener?.('change', changed);
     document.removeEventListener('visibilitychange', resume);
+    document.removeEventListener('freeze', suspend);
+    window.removeEventListener('pagehide', suspend);
     window.removeEventListener('pageshow', resume);
     window.removeEventListener('online', resume);
     detachLifecycle = null;

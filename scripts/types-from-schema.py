@@ -36,10 +36,20 @@ for name in sorted(s.get('views',[])):
 a.append('''}; Functions: {
 company_dashboard: { Args: { p_company_id: string; p_day?: string }; Returns: Json };
 driver_day_summary: { Args: { p_driver_id: string; p_day?: string }; Returns: Json };
+nearby_cars: { Args: { p_lat: number; p_lng: number; p_type?: string }; Returns: Json };
+accounting_report: { Args: { p_from: string; p_until: string; p_company_id?: string; p_driver_id?: string; p_page?: number }; Returns: Json };
+record_driver_money: { Args: { p_id: string; p_kind: string; p_amount: number; p_note: string; p_request_id?: string; p_reference_id?: string }; Returns: string };
+
 create_taxi_request: { Args: { p_quote_id: string; p_request_id: string; p_payment_method?: Database["public"]["Enums"]["payment_method"] }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 accept_taxi_request: { Args: { p_request_id: string }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"] };
 register_push_subscription: { Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent?: string }; Returns: undefined };
 request_push_recipients: { Args: { p_request_id: string }; Returns: { user_id: string }[] };
+record_driver_money_verified: { Args: { p_id: string; p_kind: string; p_amount: number; p_note: string; p_actor: string; p_request_id?: string; p_reference_id?: string; p_source?: string; p_evidence_ref?: string }; Returns: string };
+accept_legal_versions: { Args: { p_terms: string; p_privacy: string; p_method: string }; Returns: string };
+carrier_identity: { Args: { p_company: string }; Returns: Json };
+request_personal_data: { Args: { p_kind: string }; Returns: string };
+resolve_privacy_request: { Args: { p_id: string; p_status: string; p_note: string }; Returns: undefined };
+export_my_basic_data: { Args: Record<PropertyKey, never>; Returns: Json };
 }; Enums: {''')
 for name,labels in sorted(enums.items()):a.append(json.dumps(name)+': '+' | '.join(map(json.dumps,labels))+';')
 a+=['}; CompositeTypes: { [_ in never]: never }; }; };','export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];','export type TablesInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];','export type TablesUpdate<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"];','export type Enums<T extends keyof Database["public"]["Enums"]> = Database["public"]["Enums"][T];']

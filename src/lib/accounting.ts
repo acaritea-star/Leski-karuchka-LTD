@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { withRequestTimeout } from './requestTimeout';
 export interface Outcome {
  id: string; request_id: string; driver_id: string | null; driver_name: string;
  outcome: 'completed' | 'cancelled'; previous_status: string; cancelled_by: string | null;
@@ -10,11 +11,13 @@ export interface MoneyEntry {
  kind: 'income' | 'expense' | 'handover' | 'confirmation' | 'reversal'; amount: number;
  note: string; request_id: string | null; reference_id: string | null; recorded_at: string;
  reversed: boolean; confirmed: boolean;
+ evidence_source?: string; evidence_reference?: string | null;
 }
 export interface AccountingReport {
  totals: { completed: number; cancelled: number; interrupted: number; booked: number; missing_amounts: number };
- finances: { income: number; expenses: number; handed_over: number; confirmed_handover: number };
+ finances: { income: number; expenses: number; handed_over: number; confirmed_handover: number; confirmed_income?: number };
  outcome_count: number; entry_count: number; outcomes: Outcome[]; entries: MoneyEntry[];
+ reconciliation?: { request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; difference:number|null }[];
  drivers: { driver_id: string | null; driver_name: string; trips: number; cancelled: number; booked: number }[];
 }
 export function sofiaMonth(now = new Date()): string {
@@ -36,13 +39,12 @@ export const money = (value: number | null) => value == null ? 'Неизвест
 export const reportDate = (value: string) => new Date(value).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 export const stageLabels: Record<string, string> = { pending: 'Преди приемане', accepted: 'На път към клиента', arrived: 'След пристигане', in_progress: 'След начало на пътуването' };
 export const actorLabels: Record<string, string> = { customer: 'Клиент', driver: 'Шофьор', admin: 'Администратор', system: 'Система' };
-export const kindLabels: Record<MoneyEntry['kind'], string> = { income: 'Деклариран приход', expense: 'Деклариран разход', handover: 'Декларирано предаване', confirmation: 'Потвърдено получаване', reversal: 'Обратен запис' };
+export const kindLabels: Record<MoneyEntry['kind'], string> = { income: 'Деклариран приход', expense: 'Деклариран разход', handover: 'Декларирано предаване', confirmation: 'Потвърждение от фирмата', reversal: 'Обратен запис' };
+export const evidenceLabels: Record<string,string> = {declaration:'Деклариран запис',cash_count:'Преброени пари',cash_book:'Касов разчет',receipt:'Разписка / документ',bank_record:'Платежен запис'};
 export const reasonLabels: Record<string, string> = { no_driver: 'Няма наличен шофьор', customer_requested: 'Отказ по желание на клиента', not_provided: 'Без посочена причина' };
 export async function loadAccounting(month: string, scope: { companyId?: string; driverId?: string }, page = 0, signal?: AbortSignal): Promise<AccountingReport> {
  const { from, until } = monthBounds(month);
- let query = supabase.rpc('accounting_report', { p_from: from, p_until: until, p_company_id: scope.companyId, p_driver_id: scope.driverId, p_page: page });
- if (signal) query = query.abortSignal(signal);
- const { data, error } = await query;
+ const { data, error } = await withRequestTimeout(abort => supabase.rpc('accounting_report', { p_from: from, p_until: until, p_company_id: scope.companyId, p_driver_id: scope.driverId, p_page: page }).abortSignal(abort),10_000,signal);
  if (error) throw error;
  return data as unknown as AccountingReport;
 }
@@ -52,8 +54,8 @@ export function csvCell(value: unknown): string {
  return `"${(/^[\s]*[=+@-]/.test(text) ? "'" : '') + text.replace(/"/g, '""')}"`;
 }
 export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[]): string {
- const rows: unknown[][] = [['Вид', 'Шофьор', 'Дата (Europe/Sofia)', 'Заявка', 'Етап/състояние', 'Автор на отказа', 'Сума EUR', 'Бележка', 'Идентификатор', 'Свързан запис']];
- for (const o of outcomes) rows.push([o.outcome === 'completed' ? 'Завършен курс' : 'Отменена заявка', o.driver_name || o.driver_id, new Date(o.occurred_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), o.request_id, stageLabels[o.previous_status] || o.previous_status, actorLabels[o.cancelled_by ?? ''] ?? '', o.outcome === 'completed' ? o.booked_amount : '', `${reasonLabels[o.cancel_reason ?? ''] ?? o.cancel_reason ?? ''}${o.reconstructed ? ' (възстановен стар запис)' : ''}`, o.id, '']);
- for (const e of entries) rows.push([kindLabels[e.kind], e.driver_name || e.driver_id, new Date(e.recorded_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), e.request_id, e.reversed ? 'С обратен запис' : e.confirmed ? 'Потвърдено' : 'Декларирано', '', e.amount, e.note, e.id, e.reference_id]);
+ const rows: unknown[][] = [['Вид', 'Шофьор', 'Дата (Europe/Sofia)', 'Заявка', 'Етап/състояние', 'Автор на отказа', 'Сума EUR', 'Бележка', 'Идентификатор', 'Свързан запис', 'Източник на сверяване', 'Номер / референция']];
+ for (const o of outcomes) rows.push([o.outcome === 'completed' ? 'Завършен курс' : 'Отменена заявка', o.driver_name || o.driver_id, new Date(o.occurred_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), o.request_id, stageLabels[o.previous_status] || o.previous_status, actorLabels[o.cancelled_by ?? ''] ?? '', o.outcome === 'completed' ? o.booked_amount : '', `${reasonLabels[o.cancel_reason ?? ''] ?? o.cancel_reason ?? ''}${o.reconstructed ? ' (възстановен стар запис)' : ''}`, o.id, '', 'Прогнозна стойност', '']);
+ for (const e of entries) rows.push([kindLabels[e.kind], e.driver_name || e.driver_id, new Date(e.recorded_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), e.request_id, e.reversed ? 'С обратен запис' : e.confirmed ? 'Потвърдено' : 'Декларирано', '', e.amount, e.note, e.id, e.reference_id, evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source, e.evidence_reference]);
  return '\uFEFF' + rows.map(row => row.map(csvCell).join(';')).join('\r\n');
 }

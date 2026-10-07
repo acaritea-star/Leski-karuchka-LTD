@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./supabase', () => ({ supabase: {} }));
-import { csvCell, monthBounds, parseMoney, reportCsv, sofiaMonth, type Outcome } from './accounting';
+import { csvCell, monthBounds, parseMoney, reportCsv, sofiaMonth, type Outcome, type MoneyEntry } from './accounting';
 describe('accounting', () => {
  it('uses Sofia month around UTC midnight and handles December rollover', () => {
   expect(sofiaMonth(new Date('2026-09-30T22:00:00Z'))).toBe('2026-10');
@@ -22,5 +22,9 @@ describe('accounting', () => {
   expect(csv).toContain('Отменена заявка');
   expect(csv).not.toContain('999');
   expect(csv).toContain('На път към клиента');
+ });
+ it('exports evidence references without allowing spreadsheet formulas to execute',()=>{
+  const row={id:'entry',kind:'confirmation',amount:10,recorded_at:'2026-10-04T12:00:00Z',evidence_source:'receipt',evidence_reference:'=BAD()',note:'Verified'} as MoneyEntry;
+  const csv=reportCsv([],[row]);expect(csv).toContain('Разписка / документ');expect(csv).toContain('"\'=BAD()"');
  });
 });

@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const { single, upsert, update, updateSingle, readDriver } = vi.hoisted(() => ({single:vi.fn(),upsert:vi.fn(),update:vi.fn(),updateSingle:vi.fn(),readDriver:vi.fn()}));
 vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update,select:()=>({eq:()=>({abortSignal:()=>({maybeSingle:readDriver})})})})}}));
 import { stopSharedGps } from './sharedGps';
+import {bufferGps,readBufferedGps} from './gpsBuffer';
 import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
 type PositionCallback = (position: GeolocationPosition) => void;
@@ -192,4 +193,19 @@ it('shortens an idle deadline as soon as real movement resumes', async () => {
   await vi.advanceTimersByTimeAsync(1000);
   watch({...fix(43.2003),coords:{...fix(43.2003).coords,speed:8}});await flush();
   expect(single).toHaveBeenCalledTimes(2);
+});
+it('recovers a measured fix after page restart only with remembered sharing and granted permission',async()=>{
+ const saved=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value),removeItem:(key:string)=>saved.delete(key)});
+ saved.set('leski:auto-location:owner','on');
+ Object.assign(navigator,{permissions:{query:vi.fn().mockResolvedValue(Object.assign(new EventTarget(),{state:'granted'}))}});
+ const measured={...fix(),timestamp:Date.now()-1000};bufferGps('owner','driver','company',measured);
+ startDriverGps('driver','company',{},'owner');await flush();
+ expect(upsert).toHaveBeenCalledWith(expect.objectContaining({position_at:new Date(measured.timestamp).toISOString()}),expect.anything());
+ expect(readBufferedGps('owner','driver','company')).toBeNull();
+});
+it('does not upload a persisted fix when sharing has been explicitly disabled',async()=>{
+ const saved=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(key:string)=>saved.get(key)??null,setItem:(key:string,value:string)=>saved.set(key,value),removeItem:(key:string)=>saved.delete(key)});
+ saved.set('leski:auto-location:owner','off');bufferGps('owner','driver','company',fix());
+ Object.assign(navigator,{permissions:{query:vi.fn().mockResolvedValue(Object.assign(new EventTarget(),{state:'granted'}))}});
+ expect(startDriverGps('driver','company',{},'owner')).toBe(false);await flush();expect(upsert).not.toHaveBeenCalled();
 });

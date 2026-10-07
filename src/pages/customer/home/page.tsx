@@ -495,6 +495,7 @@ export default function CustomerHome() {
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
         {step === 'confirm' && pickup && destination
           ? <BookingCard pickup={pickup} destination={destination}
+            companyId={vehicleTypes.find(v => v.id === vehicleType)?.company_id}
             onFieldClick={handleFieldClick} onSwap={swapLocations}
             vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
             vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active }))}

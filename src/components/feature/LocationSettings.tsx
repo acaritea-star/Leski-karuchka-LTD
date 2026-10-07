@@ -74,6 +74,7 @@ export default function LocationSettings({ driver = false, onOffline }: { driver
         <div><p className="text-sm font-medium text-foreground-800">{en ? 'Use location automatically' : 'Използвай местоположението автоматично'}</p>
           <p className="text-xs text-foreground-400 mt-1">{en ? 'Saved for this account on this device. Your browser controls GPS permission.' : 'Запомня се за този профил на това устройство. Разрешението за GPS се управлява от браузъра.'}</p>
           {driver && <p className="text-xs text-foreground-400 mt-1">{en ? 'Turning off stops location sharing and takes you offline for new requests. Your active trip stays open.' : 'Изключването спира споделянето и те извежда офлайн за нови заявки. Активният курс остава отворен.'}</p>}
+          {driver && <p className="text-xs text-foreground-400 mt-1">{en ? 'Keep the app visible while online. A locked screen may pause browser GPS. Position is refreshed when you return.' : 'Дръж приложението отворено, докато си онлайн. Заключеният екран може да паузира GPS в браузъра. При връщане позицията се обновява.'}</p>}
         </div>
       </div>
       <button type="button" role="switch" aria-label={en ? 'Use location automatically' : 'Използвай местоположението автоматично'} aria-checked={enabled === true}

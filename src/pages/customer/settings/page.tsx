@@ -1,4 +1,5 @@
 import LocationSettings from '@/components/feature/LocationSettings';
+import PrivacyRequests from '@/components/feature/PrivacyRequests';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -178,6 +179,7 @@ export default function CustomerSettings() {
           </div>
         </section>
 
+        <PrivacyRequests />
         <div className="h-8" />
       </div>
     </div>

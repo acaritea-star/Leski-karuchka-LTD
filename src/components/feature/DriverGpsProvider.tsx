@@ -51,6 +51,11 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       const stats = getGpsStats();
       if (stats.lastWriteAgeMs >= GPS_STALE_MS || stats.lastConfirmedFixAgeMs >= GPS_STALE_MS) setState({ status: 'stale', error: stats.error || 'Локацията не се обновява. Провери GPS и интернета.' });
     }, 5000);
+    const visibility = () => setState({ status: 'stale', error: document.visibilityState === 'hidden'
+      ? 'GPS е паузиран, докато приложението е скрито. Отворете го отново за актуална позиция.'
+      : 'Възстановяване на актуалната позиция…' });
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pageshow', visibility);
     let lock: WakeLockSentinel | null = null;
     let alive = true;
     let acquiring = false;
@@ -68,6 +73,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     void wake(); document.addEventListener('visibilitychange', wake); window.addEventListener('pageshow', wake);
     return () => {
       alive = false; stopDriverGps(); clearInterval(timer);
+      document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility);
       document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
   }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation]);

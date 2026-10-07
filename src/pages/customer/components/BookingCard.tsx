@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { FareBreakdown } from '@/lib/pricing';
+import CarrierIdentity from '@/components/feature/CarrierIdentity';
 
 export interface BookingLocation { address: string; lat: number; lng: number }
 export interface VehicleOption { id: string; name: string; capacity: number; available: boolean }
 
 interface BookingCardProps {
+  companyId?: string;
   pickup: BookingLocation;
   destination: BookingLocation;
   onFieldClick: (field: 'pickup' | 'dest') => void;
@@ -71,6 +73,7 @@ export default function BookingCard(props: BookingCardProps) {
         {t('booking_legal_notice')} <Link to="/terms" className="underline text-primary-700">{t('menu_terms')}</Link>
         {' · '}<Link to="/privacy" className="underline text-primary-700">{t('menu_privacy')}</Link>
       </p>
+      <CarrierIdentity companyId={props.companyId} />
     </div>
     <button type="button" className="booking-primary" disabled={!props.canRequest || props.creating}
       onClick={props.onRequest} aria-busy={props.creating}>

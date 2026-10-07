@@ -2,20 +2,22 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), report: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), report: vi.fn(), lookup:vi.fn() }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id:'user' } }) }));
-vi.mock('@/lib/supabase', () => ({ supabase: { rpc: mocks.rpc } }));
+vi.mock('@/lib/supabase', () => ({ supabase: { rpc: mocks.rpc,from:()=>({select:()=>({eq:()=>({eq:()=>({abortSignal:()=>({maybeSingle:mocks.lookup})})})})}) } }));
 vi.mock('@/lib/accounting', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/accounting')>(), loadAccounting: mocks.report }));
 import AccountingPanel from './AccountingPanel';
 const report = { totals:{completed:2,cancelled:1,interrupted:0,booked:30,missing_amounts:0},finances:{income:0,expenses:0,handed_over:0,confirmed_handover:0},outcome_count:0,entry_count:0,outcomes:[],entries:[],drivers:[] };
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.clearAllMocks(); });
 function mount(company = false) {
  mocks.report.mockResolvedValue(report);
  const client = new QueryClient({ defaultOptions:{ queries:{retry:false},mutations:{retry:false} } });
  render(<QueryClientProvider client={client}><AccountingPanel {...company ? { companyId:'company' } : { driverId:'driver' }} /></QueryClientProvider>);
 }
 it('retries an uncertain write with the same operation ID instead of duplicating cash', async () => {
- mocks.rpc.mockResolvedValueOnce({ error:{message:'network failure'} }).mockResolvedValueOnce({error:null});
+ mocks.lookup.mockResolvedValue({data:null,error:null});
+ mocks.rpc.mockImplementationOnce(()=>({abortSignal:()=>Promise.resolve({error:{message:'network failure'}})}))
+  .mockImplementationOnce((_name,command)=>({abortSignal:()=>Promise.resolve({data:command.p_id,error:null})}));
  mount();
  await screen.findByText('Моите сметки');
  fireEvent.change(screen.getByLabelText('Сума в евро'), {target:{value:'12,50'}});

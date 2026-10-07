@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { socialAuthErrorKey } from '@/lib/socialAuth';
+import { finishLegalIntent } from '@/lib/legalAcceptance';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -39,13 +40,14 @@ export default function AuthCallback() {
             return;
           }
           if (!data.session) { setErrorKey('auth_callback_missing'); return; }
+          await finishLegalIntent();
           navigate('/app', { replace: true });
           return;
         }
 
         const { data, error } = await supabase.auth.getSession();
         if (error) { setErrorKey(socialAuthErrorKey(error)); return; }
-        if (data.session) { navigate('/app', { replace: true }); return; }
+        if (data.session) { await finishLegalIntent(); navigate('/app', { replace: true }); return; }
         setErrorKey('auth_callback_missing');
       } catch (error) {
         setErrorKey(socialAuthErrorKey(error));

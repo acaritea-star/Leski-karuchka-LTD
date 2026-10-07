@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import CustomerHome from './page';
@@ -42,7 +43,7 @@ const pickup = { id: 'a', name: 'Начало', address: 'ул. Иван Ваз�
 const destination = { id: 'b', name: 'Край', address: 'Гара, Левски', lat: 43.36, lng: 25.13 };
 const quote = (): RouteResult => ({ success: true, quote_id: 'quote', quote_expires_at: new Date(Date.now() + 60_000).toISOString(),
   breakdown: calculateFare({ distanceKm: 1.7, durationMin: 5 }), distance_km: 1.7, duration_min: 5, duration_sec: 300, polyline: '', legs: [], alternatives_count: 0 });
-const mount = async () => { render(<MemoryRouter><CustomerHome /></MemoryRouter>); await act(async () => {}); };
+const mount = async () => { const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});render(<QueryClientProvider client={client}><MemoryRouter><CustomerHome /></MemoryRouter></QueryClientProvider>); await act(async () => {}); };
 const chooseRoute = async () => {
   fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
   fireEvent.click(screen.getByRole('button', { name: /Край/ }));

@@ -147,54 +147,43 @@
   ],
   "columns": [
     {
-      "table_name": "push_subscriptions",
-      "column_name": "is_active",
-      "ordinal_position": 9,
+      "table_name": "app_config",
+      "column_name": "id",
+      "ordinal_position": 1,
       "is_nullable": "NO",
-      "column_default": "true",
+      "column_default": "1",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
+      "data_type": "integer",
+      "udt_name": "int4"
     },
     {
-      "table_name": "ride_quotes",
-      "column_name": "request_id",
-      "ordinal_position": 8,
+      "table_name": "app_config",
+      "column_name": "vapid_public_key",
+      "ordinal_position": 2,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "request_declines",
-      "column_name": "request_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "request_declines",
-      "column_name": "driver_id",
+      "table_name": "app_config",
+      "column_name": "vapid_private_key",
       "ordinal_position": 3,
-      "is_nullable": "NO",
+      "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "request_declines",
+      "table_name": "app_config",
       "column_name": "created_at",
       "ordinal_position": 4,
-      "is_nullable": "NO",
+      "is_nullable": "YES",
       "column_default": "now()",
       "is_identity": "NO",
       "is_generated": "NEVER",
@@ -202,7 +191,18 @@
       "udt_name": "timestamptz"
     },
     {
-      "table_name": "news_articles",
+      "table_name": "app_config",
+      "column_name": "updated_at",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "audit_log",
       "column_name": "id",
       "ordinal_position": 1,
       "is_nullable": "NO",
@@ -213,40 +213,84 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "saved_places",
-      "column_name": "longitude",
+      "table_name": "audit_log",
+      "column_name": "company_id",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "audit_log",
+      "column_name": "actor_id",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "audit_log",
+      "column_name": "entity_type",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "audit_log",
+      "column_name": "entity_id",
       "ordinal_position": 5,
       "is_nullable": "NO",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
+      "data_type": "uuid",
+      "udt_name": "uuid"
     },
     {
-      "table_name": "saved_places",
-      "column_name": "is_home",
+      "table_name": "audit_log",
+      "column_name": "action",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "audit_log",
+      "column_name": "old_value",
       "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "false",
+      "is_nullable": "YES",
+      "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
+      "data_type": "jsonb",
+      "udt_name": "jsonb"
     },
     {
-      "table_name": "saved_places",
-      "column_name": "is_work",
+      "table_name": "audit_log",
+      "column_name": "new_value",
       "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "false",
+      "is_nullable": "YES",
+      "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
+      "data_type": "jsonb",
+      "udt_name": "jsonb"
     },
     {
-      "table_name": "saved_places",
+      "table_name": "audit_log",
       "column_name": "created_at",
       "ordinal_position": 9,
       "is_nullable": "NO",
@@ -255,6 +299,281 @@
       "is_generated": "NEVER",
       "data_type": "timestamp with time zone",
       "udt_name": "timestamptz"
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "companies",
+      "column_name": "id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "gen_random_uuid()",
+      "ordinal_position": 1
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "name",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 2
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "slug",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 3
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "logo_url",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 4
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "brand_color_primary",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": "'#E8B42D'::text",
+      "ordinal_position": 5
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "brand_color_secondary",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": "'#1F2937'::text",
+      "ordinal_position": 6
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "phone",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 7
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "email",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 8
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "address",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 9
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "currency",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "'EUR'::text",
+      "ordinal_position": 10
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "companies",
+      "column_name": "base_fare",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "0",
+      "ordinal_position": 11
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "companies",
+      "column_name": "price_per_km",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "0",
+      "ordinal_position": 12
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "companies",
+      "column_name": "price_per_minute",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "0",
+      "ordinal_position": 13
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "companies",
+      "column_name": "min_fare",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "0",
+      "ordinal_position": 14
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "companies",
+      "column_name": "dispatch_radius_km",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "5",
+      "ordinal_position": 15
+    },
+    {
+      "udt_name": "bool",
+      "data_type": "boolean",
+      "table_name": "companies",
+      "column_name": "is_active",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "true",
+      "ordinal_position": 16
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "companies",
+      "column_name": "created_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "now()",
+      "ordinal_position": 17
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "companies",
+      "column_name": "updated_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "now()",
+      "ordinal_position": 18
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "legal_name",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 19
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "registration_id",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 20
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "companies",
+      "column_name": "permit_number",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 21
+    },
+    {
+      "udt_name": "date",
+      "data_type": "date",
+      "table_name": "companies",
+      "column_name": "permit_expires_on",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 22
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "companies",
+      "column_name": "legal_verified_at",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 23
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "companies",
+      "column_name": "legal_verified_by",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 24
+    },
+    {
+      "udt_name": "bool",
+      "data_type": "boolean",
+      "table_name": "companies",
+      "column_name": "document_checks_required",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "false",
+      "ordinal_position": 25
     },
     {
       "table_name": "coupons",
@@ -277,6 +596,17 @@
       "is_generated": "NEVER",
       "data_type": "uuid",
       "udt_name": "uuid"
+    },
+    {
+      "table_name": "coupons",
+      "column_name": "code",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
       "table_name": "coupons",
@@ -367,7 +697,381 @@
       "udt_name": "bool"
     },
     {
+      "udt_name": "uuid",
+      "data_type": "uuid",
       "table_name": "driver_documents",
+      "column_name": "id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "gen_random_uuid()",
+      "ordinal_position": 1
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_documents",
+      "column_name": "driver_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 2
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_documents",
+      "column_name": "company_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 3
+    },
+    {
+      "udt_name": "document_type",
+      "data_type": "USER-DEFINED",
+      "table_name": "driver_documents",
+      "column_name": "type",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 4
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_documents",
+      "column_name": "file_url",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 5
+    },
+    {
+      "udt_name": "document_status",
+      "data_type": "USER-DEFINED",
+      "table_name": "driver_documents",
+      "column_name": "status",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "'pending'::document_status",
+      "ordinal_position": 6
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "driver_documents",
+      "column_name": "reviewed_at",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 7
+    },
+    {
+      "udt_name": "date",
+      "data_type": "date",
+      "table_name": "driver_documents",
+      "column_name": "expires_at",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 8
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "driver_documents",
+      "column_name": "created_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "now()",
+      "ordinal_position": 9
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_documents",
+      "column_name": "reviewed_by",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 10
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "driver_id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "company_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "latitude",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "longitude",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "heading",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": "0",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "speed",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": "0",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "accuracy",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": "0",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "updated_at",
+      "ordinal_position": 8,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "geo",
+      "ordinal_position": 9,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "ALWAYS",
+      "data_type": "USER-DEFINED",
+      "udt_name": "geography"
+    },
+    {
+      "table_name": "driver_locations",
+      "column_name": "position_at",
+      "ordinal_position": 10,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 1
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "company_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 2
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "driver_id",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 3
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "driver_user_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 4
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "actor_id",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 5
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_money_entries",
+      "column_name": "kind",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 6
+    },
+    {
+      "udt_name": "numeric",
+      "data_type": "numeric",
+      "table_name": "driver_money_entries",
+      "column_name": "amount",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 7
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_money_entries",
+      "column_name": "currency",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "'EUR'::text",
+      "ordinal_position": 8
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_money_entries",
+      "column_name": "note",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 9
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "request_id",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 10
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "driver_money_entries",
+      "column_name": "reference_id",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 11
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "driver_money_entries",
+      "column_name": "recorded_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "clock_timestamp()",
+      "ordinal_position": 12
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_money_entries",
+      "column_name": "evidence_source",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "'declaration'::text",
+      "ordinal_position": 13
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "driver_money_entries",
+      "column_name": "evidence_reference",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 14
+    },
+    {
+      "table_name": "drivers",
       "column_name": "id",
       "ordinal_position": 1,
       "is_nullable": "NO",
@@ -378,8 +1082,8 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "driver_documents",
-      "column_name": "driver_id",
+      "table_name": "drivers",
+      "column_name": "user_id",
       "ordinal_position": 2,
       "is_nullable": "NO",
       "column_default": null,
@@ -389,7 +1093,7 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "driver_documents",
+      "table_name": "drivers",
       "column_name": "company_id",
       "ordinal_position": 3,
       "is_nullable": "NO",
@@ -400,31 +1104,581 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "driver_documents",
+      "table_name": "drivers",
+      "column_name": "vehicle_id",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "is_online",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "is_verified",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "rating",
+      "ordinal_position": 7,
+      "is_nullable": "NO",
+      "column_default": "5.00",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "numeric",
+      "udt_name": "numeric"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "total_trips",
+      "ordinal_position": 8,
+      "is_nullable": "NO",
+      "column_default": "0",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "status",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "'offline'::driver_status",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "USER-DEFINED",
+      "udt_name": "driver_status"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "created_at",
+      "ordinal_position": 10,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "drivers",
+      "column_name": "updated_at",
+      "ordinal_position": 11,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "f_table_catalog",
+      "ordinal_position": 1,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "f_table_schema",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "f_table_name",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "f_geography_column",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "coord_dimension",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "geography_columns",
+      "column_name": "srid",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "geography_columns",
       "column_name": "type",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "f_table_catalog",
+      "ordinal_position": 1,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "character varying",
+      "udt_name": "varchar"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "f_table_schema",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "f_table_name",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "f_geometry_column",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "name",
+      "udt_name": "name"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "coord_dimension",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "srid",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "geometry_columns",
+      "column_name": "type",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "character varying",
+      "udt_name": "varchar"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "company_id",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "transaction_id",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "account",
       "ordinal_position": 4,
       "is_nullable": "NO",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "document_type"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "driver_documents",
-      "column_name": "status",
-      "ordinal_position": 6,
+      "table_name": "ledger",
+      "column_name": "entry_type",
+      "ordinal_position": 5,
       "is_nullable": "NO",
-      "column_default": "'pending'::document_status",
+      "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "document_status"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "driver_documents",
-      "column_name": "reviewed_at",
+      "table_name": "ledger",
+      "column_name": "amount",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "numeric",
+      "udt_name": "numeric"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "currency",
       "ordinal_position": 7,
+      "is_nullable": "NO",
+      "column_default": "'EUR'::text",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "description",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "balance_after",
+      "ordinal_position": 9,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "numeric",
+      "udt_name": "numeric"
+    },
+    {
+      "table_name": "ledger",
+      "column_name": "created_at",
+      "ordinal_position": 10,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "legal_acceptances",
+      "column_name": "id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "gen_random_uuid()",
+      "ordinal_position": 1
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "legal_acceptances",
+      "column_name": "user_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 2
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "legal_acceptances",
+      "column_name": "terms_version",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 3
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "legal_acceptances",
+      "column_name": "privacy_version",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 4
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "legal_acceptances",
+      "column_name": "source_digest",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 5
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "legal_acceptances",
+      "column_name": "method",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 6
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "legal_acceptances",
+      "column_name": "accepted_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "clock_timestamp()",
+      "ordinal_position": 7
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "title",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "slug",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "excerpt",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "content",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "category",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "featured_image_url",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "featured_image_alt",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "author_name",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "'Лески Каручка'::text",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "status",
+      "ordinal_position": 10,
+      "is_nullable": "NO",
+      "column_default": "'draft'::text",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "is_featured",
+      "ordinal_position": 11,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "seo_title",
+      "ordinal_position": 12,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "seo_description",
+      "ordinal_position": 13,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "published_at",
+      "ordinal_position": 14,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
@@ -433,18 +1687,183 @@
       "udt_name": "timestamptz"
     },
     {
-      "table_name": "driver_documents",
-      "column_name": "expires_at",
-      "ordinal_position": 8,
+      "table_name": "news_articles",
+      "column_name": "created_at",
+      "ordinal_position": 15,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "updated_at",
+      "ordinal_position": 16,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "title_en",
+      "ordinal_position": 17,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "date",
-      "udt_name": "date"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "driver_documents",
+      "table_name": "news_articles",
+      "column_name": "excerpt_en",
+      "ordinal_position": 18,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "content_en",
+      "ordinal_position": 19,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "category_en",
+      "ordinal_position": 20,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "seo_title_en",
+      "ordinal_position": 21,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "news_articles",
+      "column_name": "seo_description_en",
+      "ordinal_position": 22,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "user_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "company_id",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "type",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "title",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "message",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "data",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "jsonb",
+      "udt_name": "jsonb"
+    },
+    {
+      "table_name": "notifications",
+      "column_name": "is_read",
+      "ordinal_position": 8,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "notifications",
       "column_name": "created_at",
       "ordinal_position": 9,
       "is_nullable": "NO",
@@ -453,6 +1872,798 @@
       "is_generated": "NEVER",
       "data_type": "timestamp with time zone",
       "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "request_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "company_id",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "amount",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "numeric",
+      "udt_name": "numeric"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "method",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "USER-DEFINED",
+      "udt_name": "payment_method"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "status",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": "'pending'::transaction_status",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "USER-DEFINED",
+      "udt_name": "transaction_status"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "provider",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "provider_ref",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "paid_at",
+      "ordinal_position": 9,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "payment_transactions",
+      "column_name": "created_at",
+      "ordinal_position": 10,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "privacy_requests",
+      "column_name": "id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "gen_random_uuid()",
+      "ordinal_position": 1
+    },
+    {
+      "udt_name": "uuid",
+      "data_type": "uuid",
+      "table_name": "privacy_requests",
+      "column_name": "user_id",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 2
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "privacy_requests",
+      "column_name": "kind",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 3
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "privacy_requests",
+      "column_name": "status",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "'pending'::text",
+      "ordinal_position": 4
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "privacy_requests",
+      "column_name": "created_at",
+      "is_identity": "NO",
+      "is_nullable": "NO",
+      "is_generated": "NEVER",
+      "column_default": "clock_timestamp()",
+      "ordinal_position": 5
+    },
+    {
+      "udt_name": "timestamptz",
+      "data_type": "timestamp with time zone",
+      "table_name": "privacy_requests",
+      "column_name": "resolved_at",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 6
+    },
+    {
+      "udt_name": "text",
+      "data_type": "text",
+      "table_name": "privacy_requests",
+      "column_name": "resolution",
+      "is_identity": "NO",
+      "is_nullable": "YES",
+      "is_generated": "NEVER",
+      "column_default": null,
+      "ordinal_position": 7
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "first_name",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "last_name",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "phone",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "email",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "avatar_url",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "role",
+      "ordinal_position": 7,
+      "is_nullable": "NO",
+      "column_default": "'CUSTOMER'::user_role",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "USER-DEFINED",
+      "udt_name": "user_role"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "company_id",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "is_active",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "true",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "created_at",
+      "ordinal_position": 10,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "updated_at",
+      "ordinal_position": 11,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "language",
+      "ordinal_position": 12,
+      "is_nullable": "NO",
+      "column_default": "'bg'::text",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "user_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "endpoint",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "p256dh",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "auth",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "user_agent",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "created_at",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "updated_at",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "push_subscriptions",
+      "column_name": "is_active",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "true",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "request_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "company_id",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "customer_id",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "driver_id",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "score",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "feedback",
+      "ordinal_position": 7,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "ratings",
+      "column_name": "created_at",
+      "ordinal_position": 8,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "request_declines",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "request_declines",
+      "column_name": "request_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "request_declines",
+      "column_name": "driver_id",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "request_declines",
+      "column_name": "created_at",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "customer_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "company_id",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "vehicle_type_id",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "payload",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "jsonb",
+      "udt_name": "jsonb"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "created_at",
+      "ordinal_position": 6,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "expires_at",
+      "ordinal_position": 7,
+      "is_nullable": "NO",
+      "column_default": "(now() + '00:02:00'::interval)",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "ride_quotes",
+      "column_name": "request_id",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "id",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "user_id",
+      "ordinal_position": 2,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "name",
+      "ordinal_position": 3,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "latitude",
+      "ordinal_position": 4,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "longitude",
+      "ordinal_position": 5,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "double precision",
+      "udt_name": "float8"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "address",
+      "ordinal_position": 6,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "is_home",
+      "ordinal_position": 7,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "is_work",
+      "ordinal_position": 8,
+      "is_nullable": "NO",
+      "column_default": "false",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "boolean",
+      "udt_name": "bool"
+    },
+    {
+      "table_name": "saved_places",
+      "column_name": "created_at",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
+    },
+    {
+      "table_name": "spatial_ref_sys",
+      "column_name": "srid",
+      "ordinal_position": 1,
+      "is_nullable": "NO",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "spatial_ref_sys",
+      "column_name": "auth_name",
+      "ordinal_position": 2,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "character varying",
+      "udt_name": "varchar"
+    },
+    {
+      "table_name": "spatial_ref_sys",
+      "column_name": "auth_srid",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "spatial_ref_sys",
+      "column_name": "srtext",
+      "ordinal_position": 4,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "character varying",
+      "udt_name": "varchar"
+    },
+    {
+      "table_name": "spatial_ref_sys",
+      "column_name": "proj4text",
+      "ordinal_position": 5,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "character varying",
+      "udt_name": "varchar"
     },
     {
       "table_name": "taxi_requests",
@@ -533,6 +2744,17 @@
     },
     {
       "table_name": "taxi_requests",
+      "column_name": "pickup_address",
+      "ordinal_position": 8,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "taxi_requests",
       "column_name": "destination_latitude",
       "ordinal_position": 9,
       "is_nullable": "YES",
@@ -552,6 +2774,17 @@
       "is_generated": "NEVER",
       "data_type": "double precision",
       "udt_name": "float8"
+    },
+    {
+      "table_name": "taxi_requests",
+      "column_name": "destination_address",
+      "ordinal_position": 11,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
       "table_name": "taxi_requests",
@@ -687,6 +2920,17 @@
     },
     {
       "table_name": "taxi_requests",
+      "column_name": "cancel_reason",
+      "ordinal_position": 24,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "taxi_requests",
       "column_name": "cancelled_by",
       "ordinal_position": 25,
       "is_nullable": "YES",
@@ -741,1023 +2985,11 @@
       "udt_name": "int4"
     },
     {
-      "table_name": "audit_log",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "company_id",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "actor_id",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "entity_id",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "old_value",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "jsonb",
-      "udt_name": "jsonb"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "new_value",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "jsonb",
-      "udt_name": "jsonb"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "created_at",
-      "ordinal_position": 9,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "company_id",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "transaction_id",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "amount",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "balance_after",
-      "ordinal_position": 9,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "created_at",
-      "ordinal_position": 10,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "user_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "created_at",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "updated_at",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "app_config",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "1",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "app_config",
-      "column_name": "created_at",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "app_config",
-      "column_name": "updated_at",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "customer_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "company_id",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "vehicle_type_id",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "payload",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "jsonb",
-      "udt_name": "jsonb"
-    },
-    {
-      "table_name": "ride_quotes",
-      "column_name": "created_at",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "ride_quotes",
+      "table_name": "taxi_requests",
       "column_name": "expires_at",
-      "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "(now() + '00:02:00'::interval)",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "request_declines",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "is_featured",
-      "ordinal_position": 11,
-      "is_nullable": "NO",
-      "column_default": "false",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "published_at",
-      "ordinal_position": 14,
+      "ordinal_position": 30,
       "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "created_at",
-      "ordinal_position": 15,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "updated_at",
-      "ordinal_position": 16,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "role",
-      "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "'CUSTOMER'::user_role",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "user_role"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "company_id",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "is_active",
-      "ordinal_position": 9,
-      "is_nullable": "NO",
-      "column_default": "true",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "created_at",
-      "ordinal_position": 10,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "updated_at",
-      "ordinal_position": 11,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "coord_dimension",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "srid",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "coord_dimension",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "srid",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "spatial_ref_sys",
-      "column_name": "srid",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "spatial_ref_sys",
-      "column_name": "auth_srid",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "base_fare",
-      "ordinal_position": 11,
-      "is_nullable": "NO",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "price_per_km",
-      "ordinal_position": 12,
-      "is_nullable": "NO",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "price_per_minute",
-      "ordinal_position": 13,
-      "is_nullable": "NO",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "min_fare",
-      "ordinal_position": 14,
-      "is_nullable": "NO",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "dispatch_radius_km",
-      "ordinal_position": 15,
-      "is_nullable": "NO",
-      "column_default": "5",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "is_active",
-      "ordinal_position": 16,
-      "is_nullable": "NO",
-      "column_default": "true",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "created_at",
-      "ordinal_position": 17,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "updated_at",
-      "ordinal_position": 18,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "company_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "capacity",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": "4",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "multiplier",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": "1.00",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "is_active",
-      "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "true",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "created_at",
-      "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "updated_at",
-      "ordinal_position": 9,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "company_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "vehicle_type_id",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "year",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "capacity",
-      "ordinal_position": 9,
-      "is_nullable": "NO",
-      "column_default": "4",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "insurance_expiry_date",
-      "ordinal_position": 10,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "date",
-      "udt_name": "date"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "inspection_expiry_date",
-      "ordinal_position": 11,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "date",
-      "udt_name": "date"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "is_active",
-      "ordinal_position": 12,
-      "is_nullable": "NO",
-      "column_default": "true",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "created_at",
-      "ordinal_position": 13,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "vehicles",
-      "column_name": "updated_at",
-      "ordinal_position": 14,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "request_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "company_id",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "customer_id",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "driver_id",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "score",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "integer",
-      "udt_name": "int4"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "created_at",
-      "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "driver_id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "company_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "latitude",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "longitude",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "heading",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "speed",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "accuracy",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": "0",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "updated_at",
-      "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "geo",
-      "ordinal_position": 9,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "ALWAYS",
-      "data_type": "USER-DEFINED",
-      "udt_name": "geography"
-    },
-    {
-      "table_name": "driver_locations",
-      "column_name": "position_at",
-      "ordinal_position": 10,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "user_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "company_id",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "data",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "jsonb",
-      "udt_name": "jsonb"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "is_read",
-      "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "false",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "created_at",
-      "ordinal_position": 9,
-      "is_nullable": "NO",
-      "column_default": "now()",
+      "column_default": "(clock_timestamp() + '00:02:00'::interval)",
       "is_identity": "NO",
       "is_generated": "NEVER",
       "data_type": "timestamp with time zone",
@@ -1896,7 +3128,7 @@
       "udt_name": "timestamptz"
     },
     {
-      "table_name": "drivers",
+      "table_name": "vehicle_types",
       "column_name": "id",
       "ordinal_position": 1,
       "is_nullable": "NO",
@@ -1907,8 +3139,8 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "drivers",
-      "column_name": "user_id",
+      "table_name": "vehicle_types",
+      "column_name": "company_id",
       "ordinal_position": 2,
       "is_nullable": "NO",
       "column_default": null,
@@ -1918,224 +3150,37 @@
       "udt_name": "uuid"
     },
     {
-      "table_name": "drivers",
-      "column_name": "company_id",
+      "table_name": "vehicle_types",
+      "column_name": "name",
       "ordinal_position": 3,
       "is_nullable": "NO",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
+      "data_type": "text",
+      "udt_name": "text"
     },
     {
-      "table_name": "drivers",
-      "column_name": "vehicle_id",
+      "table_name": "vehicle_types",
+      "column_name": "capacity",
       "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "is_online",
-      "ordinal_position": 5,
       "is_nullable": "NO",
-      "column_default": "false",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "is_verified",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": "false",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "boolean",
-      "udt_name": "bool"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "rating",
-      "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "5.00",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "numeric",
-      "udt_name": "numeric"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "total_trips",
-      "ordinal_position": 8,
-      "is_nullable": "NO",
-      "column_default": "0",
+      "column_default": "4",
       "is_identity": "NO",
       "is_generated": "NEVER",
       "data_type": "integer",
       "udt_name": "int4"
     },
     {
-      "table_name": "drivers",
-      "column_name": "status",
-      "ordinal_position": 9,
+      "table_name": "vehicle_types",
+      "column_name": "multiplier",
+      "ordinal_position": 5,
       "is_nullable": "NO",
-      "column_default": "'offline'::driver_status",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "driver_status"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "created_at",
-      "ordinal_position": 10,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "drivers",
-      "column_name": "updated_at",
-      "ordinal_position": 11,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "request_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "company_id",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "amount",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
+      "column_default": "1.00",
       "is_identity": "NO",
       "is_generated": "NEVER",
       "data_type": "numeric",
       "udt_name": "numeric"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "method",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "payment_method"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "status",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": "'pending'::transaction_status",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "USER-DEFINED",
-      "udt_name": "transaction_status"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "paid_at",
-      "ordinal_position": 9,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "created_at",
-      "ordinal_position": 10,
-      "is_nullable": "NO",
-      "column_default": "now()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "timestamp with time zone",
-      "udt_name": "timestamptz"
-    },
-    {
-      "table_name": "saved_places",
-      "column_name": "id",
-      "ordinal_position": 1,
-      "is_nullable": "NO",
-      "column_default": "gen_random_uuid()",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "saved_places",
-      "column_name": "user_id",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "uuid",
-      "udt_name": "uuid"
-    },
-    {
-      "table_name": "saved_places",
-      "column_name": "latitude",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "double precision",
-      "udt_name": "float8"
     },
     {
       "table_name": "vehicle_types",
@@ -2149,301 +3194,70 @@
       "udt_name": "text"
     },
     {
-      "table_name": "news_articles",
-      "column_name": "slug",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "excerpt",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "content",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "category",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "featured_image_url",
+      "table_name": "vehicle_types",
+      "column_name": "is_active",
       "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
+      "is_nullable": "NO",
+      "column_default": "true",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "boolean",
+      "udt_name": "bool"
     },
     {
-      "table_name": "news_articles",
-      "column_name": "featured_image_alt",
+      "table_name": "vehicle_types",
+      "column_name": "created_at",
       "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
+      "is_nullable": "NO",
+      "column_default": "now()",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
     },
     {
-      "table_name": "news_articles",
-      "column_name": "author_name",
+      "table_name": "vehicle_types",
+      "column_name": "updated_at",
       "ordinal_position": 9,
       "is_nullable": "NO",
-      "column_default": "'Лески Каручка'::text",
+      "column_default": "now()",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
     },
     {
-      "table_name": "news_articles",
-      "column_name": "status",
-      "ordinal_position": 10,
+      "table_name": "vehicles",
+      "column_name": "id",
+      "ordinal_position": 1,
       "is_nullable": "NO",
-      "column_default": "'draft'::text",
+      "column_default": "gen_random_uuid()",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "uuid",
+      "udt_name": "uuid"
     },
     {
-      "table_name": "payment_transactions",
-      "column_name": "provider_ref",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "seo_title",
-      "ordinal_position": 12,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "seo_description",
-      "ordinal_position": 13,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "entity_type",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "currency",
-      "ordinal_position": 7,
-      "is_nullable": "NO",
-      "column_default": "'EUR'::text",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "audit_log",
-      "column_name": "action",
-      "ordinal_position": 6,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "title_en",
-      "ordinal_position": 17,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "excerpt_en",
-      "ordinal_position": 18,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "content_en",
-      "ordinal_position": 19,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "category_en",
-      "ordinal_position": 20,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "seo_title_en",
-      "ordinal_position": 21,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "seo_description_en",
-      "ordinal_position": 22,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "taxi_requests",
-      "column_name": "pickup_address",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "first_name",
+      "table_name": "vehicles",
+      "column_name": "company_id",
       "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "last_name",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "phone",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "email",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "avatar_url",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "saved_places",
-      "column_name": "name",
-      "ordinal_position": 3,
       "is_nullable": "NO",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "uuid",
+      "udt_name": "uuid"
+    },
+    {
+      "table_name": "vehicles",
+      "column_name": "vehicle_type_id",
+      "ordinal_position": 3,
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "uuid",
+      "udt_name": "uuid"
     },
     {
       "table_name": "vehicles",
@@ -2468,120 +3282,21 @@
       "udt_name": "text"
     },
     {
-      "table_name": "ledger",
-      "column_name": "description",
-      "ordinal_position": 8,
+      "table_name": "vehicles",
+      "column_name": "year",
+      "ordinal_position": 6,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "integer",
+      "udt_name": "int4"
     },
     {
       "table_name": "vehicles",
       "column_name": "color",
       "ordinal_position": 7,
       "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "profiles",
-      "column_name": "language",
-      "ordinal_position": 12,
-      "is_nullable": "NO",
-      "column_default": "'bg'::text",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "ratings",
-      "column_name": "feedback",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "endpoint",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "account",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "ledger",
-      "column_name": "entry_type",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "vehicle_types",
-      "column_name": "name",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "p256dh",
-      "ordinal_position": 4,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "payment_transactions",
-      "column_name": "provider",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "news_articles",
-      "column_name": "title",
-      "ordinal_position": 2,
-      "is_nullable": "NO",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
@@ -2600,385 +3315,66 @@
       "udt_name": "text"
     },
     {
-      "table_name": "taxi_requests",
-      "column_name": "cancel_reason",
-      "ordinal_position": 24,
+      "table_name": "vehicles",
+      "column_name": "capacity",
+      "ordinal_position": 9,
+      "is_nullable": "NO",
+      "column_default": "4",
+      "is_identity": "NO",
+      "is_generated": "NEVER",
+      "data_type": "integer",
+      "udt_name": "int4"
+    },
+    {
+      "table_name": "vehicles",
+      "column_name": "insurance_expiry_date",
+      "ordinal_position": 10,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "date",
+      "udt_name": "date"
     },
     {
-      "table_name": "geography_columns",
-      "column_name": "type",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "saved_places",
-      "column_name": "address",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "type",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "type",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "character varying",
-      "udt_name": "varchar"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "title",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "spatial_ref_sys",
-      "column_name": "auth_name",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "character varying",
-      "udt_name": "varchar"
-    },
-    {
-      "table_name": "notifications",
-      "column_name": "message",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "spatial_ref_sys",
-      "column_name": "srtext",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "character varying",
-      "udt_name": "varchar"
-    },
-    {
-      "table_name": "spatial_ref_sys",
-      "column_name": "proj4text",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "character varying",
-      "udt_name": "varchar"
-    },
-    {
-      "table_name": "taxi_requests",
-      "column_name": "destination_address",
+      "table_name": "vehicles",
+      "column_name": "inspection_expiry_date",
       "ordinal_position": 11,
       "is_nullable": "YES",
       "column_default": null,
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "date",
+      "udt_name": "date"
     },
     {
-      "table_name": "companies",
-      "column_name": "name",
-      "ordinal_position": 2,
+      "table_name": "vehicles",
+      "column_name": "is_active",
+      "ordinal_position": 12,
       "is_nullable": "NO",
-      "column_default": null,
+      "column_default": "true",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "boolean",
+      "udt_name": "bool"
     },
     {
-      "table_name": "companies",
-      "column_name": "slug",
-      "ordinal_position": 3,
+      "table_name": "vehicles",
+      "column_name": "created_at",
+      "ordinal_position": 13,
       "is_nullable": "NO",
-      "column_default": null,
+      "column_default": "now()",
       "is_identity": "NO",
       "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz"
     },
     {
-      "table_name": "companies",
-      "column_name": "logo_url",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "brand_color_primary",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": "'#E8B42D'::text",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "brand_color_secondary",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": "'#1F2937'::text",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "phone",
-      "ordinal_position": 7,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "email",
-      "ordinal_position": 8,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "address",
-      "ordinal_position": 9,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "companies",
-      "column_name": "currency",
-      "ordinal_position": 10,
+      "table_name": "vehicles",
+      "column_name": "updated_at",
+      "ordinal_position": 14,
       "is_nullable": "NO",
-      "column_default": "'EUR'::text",
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "driver_documents",
-      "column_name": "file_url",
-      "ordinal_position": 5,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "auth",
-      "ordinal_position": 5,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "push_subscriptions",
-      "column_name": "user_agent",
-      "ordinal_position": 6,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "app_config",
-      "column_name": "vapid_private_key",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "coupons",
-      "column_name": "code",
-      "ordinal_position": 3,
-      "is_nullable": "NO",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "app_config",
-      "column_name": "vapid_public_key",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "text",
-      "udt_name": "text"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "f_table_catalog",
-      "ordinal_position": 1,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "f_table_schema",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "f_table_name",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geography_columns",
-      "column_name": "f_geography_column",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "f_table_schema",
-      "ordinal_position": 2,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "f_table_name",
-      "ordinal_position": 3,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "f_geometry_column",
-      "ordinal_position": 4,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "name",
-      "udt_name": "name"
-    },
-    {
-      "table_name": "geometry_columns",
-      "column_name": "f_table_catalog",
-      "ordinal_position": 1,
-      "is_nullable": "YES",
-      "column_default": null,
-      "is_identity": "NO",
-      "is_generated": "NEVER",
-      "data_type": "character varying",
-      "udt_name": "varchar"
-    },
-    {
-      "table_name": "taxi_requests",
-      "column_name": "expires_at",
-      "ordinal_position": 30,
-      "is_nullable": "YES",
-      "column_default": "(clock_timestamp() + '00:02:00'::interval)",
+      "column_default": "now()",
       "is_identity": "NO",
       "is_generated": "NEVER",
       "data_type": "timestamp with time zone",
@@ -2987,28 +3383,268 @@
   ],
   "foreign_keys": [
     {
-      "table": "request_declines",
+      "table": "companies",
+      "columns": [
+        "legal_verified_by"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "companies_legal_verified_by_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "coupons",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "coupons_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "driver_documents",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_documents_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "driver_documents",
       "columns": [
         "driver_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "request_declines_driver_id_fkey",
+      "foreignKeyName": "driver_documents_driver_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "drivers"
     },
     {
-      "table": "request_declines",
+      "table": "driver_documents",
+      "columns": [
+        "reviewed_by"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_documents_reviewed_by_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "driver_locations",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_locations_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "driver_locations",
+      "columns": [
+        "driver_id"
+      ],
+      "isOneToOne": true,
+      "foreignKeyName": "driver_locations_driver_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "drivers"
+    },
+    {
+      "table": "driver_money_entries",
+      "columns": [
+        "actor_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_money_entries_actor_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "driver_money_entries",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_money_entries_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "driver_money_entries",
+      "columns": [
+        "driver_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_money_entries_driver_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "drivers"
+    },
+    {
+      "table": "driver_money_entries",
+      "columns": [
+        "driver_user_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_money_entries_driver_user_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "driver_money_entries",
+      "columns": [
+        "reference_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "driver_money_entries_reference_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "driver_money_entries"
+    },
+    {
+      "table": "driver_money_entries",
       "columns": [
         "request_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "request_declines_request_id_fkey",
+      "foreignKeyName": "driver_money_entries_request_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "taxi_requests"
+    },
+    {
+      "table": "drivers",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "drivers_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "drivers",
+      "columns": [
+        "user_id"
+      ],
+      "isOneToOne": true,
+      "foreignKeyName": "drivers_user_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "drivers",
+      "columns": [
+        "vehicle_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "drivers_vehicle_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "vehicles"
+    },
+    {
+      "table": "legal_acceptances",
+      "columns": [
+        "user_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "legal_acceptances_user_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "notifications",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "notifications_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "notifications",
+      "columns": [
+        "user_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "notifications_user_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
+    },
+    {
+      "table": "payment_transactions",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "payment_transactions_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "payment_transactions",
+      "columns": [
+        "request_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "payment_transactions_request_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "taxi_requests"
+    },
+    {
+      "table": "privacy_requests",
+      "columns": [
+        "user_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "privacy_requests_user_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "profiles"
     },
     {
       "table": "profiles",
@@ -3035,40 +3671,16 @@
       "referencedRelation": "users"
     },
     {
-      "table": "vehicle_types",
+      "table": "push_subscriptions",
       "columns": [
-        "company_id"
+        "user_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "vehicle_types_company_id_fkey",
+      "foreignKeyName": "push_subscriptions_user_id_fkey",
       "referencedColumns": [
         "id"
       ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "vehicles",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "vehicles_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "vehicles",
-      "columns": [
-        "vehicle_type_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "vehicles_vehicle_type_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "vehicle_types"
+      "referencedRelation": "users"
     },
     {
       "table": "ratings",
@@ -3119,160 +3731,76 @@
       "referencedRelation": "taxi_requests"
     },
     {
-      "table": "driver_locations",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "driver_locations_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "driver_locations",
+      "table": "request_declines",
       "columns": [
         "driver_id"
       ],
-      "isOneToOne": true,
-      "foreignKeyName": "driver_locations_driver_id_fkey",
+      "isOneToOne": false,
+      "foreignKeyName": "request_declines_driver_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "drivers"
     },
     {
-      "table": "notifications",
+      "table": "request_declines",
+      "columns": [
+        "request_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "request_declines_request_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "taxi_requests"
+    },
+    {
+      "table": "ride_quotes",
       "columns": [
         "company_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "notifications_company_id_fkey",
+      "foreignKeyName": "ride_quotes_company_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "companies"
     },
     {
-      "table": "notifications",
-      "columns": [
-        "user_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "notifications_user_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "profiles"
-    },
-    {
-      "table": "trips",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "trips_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "trips",
+      "table": "ride_quotes",
       "columns": [
         "customer_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "trips_customer_id_fkey",
+      "foreignKeyName": "ride_quotes_customer_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "profiles"
     },
     {
-      "table": "trips",
-      "columns": [
-        "driver_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "trips_driver_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "drivers"
-    },
-    {
-      "table": "trips",
+      "table": "ride_quotes",
       "columns": [
         "request_id"
       ],
       "isOneToOne": true,
-      "foreignKeyName": "trips_request_id_fkey",
+      "foreignKeyName": "ride_quotes_request_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "taxi_requests"
     },
     {
-      "table": "drivers",
+      "table": "ride_quotes",
       "columns": [
-        "company_id"
+        "vehicle_type_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "drivers_company_id_fkey",
+      "foreignKeyName": "ride_quotes_vehicle_type_id_fkey",
       "referencedColumns": [
         "id"
       ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "drivers",
-      "columns": [
-        "user_id"
-      ],
-      "isOneToOne": true,
-      "foreignKeyName": "drivers_user_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "profiles"
-    },
-    {
-      "table": "drivers",
-      "columns": [
-        "vehicle_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "drivers_vehicle_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "vehicles"
-    },
-    {
-      "table": "payment_transactions",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "payment_transactions_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "payment_transactions",
-      "columns": [
-        "request_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "payment_transactions_request_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "taxi_requests"
+      "referencedRelation": "vehicle_types"
     },
     {
       "table": "saved_places",
@@ -3285,42 +3813,6 @@
         "id"
       ],
       "referencedRelation": "profiles"
-    },
-    {
-      "table": "coupons",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "coupons_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "driver_documents",
-      "columns": [
-        "company_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "driver_documents_company_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "companies"
-    },
-    {
-      "table": "driver_documents",
-      "columns": [
-        "driver_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "driver_documents_driver_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "drivers"
     },
     {
       "table": "taxi_requests",
@@ -3371,60 +3863,84 @@
       "referencedRelation": "vehicle_types"
     },
     {
-      "table": "push_subscriptions",
-      "columns": [
-        "user_id"
-      ],
-      "isOneToOne": false,
-      "foreignKeyName": "push_subscriptions_user_id_fkey",
-      "referencedColumns": [
-        "id"
-      ],
-      "referencedRelation": "users"
-    },
-    {
-      "table": "ride_quotes",
+      "table": "trips",
       "columns": [
         "company_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "ride_quotes_company_id_fkey",
+      "foreignKeyName": "trips_company_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "companies"
     },
     {
-      "table": "ride_quotes",
+      "table": "trips",
       "columns": [
         "customer_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "ride_quotes_customer_id_fkey",
+      "foreignKeyName": "trips_customer_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "profiles"
     },
     {
-      "table": "ride_quotes",
+      "table": "trips",
+      "columns": [
+        "driver_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "trips_driver_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "drivers"
+    },
+    {
+      "table": "trips",
       "columns": [
         "request_id"
       ],
       "isOneToOne": true,
-      "foreignKeyName": "ride_quotes_request_id_fkey",
+      "foreignKeyName": "trips_request_id_fkey",
       "referencedColumns": [
         "id"
       ],
       "referencedRelation": "taxi_requests"
     },
     {
-      "table": "ride_quotes",
+      "table": "vehicle_types",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "vehicle_types_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "vehicles",
+      "columns": [
+        "company_id"
+      ],
+      "isOneToOne": false,
+      "foreignKeyName": "vehicles_company_id_fkey",
+      "referencedColumns": [
+        "id"
+      ],
+      "referencedRelation": "companies"
+    },
+    {
+      "table": "vehicles",
       "columns": [
         "vehicle_type_id"
       ],
       "isOneToOne": false,
-      "foreignKeyName": "ride_quotes_vehicle_type_id_fkey",
+      "foreignKeyName": "vehicles_vehicle_type_id_fkey",
       "referencedColumns": [
         "id"
       ],

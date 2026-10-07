@@ -1,4 +1,5 @@
 import { stopSharedGps } from './sharedGps';
+import { clearGpsBuffer } from './gpsBuffer';
 const PREFIX = 'leski:auto-location:';
 const memory = new Map<string, boolean>();
 const subscribers = new Set<() => void>();
@@ -12,7 +13,7 @@ export function getLocationEnabled(userId?: string): boolean | null {
 export function setLocationEnabled(userId: string, enabled: boolean) {
   memory.set(userId, enabled);
   try { localStorage.setItem(PREFIX + userId, enabled ? 'on' : 'off'); memory.delete(userId); } catch { /* Session fallback. */ }
-  if (!enabled) stopSharedGps();
+  if (!enabled) { clearGpsBuffer(userId); stopSharedGps(); }
   subscribers.forEach(fn => fn());
 }
 export function subscribeLocationPreference(fn: () => void, userId?: string) {
@@ -20,7 +21,7 @@ export function subscribeLocationPreference(fn: () => void, userId?: string) {
   const storage = (event: StorageEvent) => {
     if (event.key !== null && event.key !== PREFIX + userId) return;
     if (userId) memory.delete(userId);
-    if (event.key === null || event.newValue === 'off') stopSharedGps();
+    if (event.key === null || event.newValue === 'off') { if (userId) clearGpsBuffer(userId); stopSharedGps(); }
     subscribers.forEach(listener => listener());
   };
   window.addEventListener('storage', storage);

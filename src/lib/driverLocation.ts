@@ -6,6 +6,8 @@ import { withRequestTimeout } from './requestTimeout';
 import { isAmbiguousWrite } from './rideOperations';
 import type { Tables } from './database.types';
 import { distanceMetres } from './routeGeometry';
+import { bufferGps, readBufferedGps, clearGpsBuffer } from './gpsBuffer';
+import { gpsPermission } from './sharedGps';
 
 export const GPS_HEARTBEAT_MS = 15_000;
 export const GPS_STALE_MS = 45_000;
@@ -17,6 +19,7 @@ let heartbeat: ReturnType<typeof setInterval> | null = null;
 let lastFixAt = 0, lastWriteAt = 0, lastConfirmedFixAt = 0;
 let lastError = '';
 let stopListeners: (() => void) | null = null;
+let bufferOwner: string | undefined;
 
 type Callbacks = { onUpdate?: () => void; onError?: (message: string) => void };
 
@@ -73,7 +76,9 @@ export async function setDriverOnline(driver: { id: string; company_id: string; 
   return confirmed;
 }
 export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}, userId?: string): boolean {
-  stopDriverGps();
+  stopDriverGps(false);
+  if (bufferOwner && bufferOwner !== userId) clearGpsBuffer(bufferOwner);
+  bufferOwner = userId;
   if (getLocationEnabled(userId) === false) { callbacks.onError?.('Местоположението е изключено от настройките.'); return false; }
   if (!navigator.geolocation) { callbacks.onError?.('Браузърът не поддържа GPS.'); return false; }
   const run = generation;
@@ -96,17 +101,18 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     if (run !== generation) return;
     if (isGpsPermissionDenied(error)) {
       permissionDenied = true; queued = null; controller?.abort();
+      if (userId) clearGpsBuffer(userId);
       if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
     }
     lastError = gpsErrorMessage(error);
     callbacks.onError?.(lastError);
   };
   const schedule = () => {
-    if (retry !== undefined || !queued || writing || run !== generation || document.visibilityState === 'hidden') return;
+    if (retry !== undefined || !queued || writing || run !== generation || document.visibilityState === 'hidden' || navigator.onLine === false) return;
     retry = setTimeout(() => { retry = undefined; void drain(); }, Math.max(0, writeDeadline() - Date.now()));
   };
   const drain = async () => {
-    if (run !== generation || writing || !queued || document.visibilityState === 'hidden') return;
+    if (run !== generation || writing || !queued || document.visibilityState === 'hidden' || navigator.onLine === false) return;
     if (Date.now() < writeDeadline()) { schedule(); return; }
     const position = queued; queued = null;
     try { validatePosition(position); }
@@ -120,6 +126,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
       lastWriteAt = Date.parse(savedAt);
       lastConfirmedFixAt = position.timestamp;
       confirmedFix = position;
+      if (userId && (!queued || (queued as GeolocationPosition).timestamp <= position.timestamp)) clearGpsBuffer(userId);
       failures = 0; lastError = '';
       callbacks.onUpdate?.();
     } catch (error) {
@@ -144,6 +151,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     lastFixAt = position.timestamp;
     if (position.timestamp <= lastConfirmedFixAt || writing && position.timestamp <= writing.timestamp) return;
     queued = position;
+    if (userId) bufferGps(userId, id, company, position);
     // Motion can shorten an idle deadline. Recompute from the latest fix,
     // while keeping the absolute throttle/backoff and one in-flight write.
     if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
@@ -158,16 +166,25 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
   };
   const resume = () => {
     if (document.visibilityState === 'hidden') return;
+    if (queued) { try { validatePosition(queued); } catch { queued = null; if (userId) clearGpsBuffer(userId); } }
     failures = 0;
     nextAttempt = Math.max(lastAttempt + MOVING_INTERVAL_MS, Math.min(nextAttempt, Date.now()));
     if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
     void refresh();
+    void drain();
   };
   unsubscribeGps = subscribeGps(push, fail);
+  if (userId) void gpsPermission().then(permission => {
+    if (run !== generation || permission !== 'granted' || permissionDenied || getLocationEnabled(userId) !== true) return;
+    const saved = readBufferedGps(userId,id,company);
+    if (saved && (!queued || saved.timestamp > queued.timestamp) && saved.timestamp > lastFixAt) push(saved);
+  });
   heartbeat = setInterval(() => void refresh(), GPS_HEARTBEAT_MS);
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
   window.addEventListener('pageshow', resume);
+  const offline = () => { lastError = 'Няма интернет. Последната актуална позиция се пази на устройството.'; callbacks.onError?.(lastError); };
+  window.addEventListener('offline', offline);
   stopListeners = () => {
     controller?.abort();
     if (retry !== undefined) clearTimeout(retry);
@@ -175,10 +192,12 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     document.removeEventListener('visibilitychange', resume);
     window.removeEventListener('online', resume);
     window.removeEventListener('pageshow', resume);
+    window.removeEventListener('offline', offline);
   };
   return true;
 }
-export function stopDriverGps() {
+export function stopDriverGps(clearBuffer = true) {
+  if (clearBuffer && bufferOwner) { clearGpsBuffer(bufferOwner); bufferOwner = undefined; }
   generation++;
   unsubscribeGps?.();
   if (heartbeat) clearInterval(heartbeat);

@@ -1,4 +1,6 @@
 import LocationSettings from '@/components/feature/LocationSettings';
+import PrivacyRequests from '@/components/feature/PrivacyRequests';
+import { documentExpired } from '@/lib/legalWorkflow';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +22,7 @@ interface DocumentInfo {
   type: string;
   status: string;
   created_at: string;
+  expires_at: string | null;
 }
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -160,6 +163,7 @@ export default function DriverProfile() {
             </div>
 
             <LocationSettings driver onOffline={() => void fetchProfile()} />
+            <PrivacyRequests />
 
             {/* Vehicle Card */}
             <div className="bg-white rounded-2xl p-5 mb-4">
@@ -224,7 +228,7 @@ export default function DriverProfile() {
                         </span>
                       </div>
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${DOC_STATUS_COLORS[doc.status] || 'bg-background-100 text-foreground-500'}`}>
-                        {t(doc.status === 'rejected' ? 'rejected_status' : doc.status)}
+                        {documentExpired(doc.expires_at) ? 'Изтекъл срок' : t(doc.status === 'rejected' ? 'rejected_status' : doc.status)}
                       </span>
                     </div>
                   ))}

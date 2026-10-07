@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { LOGO_URL } from '@/lib/logo';
 import { socialAuthErrorKey, type SocialProvider } from '@/lib/socialAuth';
 import { legalOperator } from '@/config/legal';
+import { beginLegalIntent } from '@/lib/legalAcceptance';
 
 export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
     setPending(provider);
     setError('');
     try {
+      beginLegalIntent(provider);
       const result = await signInWithOAuth(provider);
       if (result.error) throw result.error;
       if (!result.data.url) throw new Error('missing_oauth_url');

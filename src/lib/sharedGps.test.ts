@@ -151,3 +151,15 @@ it('expires a one-shot read on return from frozen browser timers', async () => {
   vi.setSystemTime(Date.now() + 60_000); window.dispatchEvent(new Event('pageshow')); await rejected;
   read(fix()); expect(getGpsPosition()).toBeNull(); expect(vi.getTimerCount()).toBe(0);
 });
+it('pauses a hidden watch and resumes immediately without waiting for a restart throttle',()=>{
+ const consumer=vi.fn();releases.push(subscribeGps(consumer));const previous=receive;
+ Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));
+ expect(clear).toHaveBeenCalledWith(7);previous(fix());expect(consumer).not.toHaveBeenCalled();
+ Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));
+ expect(watch).toHaveBeenCalledTimes(2);receive(fix());expect(consumer).toHaveBeenCalledOnce();
+});
+it('fences frozen-page callbacks and starts a fresh watch on restoration',()=>{
+ const consumer=vi.fn();releases.push(subscribeGps(consumer));const previous=receive;
+ document.dispatchEvent(new Event('freeze'));previous(fix());expect(consumer).not.toHaveBeenCalled();
+ window.dispatchEvent(new Event('pageshow'));expect(watch).toHaveBeenCalledTimes(2);receive(fix());expect(consumer).toHaveBeenCalledOnce();
+});

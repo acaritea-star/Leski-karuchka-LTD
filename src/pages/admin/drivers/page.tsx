@@ -7,6 +7,8 @@ import type { Tables } from '@/lib/database.types';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import { useAuth } from '@/hooks/useAuth';
+import { documentExpired } from '@/lib/legalWorkflow';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 
 type DriverWithName = Tables<'drivers'> & { first_name: string; last_name: string };
 type DocumentRow = Tables<'driver_documents'>;
@@ -27,6 +29,7 @@ export default function AdminDrivers() {
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<DriverWithName | null>(null);
+  const [documentDates,setDocumentDates] = useState<Record<string,string>>({});
 
   // Add driver state
   const [showAdd, setShowAdd] = useState(false);
@@ -111,10 +114,10 @@ export default function AdminDrivers() {
 
   const setDocStatusMutation = useMutation({
     mutationFn: async (input: { doc: DocumentRow; status: DocumentRow['status'] }) => {
-      const { error } = await supabase
+      const { error } = await withRequestTimeout(signal => supabase
         .from('driver_documents')
-        .update({ status: input.status, reviewed_at: new Date().toISOString() })
-        .eq('id', input.doc.id);
+        .update({ status: input.status, expires_at: (documentDates[input.doc.id] ?? input.doc.expires_at) || null })
+        .eq('id', input.doc.id).select('id').abortSignal(signal).single());
       if (error) throw error;
     },
     onSuccess: () => {
@@ -202,6 +205,7 @@ export default function AdminDrivers() {
 
   return (
     <AdminLayout title={t('nav_drivers')}>
+      {setDocStatusMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">Документът не е потвърден. За одобрение на книжка или застраховка посочете валиден срок и опитайте отново.</p>}
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -524,10 +528,11 @@ export default function AdminDrivers() {
                               : 'bg-primary-100 text-primary-700'
                           }`}
                         >
-                          {doc.status === 'approved' ? 'Одобрен' : doc.status === 'rejected' ? 'Отхвърлен' : 'Изчаква'}
+                          {documentExpired(doc.expires_at) ? 'Изтекъл срок' : doc.status === 'approved' ? 'Одобрен' : doc.status === 'rejected' ? 'Отхвърлен' : 'Изчаква'}
                         </span>
                       </div>
 
+                      <label className="block text-xs text-foreground-500 mt-3">Валиден до<input aria-label={'Валиден до '+doc.id} type="date" value={documentDates[doc.id] ?? doc.expires_at ?? ''} onChange={e=>setDocumentDates({...documentDates,[doc.id]:e.target.value})} className="block w-full rounded-lg border border-background-200 p-2 mt-1"/></label>
                       <div className="flex gap-2 mt-3 pt-3 border-t border-background-100">
                         <a
                           href={doc.file_url || '#'}
@@ -537,8 +542,9 @@ export default function AdminDrivers() {
                         >
                           Преглед
                         </a>
-                        {doc.status !== 'approved' && (
+                        {(doc.status !== 'approved' || documentDates[doc.id] !== undefined) && (
                           <button
+                            disabled={setDocStatusMutation.isPending}
                             onClick={() => setDocStatusMutation.mutate({ doc, status: 'approved' })}
                             className="flex-1 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer"
                           >
@@ -547,6 +553,7 @@ export default function AdminDrivers() {
                         )}
                         {doc.status !== 'rejected' && (
                           <button
+                            disabled={setDocStatusMutation.isPending}
                             onClick={() => setDocStatusMutation.mutate({ doc, status: 'rejected' })}
                             className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors whitespace-nowrap cursor-pointer"
                           >
