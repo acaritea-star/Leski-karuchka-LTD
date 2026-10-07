@@ -43,11 +43,15 @@ BEGIN
   denied:=false;BEGIN EXECUTE stmt;EXCEPTION WHEN OTHERS THEN denied:=true;END;
   IF NOT denied THEN RAISE EXCEPTION 'FAIL expected rejection: %',stmt;END IF;
  END LOOP;
- INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at,reviewed_at,reviewed_by)
- VALUES(license,did,cid,'license','storage://driver-documents/'||duid||'/'||license||'.pdf','approved',today+30,now(),admin_uid);
+ denied:=false;
+ BEGIN
+  INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at,reviewed_at,reviewed_by)
+  VALUES(license,did,cid,'license','storage://driver-documents/'||duid||'/'||license||'.pdf','approved',today+30,now(),admin_uid);
+ EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL direct document insert'; END IF;
+ PERFORM public.register_driver_document(license,'license',today+30,duid||'/'||license||'.pdf');
  IF NOT EXISTS(SELECT 1 FROM public.driver_documents WHERE id=license AND status='pending' AND reviewed_at IS NULL AND reviewed_by IS NULL) THEN RAISE EXCEPTION 'FAIL forged driver approval'; END IF;
- INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at)
- VALUES(insurance,did,cid,'insurance','storage://driver-documents/'||duid||'/'||insurance||'.pdf','pending',today+30);
+ PERFORM public.register_driver_document(insurance,'insurance',today+30,duid||'/'||insurance||'.pdf');
  IF public.record_driver_money_verified(income,'income',12.50,'Measured cash',duid,ride)<>income THEN RAISE EXCEPTION 'FAIL income';END IF;
  PERFORM public.record_driver_money_verified(income,'income',12.50,'Measured cash',duid,ride);
  ticket:=public.request_personal_data('deletion');

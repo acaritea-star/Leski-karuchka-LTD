@@ -1,3 +1,5 @@
+import DriverVerificationStatus from '@/components/feature/DriverVerificationStatus';
+import { verificationKey } from '@/lib/driverVerification';
 import DriverApplications from './DriverApplications';
 import { signedDocumentUrl, workflowError } from '@/lib/driverDocuments';
 import { useState, useRef } from 'react';
@@ -109,6 +111,7 @@ export default function AdminDrivers() {
     onSettled: (_data, _error, d) => {
       verifyLatch.current = false;
       void queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(d.company_id) });
+      void queryClient.invalidateQueries({ queryKey: verificationKey(d.id) });
     },
   });
   const setDocStatusMutation = useMutation({
@@ -122,6 +125,7 @@ export default function AdminDrivers() {
     onSettled: (_data, _error, input) => {
       documentLatch.current = false;
       void queryClient.invalidateQueries({ queryKey: queryKeys.driverDocuments(input.doc.driver_id) });
+      void queryClient.invalidateQueries({ queryKey: verificationKey(input.doc.driver_id) });
     },
   });
   function reviewDocument(doc: DocumentRow, status: DocumentRow['status']) {
@@ -310,6 +314,7 @@ export default function AdminDrivers() {
             </div>
 
             <div className="p-5">
+              <DriverVerificationStatus key={selected.id} driverId={selected.id} />
               {documentError && <p role="alert" className="text-sm text-red-600 mb-3">{documentError}</p>}
               {setDocStatusMutation.isError && <p role="alert" className="text-sm text-red-600 mb-3">{workflowError(setDocStatusMutation.error, 'Промяната не е потвърдена. Обновете документите.')}</p>}
               {documentsQuery.isError ? <p role="alert" className="text-sm text-red-600">Документите не са заредени. <button className="underline" onClick={() => void documentsQuery.refetch()}>Опитай отново</button></p> : docLoading ? (

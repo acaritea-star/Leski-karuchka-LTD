@@ -1,3 +1,4 @@
+import { documentExpired } from '@/lib/legalWorkflow';
 import { useState, useMemo, useRef } from 'react';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { workflowError } from '@/lib/driverDocuments';
@@ -20,6 +21,8 @@ const emptyForm = {
   registration_number: '',
   vehicle_type_id: '',
   capacity: '4',
+  insurance_expiry_date: '',
+  inspection_expiry_date: '',
   driver_id: '',
 };
 
@@ -120,6 +123,8 @@ export default function AdminVehicles() {
       registration_number: v.registration_number || '',
       vehicle_type_id: v.vehicle_type_id || '',
       capacity: v.capacity ? String(v.capacity) : '4',
+      insurance_expiry_date: v.insurance_expiry_date ?? '',
+      inspection_expiry_date: v.inspection_expiry_date ?? '',
       driver_id: v.driver_id || '',
     });
     setShowForm(true);
@@ -140,6 +145,8 @@ export default function AdminVehicles() {
           make: form.make.trim(), model: form.model.trim(), registration_number: form.registration_number.trim(),
           year: form.year || null, color: form.color.trim() || null, vehicle_type_id: form.vehicle_type_id,
           capacity: form.capacity ? Number(form.capacity) : 4,
+          insurance_expiry_date: form.insurance_expiry_date || null,
+          inspection_expiry_date: form.inspection_expiry_date || null,
         },
       }).abortSignal(signal));
       if (error) throw error;
@@ -150,6 +157,7 @@ export default function AdminVehicles() {
       if (companyId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.adminVehicles(companyId) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(companyId) });
+        void queryClient.invalidateQueries({ queryKey: ['driver-verification'] });
       }
     },
     onSuccess: () => {
@@ -297,6 +305,12 @@ export default function AdminVehicles() {
             </div>
 
             <div className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs text-foreground-600">Застраховка до<input type="date" value={form.insurance_expiry_date} onChange={e => setField('insurance_expiry_date', e.target.value)} className="block w-full p-2 mt-1 border border-background-200 rounded-lg" /></label>
+                <label className="text-xs text-foreground-600">Технически преглед до<input type="date" value={form.inspection_expiry_date} onChange={e => setField('inspection_expiry_date', e.target.value)} className="block w-full p-2 mt-1 border border-background-200 rounded-lg" /></label>
+              </div>
+              <p className="text-xs text-foreground-500">Въведете сроковете от действителните документи на автомобила. Изтекъл срок блокира верификацията и новите заявки.</p>
+              {(documentExpired(form.insurance_expiry_date) || documentExpired(form.inspection_expiry_date)) && <p className="text-xs text-red-600">Поне един от въведените срокове е изтекъл.</p>}
               {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div>

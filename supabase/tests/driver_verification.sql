@@ -8,6 +8,7 @@ DECLARE
  admin_id uuid:=gen_random_uuid(); foreign_admin uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid();
  application uuid; d uuid; vt uuid:=gen_random_uuid(); car uuid:=gen_random_uuid();
  license uuid:=gen_random_uuid(); insurance uuid:=gen_random_uuid(); fake uuid:=gen_random_uuid(); quote uuid:=gen_random_uuid(); ride uuid:=gen_random_uuid();
+ report jsonb;
  today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; denied boolean; count_rows integer; stmt text; obj_path text;
 BEGIN
  INSERT INTO public.companies(id,name,slug) VALUES(c,'Verification fixture','verify-'||c),(other_c,'Foreign verification fixture','verify-'||other_c);
@@ -47,6 +48,7 @@ BEGIN
  SET LOCAL ROLE authenticated;
  FOREACH stmt IN ARRAY ARRAY[
   format('UPDATE public.drivers SET is_verified=true WHERE id=%L',d),
+  format('INSERT INTO public.driver_documents(driver_id,company_id,type,file_url) VALUES(%L,%L,''insurance'',''forged'')',d,c),
   format('SELECT public.register_driver_document(%L,''license'',%L,%L)',fake,today+30,candidate||'/'||fake||'.pdf'),
   format('INSERT INTO storage.objects(bucket_id,name) VALUES(''driver-documents'',%L)',customer||'/'||fake||'.pdf')
  ] LOOP
@@ -61,6 +63,8 @@ BEGIN
  INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',obj_path,candidate::text,'{"mimetype":"application/pdf","size":100}');
  PERFORM public.register_driver_document(license,'license',today+30,obj_path);
  PERFORM public.register_driver_document(license,'license',today+30,obj_path);
+ report:=public.driver_verification_status(d);
+ IF report#>>'{documents,insurance,state}'<>'missing' OR report#>>'{documents,license,state}'<>'pending' OR (report->>'can_verify')::boolean THEN RAISE EXCEPTION 'FAIL explicit missing insurance'; END IF;
  obj_path:=candidate||'/'||insurance||'.pdf';
  INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',obj_path,candidate::text,'{"mimetype":"application/pdf","size":100}');
  PERFORM public.register_driver_document(insurance,'insurance',today+30,obj_path);
@@ -74,6 +78,8 @@ BEGIN
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',foreign_admin,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
+ denied:=false;BEGIN PERFORM public.driver_verification_status(d);EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL foreign verification report'; END IF;
  IF EXISTS(SELECT 1 FROM public.driver_documents WHERE driver_id=d) OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%') THEN RAISE EXCEPTION 'FAIL foreign document disclosure'; END IF;
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
@@ -83,6 +89,28 @@ BEGIN
  IF NOT denied THEN RAISE EXCEPTION 'FAIL expired approval'; END IF;
  UPDATE public.driver_documents SET status='approved' WHERE driver_id=d;
  IF (SELECT count(*) FROM public.driver_documents WHERE driver_id=d AND reviewed_by=admin_id AND reviewed_at IS NOT NULL)<>2 THEN RAISE EXCEPTION 'FAIL review provenance'; END IF;
+ PERFORM public.save_driver_vehicle(car,c,d,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4,'insurance_expiry_date',today-1,'inspection_expiry_date',today-1));
+ report:=public.driver_verification_status(d);
+ IF (report->>'can_verify')::boolean OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(report->'blockers') x WHERE x->>'code'='vehicle_insurance')
+  OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(report->'blockers') x WHERE x->>'code'='vehicle_inspection') THEN RAISE EXCEPTION 'FAIL detailed expired vehicle report'; END IF;
+ denied:=false;BEGIN UPDATE public.drivers SET is_verified=true WHERE id=d;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL verification with expired vehicle'; END IF;
+ PERFORM public.save_driver_vehicle(car,c,d,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4,'insurance_expiry_date',today+60,'inspection_expiry_date',today+30));
+ -- Requests from the earlier UI must preserve the dates when those JSON keys are omitted.
+ PERFORM public.save_driver_vehicle(car,c,d,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
+ IF NOT EXISTS(SELECT 1 FROM public.vehicles WHERE id=car AND insurance_expiry_date=today+60 AND inspection_expiry_date=today+30) THEN RAISE EXCEPTION 'FAIL vehicle dates persisted'; END IF;
+ report:=public.driver_verification_status(d);
+ IF NOT (report->>'can_verify')::boolean THEN RAISE EXCEPTION 'FAIL verification readiness %',report; END IF;
+ RESET ROLE;
+ UPDATE storage.objects SET name=candidate||'/'||fake||'.pdf' WHERE bucket_id='driver-documents' AND name=candidate||'/'||license||'.pdf';
+ SET LOCAL ROLE authenticated;
+ report:=public.driver_verification_status(d);
+ IF report#>>'{documents,license,state}'<>'missing_file' OR private.driver_documents_ready(d) THEN RAISE EXCEPTION 'FAIL missing private file dispatch'; END IF;
+ RESET ROLE;
+ UPDATE storage.objects SET name=candidate||'/'||license||'.pdf' WHERE bucket_id='driver-documents' AND name=candidate||'/'||fake||'.pdf';
+ SET LOCAL ROLE authenticated;
+ UPDATE public.driver_documents SET expires_at=today+60 WHERE id=license;
+ IF NOT EXISTS(SELECT 1 FROM public.audit_log WHERE entity_id=license AND actor_id=admin_id AND action='document_validity_changed' AND old_value->>'expires_at'=(today+30)::text AND new_value->>'expires_at'=(today+60)::text) THEN RAISE EXCEPTION 'FAIL document expiry audit'; END IF;
  UPDATE public.drivers SET is_verified=true WHERE id=d;
  IF NOT EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND is_verified AND document_verification_required) THEN RAISE EXCEPTION 'FAIL admin verification'; END IF;
  denied:=false;BEGIN UPDATE public.drivers SET document_verification_required=false WHERE id=d;EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
@@ -90,6 +118,8 @@ BEGIN
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
+ PERFORM public.register_driver_document(license,'license',today+30,candidate||'/'||license||'.pdf');
+ IF NOT EXISTS(SELECT 1 FROM public.driver_documents WHERE id=license AND expires_at=today+60 AND status='approved') THEN RAISE EXCEPTION 'FAIL retry overwrites reviewer expiry'; END IF;
  UPDATE public.drivers SET is_online=true WHERE id=d;
  IF NOT EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND is_online) THEN RAISE EXCEPTION 'FAIL verified driver online'; END IF;
  RESET ROLE;
@@ -104,6 +134,9 @@ BEGIN
  VALUES(quote,customer,c,vt,'{"pickup_latitude":43.2,"pickup_longitude":25.6,"destination_latitude":43.21,"destination_longitude":25.61,"pickup_address":"Verification fixture","destination_address":"Verification fixture","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}');
  PERFORM set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
+ denied:=false;BEGIN PERFORM public.driver_verification_status(d);EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied OR EXISTS(SELECT 1 FROM public.driver_documents WHERE driver_id=d)
+  OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%') THEN RAISE EXCEPTION 'FAIL same-company customer disclosure'; END IF;
  PERFORM public.create_taxi_request(quote,ride,'cash');
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
@@ -133,6 +166,8 @@ BEGIN
  PERFORM set_config('request.jwt.claims','{}',true);
  SET LOCAL ROLE anon;
  IF EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%') THEN RAISE EXCEPTION 'FAIL anonymous private file'; END IF;
+ denied:=false;BEGIN PERFORM public.driver_verification_status(d);EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL anonymous report'; END IF;
  denied:=false;BEGIN PERFORM public.review_driver_application(application,'approved','Anon');EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
  IF NOT denied THEN RAISE EXCEPTION 'FAIL anonymous RPC'; END IF;
  RESET ROLE;

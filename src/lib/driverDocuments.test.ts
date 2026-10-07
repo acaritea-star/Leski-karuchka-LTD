@@ -30,3 +30,22 @@ describe('private document delivery', () => {
     expect(mock.createSignedUrl).toHaveBeenCalledWith(command.path, 60);
   });
 });
+
+it('keeps insurance independent of an uncertain licence upload from the previous UI', () => {
+  localStorage.setItem(`leski:document-upload:${owner}`, JSON.stringify(command));
+  const insurance = { ...command, type: 'insurance', id: '33333333-3333-4333-8333-333333333333', path: `${owner}/33333333-3333-4333-8333-333333333333.pdf` };
+  localStorage.setItem(`leski:document-upload:${owner}:insurance`, JSON.stringify(insurance));
+  expect(loadDocumentUpload(owner, 'license')).toEqual(command);
+  expect(loadDocumentUpload(owner, 'insurance')).toEqual(insurance);
+});
+it('an old confirmation cannot clear a newer upload from another tab', async () => {
+  const newer = { ...command, id: '33333333-3333-4333-8333-333333333333', path: `${owner}/33333333-3333-4333-8333-333333333333.pdf` };
+  localStorage.setItem(`leski:document-upload:${owner}:license`, JSON.stringify(newer));
+  await registerDocumentUpload(command);
+  expect(loadDocumentUpload(owner, 'license')).toEqual(newer);
+});
+it('surfaces the storage failure if neither upload nor registration is confirmed', async () => {
+  mock.upload.mockResolvedValue({ data: null, error: { message: 'File too large', statusCode: '413' } });
+  mock.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: null, error: { message: 'No object' } }) });
+  await expect(uploadDriverDocument(command, new File(['test'], 'test.pdf', { type: 'application/pdf' }))).rejects.toThrow('File too large');
+});

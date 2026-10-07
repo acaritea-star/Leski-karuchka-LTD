@@ -1883,6 +1883,7 @@ export type Database = {
         Args: { p_day?: string; p_driver_id: string }
         Returns: Json
       }
+      driver_verification_status: { Args: { p_driver: string }; Returns: Json }
       dropgeometrycolumn:
         | {
             Args: {
