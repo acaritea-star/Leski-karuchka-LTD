@@ -1,3 +1,4 @@
+import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
@@ -123,7 +124,8 @@ export default function DriverRequests() {
     enabled: !!user?.company_id && isOnline && !!driver?.id && !activeRequest,
     refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
-  const incomingRequests = (incomingQuery.data ?? []).filter((r) => !declinedIds.has(r.id));
+  const freshIncoming = useFreshRequests(incomingQuery.data ?? []);
+  const incomingRequests = freshIncoming.filter((r) => !declinedIds.has(r.id));
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
@@ -183,6 +185,8 @@ export default function DriverRequests() {
   });
   const acceptRequest = (id: string) => {
     if (acceptInFlight.current) return;
+    const request = incomingRequests.find(row => row.id === id);
+    if (!request || !isOpenRequest(request)) { setError('Заявката вече не е налична. Обнови списъка.'); return; }
     acceptInFlight.current = true; acceptMutation.mutate(id);
   };
 

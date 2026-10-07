@@ -425,9 +425,9 @@ export default function CustomerHome() {
     const load = async () => {
       let companies = supabase.from('companies').select('id').eq('is_active',true).order('created_at').order('id').limit(1);
       if (user?.company_id) companies = companies.eq('id',user.company_id);
-      const {data:company,error:companyError} = await companies.maybeSingle();
+      const {data:company,error:companyError} = await withRequestTimeout(signal => companies.abortSignal(signal).maybeSingle());
       if (companyError || !company) { if(active) setRequestError('Няма активна компания.'); return; }
-      const {data,error} = await supabase.from('vehicle_types').select('*').eq('company_id',company.id).order('multiplier').order('id');
+      const {data,error} = await withRequestTimeout(signal => supabase.from('vehicle_types').select('*').eq('company_id',company.id).order('multiplier').order('id').abortSignal(signal));
       if (!active) return;
       if(error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
       setVehicleTypes(data);
@@ -438,7 +438,7 @@ export default function CustomerHome() {
         return firstAvailable ? firstAvailable.id : '';
       });
     };
-    void load();
+    void load().catch(() => { if (active) setRequestError('Не успяхме да заредим автомобилите. Провери връзката и опитай отново.'); });
     return () => {active=false;};
   }, [user?.id, user?.company_id, configAttempt, t]);
 

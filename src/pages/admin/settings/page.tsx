@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
@@ -33,23 +33,27 @@ export default function AdminSettings() {
     legal_name: '', registration_id: '', permit_number: '', permit_expires_on: '', document_checks_required: false, legal_verified_at: null,
   });
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
   const fetchProfile = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId) { setLoading(false); return; }
     setLoading(true);
+    setLoaded(false);
     setError('');
     try {
       const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
         .select('name, phone, email, address, legal_name, registration_id, permit_number, permit_expires_on, document_checks_required, legal_verified_at')
         .eq('id', companyId)
-        .abortSignal(signal).maybeSingle());
+        .abortSignal(signal).single());
 
       if (err) throw err;
       if (data) {
+        setLoaded(true);
         setProfile({
           name: data.name || '',
           phone: data.phone || '',
@@ -73,7 +77,8 @@ export default function AdminSettings() {
   }, [fetchProfile]);
 
   const handleSave = async () => {
-    if (!companyId || !profile.name.trim()) return;
+    if (!companyId || !loaded || savingRef.current || !profile.name.trim()) return;
+    savingRef.current = true;
     setSaving(true);
     setError('');
     setSaved(false);
@@ -100,6 +105,7 @@ export default function AdminSettings() {
       const msg = err instanceof Error ? err.message : 'Грешка при запис';
       setError(msg);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -113,6 +119,7 @@ export default function AdminSettings() {
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
           {error}
+          {!loaded && <button className="underline" onClick={() => void fetchProfile()}>Опитай отново</button>}
           <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
             <i className="ri-close-line text-red-400 text-xs" />
           </button>
@@ -179,7 +186,7 @@ export default function AdminSettings() {
             {user?.role==='SUPER_ADMIN' && <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={!!profile.legal_verified_at} onChange={e=>setField('legal_verified_at',e.target.checked?new Date().toISOString():null)}/>Проверих идентичността и валидността на посоченото разрешение</label>}
             <button
               onClick={handleSave}
-              disabled={saving || !profile.name.trim()}
+              disabled={saving || !loaded || !profile.name.trim()}
               className="w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
             >
               {saving ? t('loading') : t('save')}

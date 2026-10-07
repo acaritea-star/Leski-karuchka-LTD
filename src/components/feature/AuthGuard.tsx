@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
+import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import LegalAcceptanceNotice from './LegalAcceptanceNotice';
 
 interface AuthGuardProps {
@@ -19,6 +20,7 @@ function roleHome(user: AppUser | null): string {
 
 export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: AuthGuardProps) {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
+  const { companyId } = useAdminCompany();
   const [retrying, setRetrying] = useState(false);
   const navigate = useNavigate();
 
@@ -27,7 +29,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
   useEffect(() => {
     if (loading) return;
     // An authenticated session with an unavailable profile gets a recovery screen.
-    if (!user && session) return;
+    if (!user && (session || profileError)) return;
     if (!user) {
       navigate(redirectTo, { replace: true });
       return;
@@ -36,7 +38,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
       navigate(roleHome(user), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, session, navigate, redirectTo, rolesKey]);
+  }, [loading, user, session, profileError, navigate, redirectTo, rolesKey]);
 
   if (loading) {
     return (
@@ -49,7 +51,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
     );
   }
 
-  if (!user && session) {
+  if (!user && (session || profileError)) {
     const onRetry = async () => {
       setRetrying(true);
       try {
@@ -63,7 +65,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
         <div role="alert" className="max-w-sm text-center space-y-4">
           <p>Профилът не е достъпен в момента. Опитай отново или се свържи с поддръжката.</p>
           {profileError && (
-            <p className="text-xs text-foreground-400 break-words">Техническа причина: {profileError}</p>
+            <p className="text-xs text-foreground-400 break-words">{profileError}</p>
           )}
           <button
             onClick={onRetry}
@@ -82,5 +84,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
     return null;
   }
 
-  return <><LegalAcceptanceNotice />{children}</>;
+  const scope = user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN' ? companyId : '';
+  // Discard forms, dialogs and late component reads when account/company changes.
+  return <Fragment key={`${user.id}:${user.role}:${scope}`}><LegalAcceptanceNotice />{children}</Fragment>;
 }

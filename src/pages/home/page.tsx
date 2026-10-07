@@ -27,14 +27,14 @@ export default function AppRedirect() {
       <div className="max-w-sm text-center space-y-4">
         {loading || user ? <p role="status">Подготвяме твоята каручка…</p> : <>
           <p role="alert">
-            {session
+            {session || profileError
               ? 'Профилът не е достъпен в момента. Опитай отново или се свържи с поддръжката.'
               : 'Влез в акаунта си, за да продължиш.'}
           </p>
-          {session && profileError && (
-            <p className="text-xs text-foreground-400 break-words">Техническа причина: {profileError}</p>
+          {profileError && (
+            <p className="text-xs text-foreground-400 break-words">{profileError}</p>
           )}
-          {session && (
+          {(session || profileError) && (
             <button
               onClick={onRetry}
               disabled={retrying}

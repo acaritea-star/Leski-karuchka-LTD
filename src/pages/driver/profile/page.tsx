@@ -1,3 +1,5 @@
+import { useSignOut } from '@/hooks/useSignOut';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import LocationSettings from '@/components/feature/LocationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
 import { documentExpired } from '@/lib/legalWorkflow';
@@ -45,7 +47,7 @@ const DOC_STATUS_COLORS: Record<string, string> = {
 
 export default function DriverProfile() {
   const { t } = useTranslation();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<DriverProfile | null>(null);
@@ -94,14 +96,13 @@ export default function DriverProfile() {
     fetchProfile();
   }, [fetchProfile]);
 
-  const handleSignOut = async () => {
-    // If driver was online, set offline first
+  const { logout: handleSignOut, pending: loggingOut, error: logoutError } = useSignOut(async () => {
     if (profile?.is_online) {
-      await supabase.from('drivers').update({ is_online: false }).eq('id', profile.id);
+      const { error } = await withRequestTimeout(signal => supabase.from('drivers')
+        .update({ is_online: false }).eq('id', profile.id).select('id').abortSignal(signal).single());
+      if (error) throw error;
     }
-    await signOut();
-    navigate('/');
-  };
+  });
 
   return (
     <div className="min-h-screen bg-background-50">
@@ -113,6 +114,7 @@ export default function DriverProfile() {
       </header>
 
       <div className="p-4">
+        {logoutError && <p role="alert" className="mb-3 text-sm text-red-600">{logoutError}</p>}
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
@@ -238,7 +240,7 @@ export default function DriverProfile() {
 
             {/* Sign Out */}
             <button
-              onClick={handleSignOut}
+              onClick={handleSignOut} disabled={loggingOut}
               className="w-full py-3 bg-red-50 text-red-600 font-medium rounded-xl hover:bg-red-100 transition-colors whitespace-nowrap cursor-pointer active:scale-[0.98]"
             >
               {t('logout')}

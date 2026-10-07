@@ -41,7 +41,8 @@ interface AuthContextType {
 
 // Result of a profile lookup: we keep the real API error separate from the
 // "there is simply no profile row" case so the UI never lies about the cause.
-type ProfileResult = { user: AppUser | null; error: string | null };
+type ProfileResult = { user: AppUser | null; error: string | null; retryable?: boolean };
+const CONNECTION_ERROR = 'Връзката се забави. Провери интернета и опитай отново.';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -59,16 +60,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentUser = useRef(user);
   currentUser.current = user;
   const currentSession = useRef<Session | null>(null);
+  const applySessionRef = useRef<((next: Session | null) => Promise<void>) | null>(null);
 
   const enrichWithDriverCompany = useCallback(
     async (baseUser: AppUser): Promise<AppUser> => {
       if (baseUser.role === 'DRIVER' && !baseUser.company_id) {
         try {
-          const { data } = await supabase
+          const { data } = await withRequestTimeout(signal => supabase
             .from('drivers')
             .select('company_id')
             .eq('user_id', baseUser.id)
-            .maybeSingle();
+            .abortSignal(signal).maybeSingle());
           if (data?.company_id) {
             return { ...baseUser, company_id: data.company_id };
           }
@@ -109,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // before concluding the profile is unavailable.
       const retryDelaysMs = [0, 400, 1200];
       let lastError: string | null = null;
+      let retryable = false;
 
       for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
         if (retryDelaysMs[attempt] > 0) {
@@ -119,10 +122,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Make sure the client actually holds a session before querying —
           // without it the request goes out unauthenticated and RLS returns
           // zero rows with no error.
-          const { data: sessionData } = await withRequestTimeout(() => supabase.auth.getSession());
+          const { data: sessionData, error: sessionError } = await withRequestTimeout(() => supabase.auth.getSession());
+          if (sessionError) throw sessionError;
+          if (sessionData.session?.user.id !== authUser.id) return { user: null, error: null };
           const hasToken = Boolean(sessionData.session?.access_token);
 
-          const { data, error } = await withRequestTimeout(signal => supabase
+          const { data, error, status } = await withRequestTimeout(signal => supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
@@ -133,25 +138,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // A rejected request (401 / missing table / clock-skewed JWT) is a
             // real failure — remember it instead of pretending the row is gone.
             lastError = error.message || 'Грешка при зареждане на профила.';
+            retryable = !status || status >= 500 || status === 429;
             console.error('[AuthContext] fetchProfile query error:', error);
+            if (!retryable) return { user: null, error: lastError };
             continue;
           }
 
           if (data) {
             return await buildAppUser(data, authUser);
           }
+          lastError = null;
+          retryable = false;
 
           console.warn(
             `[AuthContext] fetchProfile: no profile for user ${authUser.id} (attempt ${attempt + 1}, token: ${hasToken})`,
           );
         } catch (e) {
           lastError = e instanceof Error ? e.message : String(e);
+          retryable = e instanceof TypeError || (e instanceof Error && ['TimeoutError', 'AbortError', 'AuthRetryableFetchError'].includes(e.name));
           console.error('[AuthContext] fetchProfile exception:', e);
         }
       }
 
       // Rows genuinely missing -> error stays null. API failures -> real message.
-      return { user: null, error: lastError };
+      return { user: null, error: retryable ? CONNECTION_ERROR : lastError, retryable };
     },
     [buildAppUser],
   );
@@ -180,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
     let revision = 0;
     let lastUserId: string | undefined;
-    const applySession = (next: Session | null) => {
+    const applySession = async (next: Session | null) => {
       if (!alive) return;
       const current = ++revision;
       const identityChanged = lastUserId !== next?.user.id;
@@ -193,46 +203,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastUserId = next?.user.id;
       currentSession.current = next;
       setSession(next);
+      if (!next) setProfileError(null);
       // A refresh/confirmed sign-in for the same account validates its profile
       // in the background. It must not unmount maps, forms and booking state.
       setLoading(!!next && (identityChanged || !currentUser.current));
       if (!next) return;
       // Leave Supabase's auth callback before making another authenticated request.
-      setTimeout(() => {
-        if (!alive || current !== revision) return;
-        void fetchProfile(next.user).then(result => {
-          if (alive && current === revision) {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      if (!alive || current !== revision) return;
+      await fetchProfile(next.user).then(result => {
+        if (alive && current === revision && currentSession.current?.user.id === next.user.id) {
+          // Keep the last verified identity through a transient network failure.
+          // Missing, disabled and permission-denied profiles still fail closed.
+          if (!result.retryable || currentUser.current?.id !== next.user.id) {
             currentUser.current = result.user;
             setUser(result.user);
-            setProfileError(result.error);
-            setLoading(false);
           }
-        });
-      }, 0);
+          setProfileError(result.error);
+          setLoading(false);
+        }
+      });
     };
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => applySession(next));
-    void supabase.auth.getSession().then(({ data }) => { if (!revision) applySession(data.session); })
-      .catch(() => { if (!revision) applySession(null); });
-    return () => { alive = false; revision++; subscription.unsubscribe(); };
+    applySessionRef.current = applySession;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => { void applySession(next); });
+    void withRequestTimeout(() => supabase.auth.getSession()).then(({ data, error }) => {
+      if (error) throw error;
+      if (!revision) void applySession(data.session);
+    }).catch(() => {
+      if (alive && !revision) { setProfileError(CONNECTION_ERROR); setLoading(false); }
+    });
+    return () => { alive = false; revision++; applySessionRef.current = null; subscription.unsubscribe(); };
   }, [fetchProfile]);
 
   const refreshProfile = useCallback(async () => {
-    const { data } = await supabase.auth.getSession();
-    const next = data.session;
-    if (!next) { currentUser.current = null; setUser(null); return; }
-    const expectedUserId = next.user.id;
-    profileFetchRef.current = null;
-    setLoading(!currentUser.current);
+    const expected = currentSession.current;
     try {
-      const result = await fetchProfile(next.user);
-      if (currentSession.current?.user.id !== expectedUserId) return;
-      currentUser.current = result.user;
-      setUser(result.user);
-      setProfileError(result.error);
-    } finally {
-      if (currentSession.current?.user.id === expectedUserId) setLoading(false);
+      const { data, error } = await withRequestTimeout(() => supabase.auth.getSession());
+      if (error) throw error;
+      if (currentSession.current !== expected) return;
+      await applySessionRef.current?.(data.session);
+    } catch {
+      if (currentSession.current === expected) { setProfileError(CONNECTION_ERROR); setLoading(false); }
     }
-  }, [fetchProfile]);
+  }, []);
 
   const signInWithOAuth = useCallback(
     (provider: SocialProvider) => startSocialSignIn(provider),
@@ -240,17 +253,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    stopDriverGps(); stopSharedGps();
     if (session?.user.id) {
-      try { await unregisterPush(session.user.id); }
+      try { await withRequestTimeout(() => unregisterPush(session.user.id)); }
       catch { console.warn('Push cleanup failed; notification permission can be revoked in browser settings.'); }
     }
-    const { error } = await supabase.auth.signOut();
+    if (currentSession.current?.user.id !== session?.user.id) return;
+    const { error } = await withRequestTimeout(() => supabase.auth.signOut());
     if (error) throw error;
+    stopDriverGps(); stopSharedGps();
     clearRecentLocations();
     queryClient.clear();
     setUser(null);
     setSession(null);
+    currentUser.current = null;
+    currentSession.current = null;
   }, [session?.user.id]);
 
   const updateProfile = useCallback(
@@ -263,23 +279,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (updates.phone !== undefined) updateData.phone = updates.phone;
       if (updates.avatar_url !== undefined) updateData.avatar_url = updates.avatar_url;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', user.id)
-        .select('*')
-        .maybeSingle();
+      try {
+        const { data, error } = await withRequestTimeout(signal => supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', user.id)
+          .select('*')
+          .abortSignal(signal).single());
 
-      if (!error && data && currentSession.current?.user.id === user.id) {
-        setUser({
-          ...user,
-          first_name: data.first_name ?? '',
-          last_name: data.last_name ?? '',
-          phone: data.phone ?? '',
-          avatar_url: data.avatar_url,
-        });
+        if (!error && data && currentSession.current?.user.id === user.id && currentUser.current?.id === user.id) {
+          const next = {
+            ...currentUser.current,
+            first_name: data.first_name ?? '',
+            last_name: data.last_name ?? '',
+            phone: data.phone ?? '',
+            avatar_url: data.avatar_url,
+          };
+          currentUser.current = next;
+          setUser(next);
+        }
+        return { data, error };
+      } catch (error) {
+        return { data: null, error: { message: error instanceof Error ? error.message : CONNECTION_ERROR } };
       }
-      return { data, error };
     },
     [user],
   );

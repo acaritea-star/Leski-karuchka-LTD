@@ -1,3 +1,4 @@
+import { useSignOut } from '@/hooks/useSignOut';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +30,9 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
-  const { companyId, companies, setCompanyId, companyName } = useAdminCompany();
+  const { user } = useAuth();
+  const { logout, pending: loggingOut, error: logoutError } = useSignOut();
+  const { companyId, companies, setCompanyId, companyName, error: companyError, reload } = useAdminCompany();
 
   return (
     <div className="min-h-screen bg-background-50 flex">
@@ -79,15 +81,14 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
         </nav>
         <div className="absolute bottom-4 left-3 right-3">
           <button
-            onClick={async () => {
-              await signOut();
-              navigate('/');
-            }}
+            onClick={logout}
+            disabled={loggingOut}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors cursor-pointer whitespace-nowrap"
           >
             <i className="ri-logout-box-line text-lg" />
             <span>{t('logout')}</span>
           </button>
+          {logoutError && <p role="alert" className="text-xs text-red-600 px-3">{logoutError}</p>}
         </div>
       </aside>
 
@@ -135,7 +136,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6">{companyError && <div role="alert" className="mb-4 text-sm text-red-600">{companyError} <button className="underline" onClick={reload}>Опитай отново</button></div>}{children}</main>
       </div>
     </div>
   );

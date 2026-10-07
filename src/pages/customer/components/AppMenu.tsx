@@ -1,3 +1,4 @@
+import { useSignOut } from '@/hooks/useSignOut';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,7 +16,8 @@ export default function AppMenu() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const { logout: handleLogout, pending: loggingOut, error: logoutError } = useSignOut();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -50,12 +52,6 @@ export default function AppMenu() {
     navigate(path);
   };
 
-  const handleLogout = async () => {
-    setOpen(false);
-    setClosing(false);
-    await signOut();
-    navigate('/');
-  };
 
   const initials = `${user?.first_name?.charAt(0) || ''}${user?.last_name?.charAt(0) || ''}`;
 
@@ -190,6 +186,7 @@ export default function AppMenu() {
           <button
             type="button"
             onClick={handleLogout}
+            disabled={loggingOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
           >
             <span className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
@@ -197,6 +194,7 @@ export default function AppMenu() {
             </span>
             <span className="text-[15px] font-medium">{t('logout')}</span>
           </button>
+          {logoutError && <p role="alert" className="text-xs text-red-600 px-3">{logoutError}</p>}
         </div>
       </aside>
     </dialog>

@@ -1,3 +1,4 @@
+import { createAuthFetch } from './authFetch';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 
@@ -34,6 +35,7 @@ function inMemoryAuthLock<R>(
 // Typed client — every .from('table') call is checked against the real schema,
 // so a misspelled column fails at compile time instead of at runtime.
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: createAuthFetch(supabaseUrl) },
   auth: {
     autoRefreshToken: true,
     persistSession: true,
