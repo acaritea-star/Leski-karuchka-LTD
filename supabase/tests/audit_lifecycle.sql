@@ -24,7 +24,8 @@ BEGIN
    VALUES(vehicle,company,vehicle_type,'Audit','Fixture','AUDIT-'||vehicle);
   INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
    VALUES(driver,company,43.2,25.6,10,clock_timestamp());
-  UPDATE public.drivers SET vehicle_id=vehicle,is_verified=true,is_online=true WHERE id=driver;
+  UPDATE public.drivers SET document_verification_required=false WHERE id=driver;
+UPDATE public.drivers SET vehicle_id=vehicle,is_verified=true,is_online=true WHERE id=driver;
   PERFORM set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true);
   FOR k IN 1..20 LOOP
    SET LOCAL ROLE authenticated;

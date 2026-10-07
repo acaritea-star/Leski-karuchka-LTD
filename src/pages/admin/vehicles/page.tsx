@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import { workflowError } from '@/lib/driverDocuments';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,40 +32,45 @@ export default function AdminVehicles() {
   const [editing, setEditing] = useState<VehicleWithDriver | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const saveId = useRef(crypto.randomUUID());
+  const saveLatch = useRef(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const vehiclesQuery = useQuery({
     queryKey: companyId ? queryKeys.adminVehicles(companyId) : ['vehicles', 'company', 'none'],
     queryFn: async (): Promise<{ vehicles: VehicleWithDriver[]; drivers: DriverOption[]; vehicleTypes: Tables<'vehicle_types'>[] }> => {
-      const { data: vehicles, error } = await supabase
+      const { data: vehicles, error } = await withRequestTimeout(signal => supabase
         .from('vehicles')
         .select('*')
         .eq('company_id', companyId!)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).abortSignal(signal));
       if (error) throw error;
 
-      const { data: drivers } = await supabase
+      const { data: drivers, error: driverError } = await withRequestTimeout(signal => supabase
         .from('drivers')
         .select('id, user_id, vehicle_id')
-        .eq('company_id', companyId!);
+        .eq('company_id', companyId!).abortSignal(signal));
+      if (driverError) throw driverError;
       const driverList = drivers ?? [];
 
       const userIds = driverList.map((d) => d.user_id);
       const nameMap: Record<string, string> = {};
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles, error: profileError } = await withRequestTimeout(signal => supabase
           .from('profiles')
           .select('id, first_name, last_name')
-          .in('id', userIds);
+          .in('id', userIds).abortSignal(signal));
+        if (profileError) throw profileError;
         for (const p of profiles ?? []) {
           nameMap[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Шофьор';
         }
       }
 
-      const { data: vehicleTypes } = await supabase
+      const { data: vehicleTypes, error: typeError } = await withRequestTimeout(signal => supabase
         .from('vehicle_types')
         .select('*')
-        .eq('company_id', companyId!);
+        .eq('company_id', companyId!).abortSignal(signal));
+      if (typeError) throw typeError;
 
       const driverOptions: DriverOption[] = driverList.map((d) => ({
         id: d.id,
@@ -88,7 +95,7 @@ export default function AdminVehicles() {
   const drivers = vehiclesQuery.data?.drivers ?? [];
   const vehicleTypes = useMemo(() => vehiclesQuery.data?.vehicleTypes ?? [], [vehiclesQuery.data?.vehicleTypes]);
   const loading = vehiclesQuery.isLoading;
-  const queryError = vehiclesQuery.error instanceof Error ? vehiclesQuery.error.message : '';
+  const queryError = vehiclesQuery.error ? workflowError(vehiclesQuery.error, 'Автомобилите не са заредени.') : '';
 
   const typeNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -97,6 +104,7 @@ export default function AdminVehicles() {
   }, [vehicleTypes]);
 
   const openAdd = () => {
+    saveId.current = crypto.randomUUID();
     setEditing(null);
     setForm(emptyForm);
     setShowForm(true);
@@ -122,35 +130,26 @@ export default function AdminVehicles() {
       if (!companyId) throw new Error('Не е заредена фирма');
       const { editing, form } = input;
 
-      const payload = {
-        company_id: companyId,
-        make: form.make.trim(),
-        model: form.model.trim(),
-        year: form.year ? parseInt(form.year, 10) : null,
-        color: form.color.trim() || null,
-        registration_number: form.registration_number.trim(),
-        vehicle_type_id: form.vehicle_type_id || null,
-        capacity: form.capacity ? parseInt(form.capacity, 10) : 4,
-        is_active: true,
-      };
-
-      let vehicleId: string;
-      if (editing) {
-        const { error } = await supabase.from('vehicles').update(payload).eq('id', editing.id);
-        if (error) throw error;
-        vehicleId = editing.id;
-      } else {
-        const { data, error } = await supabase.from('vehicles').insert(payload).select('id').single();
-        if (error) throw error;
-        vehicleId = data.id;
-      }
-
-      if (form.driver_id) {
-        const { error } = await supabase
-          .from('drivers')
-          .update({ vehicle_id: vehicleId })
-          .eq('id', form.driver_id);
-        if (error) throw error;
+      const { error } = await withRequestTimeout(signal => supabase.rpc('save_driver_vehicle', {
+        p_id: editing?.id ?? saveId.current,
+        p_company: companyId,
+        // PostgreSQL accepts NULL for unassignment; generated RPC args omit nullability.
+        p_driver: (form.driver_id || null) as string,
+        p_expected_driver: (editing?.driver_id || null) as string,
+        p_details: {
+          make: form.make.trim(), model: form.model.trim(), registration_number: form.registration_number.trim(),
+          year: form.year || null, color: form.color.trim() || null, vehicle_type_id: form.vehicle_type_id,
+          capacity: form.capacity ? Number(form.capacity) : 4,
+        },
+      }).abortSignal(signal));
+      if (error) throw error;
+    },
+    retry: false,
+    onSettled: () => {
+      saveLatch.current = false;
+      if (companyId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.adminVehicles(companyId) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(companyId) });
       }
     },
     onSuccess: () => {
@@ -159,13 +158,15 @@ export default function AdminVehicles() {
       if (companyId) queryClient.invalidateQueries({ queryKey: queryKeys.adminVehicles(companyId) });
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Грешка при запис');
+      setError(workflowError(err, 'Записът не е потвърден. Обновете списъка преди повторен опит.'));
     },
   });
 
   const deleteMutation = useMutation({
+    retry: false,
+    onError: err => setError(workflowError(err, 'Изтриването не е потвърдено.')),
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('vehicles').delete().eq('id', id);
+      const { error } = await withRequestTimeout(signal => supabase.from('vehicles').delete().eq('id', id).select('id').abortSignal(signal).single());
       if (error) throw error;
     },
     onSuccess: () => {
@@ -175,7 +176,9 @@ export default function AdminVehicles() {
   });
 
   const handleSave = () => {
-    if (!form.make.trim() || !form.model.trim()) return;
+    if (saveLatch.current || !form.make.trim() || !form.model.trim()) return;
+    if (!form.registration_number.trim() || !form.vehicle_type_id) { setError('Въведете регистрационен номер и категория.'); return; }
+    saveLatch.current = true;
     setError('');
     saveMutation.mutate({ editing, form });
   };
@@ -294,6 +297,7 @@ export default function AdminVehicles() {
             </div>
 
             <div className="p-5 space-y-3">
+              {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-foreground-500 block mb-1">Марка</label>
@@ -425,6 +429,7 @@ export default function AdminVehicles() {
             </div>
             <h3 className="font-semibold text-foreground-950 mb-1">Изтриване на автомобил</h3>
             <p className="text-sm text-foreground-500 mb-4">Сигурни ли сте, че искате да изтриете този автомобил?</p>
+            {error && <p role="alert" className="text-sm text-red-600 mb-3">{error}</p>}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteId(null)}

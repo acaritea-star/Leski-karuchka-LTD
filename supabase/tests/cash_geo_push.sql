@@ -68,6 +68,7 @@ UPDATE public.drivers SET is_online=false WHERE id=(SELECT driver FROM test_ids)
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.drivers SET is_online=true,is_verified=false WHERE id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
+UPDATE public.drivers SET document_verification_required=false WHERE id=(SELECT driver FROM test_ids);
 UPDATE public.drivers SET is_verified=true,vehicle_id=NULL WHERE id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.drivers SET vehicle_id=(SELECT vehicle FROM test_ids) WHERE id=(SELECT driver FROM test_ids);

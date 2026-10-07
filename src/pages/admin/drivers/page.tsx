@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import DriverApplications from './DriverApplications';
+import { signedDocumentUrl, workflowError } from '@/lib/driverDocuments';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +21,6 @@ const DOC_LABELS: Record<string, string> = {
   insurance: 'Застраховка',
 };
 
-const emptyForm = { first_name: '', last_name: '', email: '', phone: '', password: '' };
 
 export default function AdminDrivers() {
   const { t } = useTranslation();
@@ -31,31 +32,21 @@ export default function AdminDrivers() {
   const [selected, setSelected] = useState<DriverWithName | null>(null);
   const [documentDates,setDocumentDates] = useState<Record<string,string>>({});
 
-  // Add driver state
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState(emptyForm);
-  const [addError, setAddError] = useState('');
-  const [addSuccess, setAddSuccess] = useState(false);
-  const [modalCompanyId, setModalCompanyId] = useState<string>('');
-
+  const [documentError, setDocumentError] = useState('');
+  const [openingDocument, setOpeningDocument] = useState(false);
+  const verifyLatch = useRef(false);
+  const documentLatch = useRef(false);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-
-  useEffect(() => {
-    if (showAdd) {
-      setModalCompanyId(companyId || '');
-      setAddError('');
-      setAddSuccess(false);
-    }
-  }, [showAdd, companyId]);
 
   const driversQuery = useQuery({
     queryKey: companyId ? queryKeys.adminDrivers(companyId) : ['drivers', 'company', 'none'],
     queryFn: async (): Promise<DriverWithName[]> => {
-      const { data: driversRaw, error } = await supabase
+      const { data: driversRaw, error } = await withRequestTimeout(signal => supabase
         .from('drivers')
         .select('*')
         .eq('company_id', companyId!)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).abortSignal(signal));
       if (error) throw error;
 
       const list = driversRaw ?? [];
@@ -63,10 +54,11 @@ export default function AdminDrivers() {
 
       const profileMap: Record<string, Tables<'profiles'>> = {};
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles, error: profileError } = await withRequestTimeout(signal => supabase
           .from('profiles')
           .select('*')
-          .in('id', userIds);
+          .in('id', userIds).abortSignal(signal));
+        if (profileError) throw profileError;
         for (const p of profiles ?? []) profileMap[p.id] = p;
       }
 
@@ -80,17 +72,17 @@ export default function AdminDrivers() {
   });
 
   const drivers = driversQuery.data ?? [];
-  const error = driversQuery.error instanceof Error ? driversQuery.error.message : '';
+  const error = driversQuery.error ? workflowError(driversQuery.error, 'Не успяхме да заредим шофьорите.') : '';
   const loading = driversQuery.isLoading;
 
   const documentsQuery = useQuery({
     queryKey: selected?.id ? queryKeys.driverDocuments(selected.id) : ['driver_documents', 'none'],
     queryFn: async (): Promise<DocumentRow[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await withRequestTimeout(signal => supabase
         .from('driver_documents')
         .select('*')
         .eq('driver_id', selected!.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).abortSignal(signal));
       if (error) throw error;
       return data ?? [];
     },
@@ -100,104 +92,54 @@ export default function AdminDrivers() {
   const docLoading = documentsQuery.isLoading;
 
   const toggleVerifyMutation = useMutation({
+    retry: false,
     mutationFn: async (d: DriverWithName) => {
-      const { error } = await supabase
-        .from('drivers')
-        .update({ is_verified: !d.is_verified })
-        .eq('id', d.id);
-      if (error) throw error;
+      try {
+        const { error } = await withRequestTimeout(signal => supabase.from('drivers')
+          .update({ is_verified: !d.is_verified }).eq('id', d.id).eq('company_id', d.company_id)
+          .eq('is_verified', d.is_verified).select('id').abortSignal(signal).single());
+        if (error) throw error;
+      } catch (error) {
+        // A timed-out write may already have succeeded. Confirm once, never toggle again automatically.
+        const check = await withRequestTimeout(signal => supabase.from('drivers').select('is_verified')
+          .eq('id', d.id).abortSignal(signal).single()).catch(() => null);
+        if (check?.error || !check?.data || check.data.is_verified !== !d.is_verified) throw error;
+      }
     },
-    onSuccess: () => {
-      if (companyId) queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(companyId) });
+    onSettled: (_data, _error, d) => {
+      verifyLatch.current = false;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(d.company_id) });
     },
   });
-
   const setDocStatusMutation = useMutation({
-    mutationFn: async (input: { doc: DocumentRow; status: DocumentRow['status'] }) => {
-      const { error } = await withRequestTimeout(signal => supabase
-        .from('driver_documents')
-        .update({ status: input.status, expires_at: (documentDates[input.doc.id] ?? input.doc.expires_at) || null })
-        .eq('id', input.doc.id).select('id').abortSignal(signal).single());
+    retry: false,
+    mutationFn: async (input: { doc: DocumentRow; status: DocumentRow['status']; expires: string | null }) => {
+      const { error } = await withRequestTimeout(signal => supabase.from('driver_documents')
+        .update({ status: input.status, expires_at: input.expires }).eq('id', input.doc.id)
+        .eq('status', input.doc.status).select('id').abortSignal(signal).single());
       if (error) throw error;
     },
-    onSuccess: () => {
-      if (selected?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverDocuments(selected.id) });
+    onSettled: (_data, _error, input) => {
+      documentLatch.current = false;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.driverDocuments(input.doc.driver_id) });
     },
   });
-
-  const addDriverMutation = useMutation({
-    mutationFn: async (input: { targetCompanyId: string; form: typeof addForm }) => {
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email: input.form.email.trim(),
-        password: input.form.password,
-        options: {
-          data: {
-            role: 'DRIVER',
-            first_name: input.form.first_name.trim(),
-            last_name: input.form.last_name.trim(),
-            phone: input.form.phone.trim(),
-            company_id: input.targetCompanyId,
-          },
-        },
-      });
-
-      if (signUpErr) throw signUpErr;
-      if (!signUpData.user) throw new Error('Email-ът вече е регистриран в системата');
-
-      const { error: driverErr } = await supabase.from('drivers').insert({
-        user_id: signUpData.user.id,
-        company_id: input.targetCompanyId,
-        is_online: false,
-        is_verified: false,
-        rating: 5,
-        total_trips: 0,
-      });
-      if (driverErr) throw new Error('Грешка при създаване на шофьор: ' + driverErr.message);
-    },
-    onSuccess: () => {
-      setAddForm(emptyForm);
-      setModalCompanyId(companyId || '');
-      setAddSuccess(true);
-      setTimeout(() => setAddSuccess(false), 2500);
-      setShowAdd(false);
-      if (companyId) queryClient.invalidateQueries({ queryKey: queryKeys.adminDrivers(companyId) });
-    },
-    onError: (err) => {
-      setAddError(err instanceof Error ? err.message : 'Грешка при добавяне на шофьор');
-    },
-  });
-
-  const addField = (key: keyof typeof addForm, value: string) =>
-    setAddForm((prev) => ({ ...prev, [key]: value }));
-
-  const handleAddDriver = () => {
-    const targetCompanyId = isSuperAdmin ? modalCompanyId : companyId;
-
-    if (!targetCompanyId) {
-      setAddError(isSuperAdmin ? 'Изберете фирма от падащото меню.' : 'Не е заредена фирма. Презаредете страницата.');
-      return;
-    }
-    if (!addForm.first_name.trim()) {
-      setAddError('Въведете име на шофьора.');
-      return;
-    }
-    if (!addForm.last_name.trim()) {
-      setAddError('Въведете фамилия на шофьора.');
-      return;
-    }
-    if (!addForm.email.trim()) {
-      setAddError('Въведете имейл адрес.');
-      return;
-    }
-    if (addForm.password.length < 6) {
-      setAddError('Паролата трябва да е поне 6 символа.');
-      return;
-    }
-
-    setAddError('');
-    setAddSuccess(false);
-    addDriverMutation.mutate({ targetCompanyId, form: addForm });
-  };
+  function reviewDocument(doc: DocumentRow, status: DocumentRow['status']) {
+    if (documentLatch.current) return;
+    documentLatch.current = true;
+    setDocStatusMutation.mutate({ doc, status, expires: (documentDates[doc.id] ?? doc.expires_at) || null });
+  }
+  async function openDocument(doc: DocumentRow) {
+    if (openingDocument) return;
+    const tab = window.open('about:blank', '_blank');
+    if (tab) tab.opener = null;
+    setOpeningDocument(true); setDocumentError('');
+    try {
+      if (!tab) throw new Error('Разрешете отварянето на нов раздел за преглед на документа.');
+      tab.location.replace(await signedDocumentUrl(doc.file_url));
+    } catch (error) { tab?.close(); setDocumentError(workflowError(error, 'Документът не може да бъде отворен.')); }
+    finally { setOpeningDocument(false); }
+  }
 
   const filtered = drivers.filter((d) =>
     `${d.first_name} ${d.last_name}`.toLowerCase().includes(search.toLowerCase()),
@@ -205,7 +147,8 @@ export default function AdminDrivers() {
 
   return (
     <AdminLayout title={t('nav_drivers')}>
-      {setDocStatusMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">Документът не е потвърден. За одобрение на книжка или застраховка посочете валиден срок и опитайте отново.</p>}
+      {toggleVerifyMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">{workflowError(toggleVerifyMutation.error, 'Верификацията не е потвърдена.')}</p>}
+      <p className="mb-4 text-sm text-foreground-500">За верификация: одобрете валидни книжка и застраховка от „Детайли“ и назначете активен автомобил от „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -287,6 +230,7 @@ export default function AdminDrivers() {
                 </div>
               </div>
 
+              {d.is_verified && !d.document_verification_required && <p className="mb-3 text-xs text-foreground-500">По-ранна верификация: проверете документите. За новите профили те са задължителни.</p>}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-background-50 rounded-xl p-3 text-center">
                   <p className="text-lg font-bold text-foreground-950 font-heading">{parseFloat(String(d.rating || 0)).toFixed(1)}</p>
@@ -300,13 +244,14 @@ export default function AdminDrivers() {
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setSelected(d)}
+                  onClick={() => { setSelected(d); setDocumentError(''); setDocStatusMutation.reset(); }}
                   className="flex-1 py-2 rounded-lg bg-background-100 text-foreground-700 text-sm font-medium hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer"
                 >
                   Детайли
                 </button>
                 <button
-                  onClick={() => toggleVerifyMutation.mutate(d)}
+                  onClick={() => { if (!verifyLatch.current) { verifyLatch.current = true; toggleVerifyMutation.mutate(d); } }}
+                  disabled={toggleVerifyMutation.isPending}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
                     d.is_verified
                       ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
@@ -337,139 +282,8 @@ export default function AdminDrivers() {
             </div>
 
             <div className="p-5 space-y-3">
-              {/* Company selector */}
-              <div className="rounded-xl border border-background-200 p-3 space-y-2 bg-background-50/50">
-                <label className="text-xs font-semibold text-foreground-700 block flex items-center gap-1">
-                  <i className="ri-building-2-line" />
-                  Фирма / Автопарк *
-                </label>
-                {ctxLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-foreground-400">
-                    <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-                    Зареждане на фирми…
-                  </div>
-                ) : isSuperAdmin ? (
-                  <div className="relative">
-                    <select
-                      value={modalCompanyId}
-                      onChange={(e) => setModalCompanyId(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2.5 bg-white rounded-xl border border-background-200 text-sm text-foreground-900 focus:outline-none focus:ring-2 focus:ring-primary-200 cursor-pointer appearance-none"
-                    >
-                      <option value="" disabled>
-                        Избери фирма…
-                      </option>
-                      {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                    <i className="ri-building-2-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
-                    <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-foreground-700">
-                    <i className="ri-building-2-line text-primary-500" />
-                    <span className="font-medium">{companyName || 'Неизвестна фирма'}</span>
-                  </div>
-                )}
-                <p className="text-xs text-foreground-400">
-                  {isSuperAdmin
-                    ? 'Като супер админ можете да добавяте шофьори към всяка фирма.'
-                    : 'Шофьорът ще бъде добавен към фирмата, с която сте свързани.'}
-                </p>
-              </div>
-
-              {addSuccess && (
-                <div className="flex items-center gap-2 bg-primary-50 text-primary-600 text-sm rounded-xl px-4 py-3">
-                  <i className="ri-check-double-line" />
-                  Шофьорът е добавен успешно.
-                </div>
-              )}
-              {addError && (
-                <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3">
-                  <i className="ri-error-warning-line flex-shrink-0" />
-                  <span className="break-words">{addError}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Име *</label>
-                  <input
-                    type="text"
-                    value={addForm.first_name}
-                    onChange={(e) => addField('first_name', e.target.value)}
-                    placeholder="Иван"
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Фамилия *</label>
-                  <input
-                    type="text"
-                    value={addForm.last_name}
-                    onChange={(e) => addField('last_name', e.target.value)}
-                    placeholder="Петров"
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-foreground-500 block mb-1">Имейл *</label>
-                <input
-                  type="email"
-                  value={addForm.email}
-                  onChange={(e) => addField('email', e.target.value)}
-                  placeholder="driver@email.com"
-                  className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Телефон</label>
-                  <input
-                    type="text"
-                    value={addForm.phone}
-                    onChange={(e) => addField('phone', e.target.value)}
-                    placeholder="+359..."
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Парола * (мин. 6)</label>
-                  <input
-                    type="password"
-                    value={addForm.password}
-                    onChange={(e) => addField('password', e.target.value)}
-                    placeholder="минимум 6 символа"
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-background-50 text-foreground-500 text-xs rounded-xl px-3 py-2.5 flex items-center gap-2">
-                <i className="ri-information-line flex-shrink-0" />
-                Шофьорът ще влиза в приложението с този имейл и парола.
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowAdd(false)}
-                  className="flex-1 py-2.5 bg-background-100 text-foreground-600 font-medium rounded-xl hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer text-sm"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  onClick={handleAddDriver}
-                  disabled={addDriverMutation.isPending}
-                  className="flex-1 py-2.5 bg-primary-500 text-white font-medium rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer text-sm disabled:opacity-50"
-                >
-                  {addDriverMutation.isPending ? t('loading') : 'Добави шофьор'}
-                </button>
-              </div>
+              <p className="font-medium">{companyName || 'Изберете фирма от селектора в панела'}</p>
+              {companyId && <DriverApplications key={companyId} companyId={companyId} />}
             </div>
           </div>
         </div>
@@ -496,7 +310,9 @@ export default function AdminDrivers() {
             </div>
 
             <div className="p-5">
-              {docLoading ? (
+              {documentError && <p role="alert" className="text-sm text-red-600 mb-3">{documentError}</p>}
+              {setDocStatusMutation.isError && <p role="alert" className="text-sm text-red-600 mb-3">{workflowError(setDocStatusMutation.error, 'Промяната не е потвърдена. Обновете документите.')}</p>}
+              {documentsQuery.isError ? <p role="alert" className="text-sm text-red-600">Документите не са заредени. <button className="underline" onClick={() => void documentsQuery.refetch()}>Опитай отново</button></p> : docLoading ? (
                 <div className="flex justify-center py-10">
                   <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                 </div>
@@ -534,18 +350,16 @@ export default function AdminDrivers() {
 
                       <label className="block text-xs text-foreground-500 mt-3">Валиден до<input aria-label={'Валиден до '+doc.id} type="date" value={documentDates[doc.id] ?? doc.expires_at ?? ''} onChange={e=>setDocumentDates({...documentDates,[doc.id]:e.target.value})} className="block w-full rounded-lg border border-background-200 p-2 mt-1"/></label>
                       <div className="flex gap-2 mt-3 pt-3 border-t border-background-100">
-                        <a
-                          href={doc.file_url || '#'}
-                          target="_blank"
-                          rel="nofollow noopener noreferrer"
+                        <button type="button" disabled={openingDocument}
+                          onClick={() => void openDocument(doc)}
                           className="flex-1 py-2 rounded-lg bg-background-100 text-foreground-700 text-xs font-medium hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer text-center"
                         >
                           Преглед
-                        </a>
+                        </button>
                         {(doc.status !== 'approved' || documentDates[doc.id] !== undefined) && (
                           <button
                             disabled={setDocStatusMutation.isPending}
-                            onClick={() => setDocStatusMutation.mutate({ doc, status: 'approved' })}
+                            onClick={() => reviewDocument(doc, 'approved')}
                             className="flex-1 py-2 rounded-lg bg-primary-500 text-white text-xs font-medium hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer"
                           >
                             Одобри
@@ -554,7 +368,7 @@ export default function AdminDrivers() {
                         {doc.status !== 'rejected' && (
                           <button
                             disabled={setDocStatusMutation.isPending}
-                            onClick={() => setDocStatusMutation.mutate({ doc, status: 'rejected' })}
+                            onClick={() => reviewDocument(doc, 'rejected')}
                             className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors whitespace-nowrap cursor-pointer"
                           >
                             Отхвърли

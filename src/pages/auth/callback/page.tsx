@@ -1,3 +1,4 @@
+import { consumeAuthReturn } from '@/lib/authReturn';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -41,13 +42,13 @@ export default function AuthCallback() {
           }
           if (!data.session) { setErrorKey('auth_callback_missing'); return; }
           await finishLegalIntent();
-          navigate('/app', { replace: true });
+          navigate(consumeAuthReturn(), { replace: true });
           return;
         }
 
         const { data, error } = await supabase.auth.getSession();
         if (error) { setErrorKey(socialAuthErrorKey(error)); return; }
-        if (data.session) { await finishLegalIntent(); navigate('/app', { replace: true }); return; }
+        if (data.session) { await finishLegalIntent(); navigate(consumeAuthReturn(), { replace: true }); return; }
         setErrorKey('auth_callback_missing');
       } catch (error) {
         setErrorKey(socialAuthErrorKey(error));

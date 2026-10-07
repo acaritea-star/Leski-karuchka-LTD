@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react';
+import { beginDriverApplicationLogin } from '@/lib/authReturn';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -14,13 +16,22 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => {
 } }) }));
 
 beforeEach(() => {
-  vi.clearAllMocks(); auth.session = null; auth.loading = false;
+  sessionStorage.clear(); vi.clearAllMocks(); auth.session = null; auth.loading = false;
   auth.signInWithOAuth.mockResolvedValue({ data: { url: 'https://provider.test/login' }, error: null });
 });
 afterEach(cleanup);
 const renderLogin = () => render(<MemoryRouter><LoginPage /></MemoryRouter>);
 
 describe('two social sign-in options', () => {
+  it('preserves an application return under Strict Mode with an existing session', async () => {
+    auth.session = { user: { id: 'candidate' } };
+    beginDriverApplicationLogin();
+    render(<StrictMode><MemoryRouter initialEntries={['/auth/login']}><Routes>
+      <Route path="/auth/login" element={<LoginPage />} /><Route path="/driver-join" element={<p>Application form</p>} /><Route path="/app" element={<p>Wrong destination</p>} />
+    </Routes></MemoryRouter></StrictMode>);
+    expect(await screen.findByText('Application form')).toBeTruthy();
+    expect(screen.queryByText('Wrong destination')).toBeNull();
+  });
   it.each([LoginPage, RegisterPage])('shows only Google and Facebook on %p', Page => {
     const { container } = render(<MemoryRouter><Page /></MemoryRouter>);
     expect(screen.getAllByRole('button')).toHaveLength(2);

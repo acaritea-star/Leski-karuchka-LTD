@@ -216,6 +216,82 @@ export type Database = {
           },
         ]
       }
+      driver_applications: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string | null
+          experience: string
+          full_name: string
+          has_vehicle: boolean
+          id: string
+          message: string
+          phone: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email?: string | null
+          experience: string
+          full_name: string
+          has_vehicle: boolean
+          id?: string
+          message?: string
+          phone: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          experience?: string
+          full_name?: string
+          has_vehicle?: boolean
+          id?: string
+          message?: string
+          phone?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_applications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_documents: {
         Row: {
           company_id: string
@@ -429,6 +505,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          document_verification_required: boolean
           id: string
           is_online: boolean
           is_verified: boolean
@@ -442,6 +519,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          document_verification_required?: boolean
           id?: string
           is_online?: boolean
           is_verified?: boolean
@@ -455,6 +533,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          document_verification_required?: boolean
           id?: string
           is_online?: boolean
           is_verified?: boolean
@@ -2024,6 +2103,15 @@ export type Database = {
         }
         Returns: string
       }
+      register_driver_document: {
+        Args: {
+          p_expires: string
+          p_id: string
+          p_path: string
+          p_type: Database["public"]["Enums"]["document_type"]
+        }
+        Returns: string
+      }
       register_push_subscription: {
         Args: {
           p_auth: string
@@ -2057,9 +2145,23 @@ export type Database = {
         Args: { p_id: string; p_note: string; p_status: string }
         Returns: undefined
       }
+      review_driver_application: {
+        Args: { p_decision: string; p_id: string; p_note?: string }
+        Returns: string
+      }
       road_tile_cache: {
         Args: { p_key: string; p_roads?: Json }
         Returns: Json
+      }
+      save_driver_vehicle: {
+        Args: {
+          p_company: string
+          p_details: Json
+          p_driver: string
+          p_expected_driver: string
+          p_id: string
+        }
+        Returns: string
       }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }
@@ -2641,6 +2743,17 @@ export type Database = {
       st_wrapx: {
         Args: { geom: unknown; move: number; wrap: number }
         Returns: unknown
+      }
+      submit_driver_application: {
+        Args: {
+          p_company: string
+          p_experience: string
+          p_full_name: string
+          p_has_vehicle: boolean
+          p_message?: string
+          p_phone: string
+        }
+        Returns: string
       }
       sweep_stuck_requests: {
         Args: { max_age_minutes?: number }

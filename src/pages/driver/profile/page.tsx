@@ -2,99 +2,34 @@ import { useSignOut } from '@/hooks/useSignOut';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import LocationSettings from '@/components/feature/LocationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
-import { documentExpired } from '@/lib/legalWorkflow';
-import { useState, useEffect, useCallback } from 'react';
+import DriverDocuments from '@/components/feature/DriverDocuments';
+import { useQuery } from '@tanstack/react-query';
+import { driverRecordOptions } from '@/lib/driverRecord';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-
-interface DriverProfile {
-  id: string;
-  is_online: boolean;
-  rating: number;
-  total_trips: number;
-  is_verified: boolean;
-}
-
-type VehicleInfo = import('@/lib/database.types').Tables<'vehicles'>;
-
-interface DocumentInfo {
-  id: string;
-  type: string;
-  status: string;
-  created_at: string;
-  expires_at: string | null;
-}
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  license: 'license',
-  id_card: 'id_card',
-  insurance: 'insurance',
-};
-
-const DOC_STATUS_ICONS: Record<string, string> = {
-  pending: 'ri-time-line',
-  approved: 'ri-check-double-line',
-  rejected: 'ri-close-circle-line',
-};
-
-const DOC_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-primary-100 text-primary-700',
-  approved: 'bg-accent-100 text-accent-700',
-  rejected: 'bg-red-100 text-red-600',
-};
 
 export default function DriverProfile() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [profile, setProfile] = useState<DriverProfile | null>(null);
-  const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
-  const [documents, setDocuments] = useState<DocumentInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchProfile = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const { data: driverData } = await supabase
-        .from('drivers')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (driverData) {
-        setProfile(driverData as DriverProfile);
-
-        // Fetch vehicle if assigned
-        if (driverData.vehicle_id) {
-          const { data: vehicleData } = await supabase
-            .from('vehicles')
-            .select('*')
-            .eq('id', driverData.vehicle_id)
-            .maybeSingle();
-          if (vehicleData) setVehicle(vehicleData as VehicleInfo);
-        }
-
-        // Fetch documents
-        const { data: docsData } = await supabase
-          .from('driver_documents')
-          .select('*')
-          .eq('driver_id', driverData.id)
-          .order('created_at', { ascending: false });
-        if (docsData) setDocuments(docsData as DocumentInfo[]);
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+  const profileQuery = useQuery(driverRecordOptions(user?.id));
+  const profile = profileQuery.data;
+  const loading = profileQuery.isPending;
+  const vehicleQuery = useQuery({
+    queryKey: ['driver-profile-vehicle', user?.id, profile?.vehicle_id],
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase.from('vehicles').select('*')
+        .eq('id', profile!.vehicle_id!).abortSignal(abort).single(), 10_000, signal);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.vehicle_id,
+  });
+  const vehicle = vehicleQuery.data;
+  const fetchProfile = () => profileQuery.refetch();
 
   const { logout: handleSignOut, pending: loggingOut, error: logoutError } = useSignOut(async () => {
     if (profile?.is_online) {
@@ -114,6 +49,8 @@ export default function DriverProfile() {
       </header>
 
       <div className="p-4">
+        {(profileQuery.isError || vehicleQuery.isError) && <p role="alert" className="mb-3 text-sm text-red-600">Не успяхме да заредим профила или автомобила. <button className="underline" onClick={() => { void profileQuery.refetch(); if (profile?.vehicle_id) void vehicleQuery.refetch(); }}>Опитай отново</button></p>}
+        {profile && !profile.is_verified && <p className="mb-3 text-sm text-foreground-600">Профилът очаква верификация. Качи документите си по-долу. Фирмата трябва да ги одобри и да назначи автомобил, преди да получаваш заявки.</p>}
         {logoutError && <p role="alert" className="mb-3 text-sm text-red-600">{logoutError}</p>}
         {loading ? (
           <div className="flex justify-center py-16">
@@ -208,35 +145,7 @@ export default function DriverProfile() {
               )}
             </div>
 
-            {/* Documents Card */}
-            <div className="bg-white rounded-2xl p-5 mb-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-background-100 flex items-center justify-center">
-                  <i className="ri-file-text-line text-foreground-600 text-sm" />
-                </div>
-                <h3 className="text-sm font-semibold text-foreground-950">{t('driver_documents')}</h3>
-              </div>
-
-              {documents.length === 0 ? (
-                <p className="text-sm text-foreground-400 text-center py-3">Няма качени документи</p>
-              ) : (
-                <div className="space-y-2">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-3">
-                        <i className={`${DOC_STATUS_ICONS[doc.status] || 'ri-file-line'} text-foreground-500 text-sm`} />
-                        <span className="text-sm text-foreground-800">
-                          {t(DOC_TYPE_LABELS[doc.type] || doc.type)}
-                        </span>
-                      </div>
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${DOC_STATUS_COLORS[doc.status] || 'bg-background-100 text-foreground-500'}`}>
-                        {documentExpired(doc.expires_at) ? 'Изтекъл срок' : t(doc.status === 'rejected' ? 'rejected_status' : doc.status)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {profile && user && <DriverDocuments key={profile.id} driverId={profile.id} userId={user.id} />}
 
             {/* Sign Out */}
             <button

@@ -426,7 +426,8 @@ export default function DriverRequests() {
                 </span>
               )}
             </button>
-            {gpsError && (
+            {driver && !driver.is_verified && <p className="text-xs text-foreground-600 my-3">Профилът очаква верификация от фирмата. <button type="button" className="underline text-primary-700" onClick={() => navigate('/driver/profile')}>Към документите</button> · <button type="button" className="underline" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
+              {gpsError && (
               <p className="text-xs text-red-500 mt-3 flex items-center justify-center gap-1">
                 <i className="ri-error-warning-line" /> {gpsError}
               </p>

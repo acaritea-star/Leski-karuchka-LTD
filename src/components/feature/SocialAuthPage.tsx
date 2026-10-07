@@ -1,3 +1,4 @@
+import { consumeAuthReturn } from '@/lib/authReturn';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -14,10 +15,14 @@ export default function SocialAuthPage({ mode }: { mode: 'login' | 'register' })
   const [pending, setPending] = useState<SocialProvider | null>(null);
   const [error, setError] = useState('');
   const requestInFlight = useRef(false);
+  const redirected = useRef(false);
   const registering = mode === 'register';
 
   useEffect(() => {
-    if (!loading && session) navigate('/app', { replace: true });
+    if (!loading && session && !redirected.current) {
+      redirected.current = true;
+      navigate(consumeAuthReturn(), { replace: true });
+    }
   }, [loading, session, navigate]);
 
   const handleSignIn = async (provider: SocialProvider) => {

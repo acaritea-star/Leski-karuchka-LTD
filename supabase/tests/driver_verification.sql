@@ -1,0 +1,143 @@
+-- Role-level integration regression. Only synthetic rows, no real files, emails or API calls.
+BEGIN;
+SET LOCAL statement_timeout='20s';
+SET LOCAL lock_timeout='2s';
+DO $test$
+DECLARE
+ c uuid:=gen_random_uuid(); other_c uuid:=gen_random_uuid(); candidate uuid:=gen_random_uuid();
+ admin_id uuid:=gen_random_uuid(); foreign_admin uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid();
+ application uuid; d uuid; vt uuid:=gen_random_uuid(); car uuid:=gen_random_uuid();
+ license uuid:=gen_random_uuid(); insurance uuid:=gen_random_uuid(); fake uuid:=gen_random_uuid(); quote uuid:=gen_random_uuid(); ride uuid:=gen_random_uuid();
+ today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; denied boolean; count_rows integer; stmt text; obj_path text;
+BEGIN
+ INSERT INTO public.companies(id,name,slug) VALUES(c,'Verification fixture','verify-'||c),(other_c,'Foreign verification fixture','verify-'||other_c);
+ INSERT INTO auth.users(id,email) SELECT id,'verify-'||id||'@example.invalid' FROM unnest(ARRAY[candidate,admin_id,foreign_admin,customer]) s(id);
+ UPDATE public.profiles SET company_id=c WHERE id IN (candidate,customer);
+ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=c WHERE id=admin_id;
+ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=other_c WHERE id=foreign_admin;
+ INSERT INTO public.vehicle_types(id,company_id,name) VALUES(vt,c,'Verification fixture');
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ application:=public.submit_driver_application(c,'Test Driver','+359000000000','1–3',false,'Synthetic');
+ IF public.submit_driver_application(c,'Test Driver','+359000000000','1–3',false,'Synthetic')<>application THEN RAISE EXCEPTION 'FAIL application idempotency'; END IF;
+ IF jsonb_array_length(public.export_my_basic_data()->'driver_applications')<>1 THEN RAISE EXCEPTION 'FAIL application privacy export'; END IF;
+ denied:=false;BEGIN PERFORM public.review_driver_application(application,'approved','Self');EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL candidate self-approval'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',foreign_admin,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ IF EXISTS(SELECT 1 FROM public.driver_applications WHERE id=application) THEN RAISE EXCEPTION 'FAIL foreign application read'; END IF;
+ denied:=false;BEGIN PERFORM public.review_driver_application(application,'approved','Foreign');EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL foreign review'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ PERFORM public.review_driver_application(application,'approved','Checked applicant');
+ PERFORM public.review_driver_application(application,'approved','Lost response retry');
+ SELECT id INTO STRICT d FROM public.drivers WHERE user_id=candidate;
+ IF EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND (is_verified OR is_online OR NOT document_verification_required)) THEN RAISE EXCEPTION 'FAIL enrollment grants dispatch'; END IF;
+ denied:=false;BEGIN UPDATE public.drivers SET is_verified=true WHERE id=d;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL verify without vehicle/documents'; END IF;
+ PERFORM public.save_driver_vehicle(car,c,d,NULL,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
+ IF NOT EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND vehicle_id=car) THEN RAISE EXCEPTION 'FAIL vehicle assignment'; END IF;
+ -- Idempotent same-ID retry does not create another vehicle.
+ PERFORM public.save_driver_vehicle(car,c,d,NULL,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ FOREACH stmt IN ARRAY ARRAY[
+  format('UPDATE public.drivers SET is_verified=true WHERE id=%L',d),
+  format('SELECT public.register_driver_document(%L,''license'',%L,%L)',fake,today+30,candidate||'/'||fake||'.pdf'),
+  format('INSERT INTO storage.objects(bucket_id,name) VALUES(''driver-documents'',%L)',customer||'/'||fake||'.pdf')
+ ] LOOP
+  denied:=false;BEGIN EXECUTE stmt;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+  IF NOT denied THEN RAISE EXCEPTION 'FAIL expected candidate denial: %',stmt; END IF;
+ END LOOP;
+ INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at) VALUES(d,c,43.2,25.6,10,clock_timestamp());
+ denied:=false;BEGIN UPDATE public.drivers SET is_online=true WHERE id=d;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL unverified online'; END IF;
+ -- Object metadata fixtures test policy/registration only; no HTTP upload is claimed.
+ obj_path:=candidate||'/'||license||'.pdf';
+ INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',obj_path,candidate::text,'{"mimetype":"application/pdf","size":100}');
+ PERFORM public.register_driver_document(license,'license',today+30,obj_path);
+ PERFORM public.register_driver_document(license,'license',today+30,obj_path);
+ obj_path:=candidate||'/'||insurance||'.pdf';
+ INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',obj_path,candidate::text,'{"mimetype":"application/pdf","size":100}');
+ PERFORM public.register_driver_document(insurance,'insurance',today+30,obj_path);
+ IF (SELECT count(*) FROM public.driver_documents WHERE driver_id=d)<>2 THEN RAISE EXCEPTION 'FAIL document idempotency'; END IF;
+ UPDATE public.driver_documents SET status='approved' WHERE id=license;
+ GET DIAGNOSTICS count_rows=ROW_COUNT;
+ IF count_rows<>0 THEN RAISE EXCEPTION 'FAIL driver document self-approval'; END IF;
+ UPDATE storage.objects SET name=candidate||'/'||fake||'.pdf' WHERE bucket_id='driver-documents' AND name=obj_path;
+ GET DIAGNOSTICS count_rows=ROW_COUNT;
+ IF count_rows<>0 THEN RAISE EXCEPTION 'FAIL mutable upload'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',foreign_admin,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ IF EXISTS(SELECT 1 FROM public.driver_documents WHERE driver_id=d) OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%') THEN RAISE EXCEPTION 'FAIL foreign document disclosure'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ IF (SELECT count(*) FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%')<>2 THEN RAISE EXCEPTION 'FAIL admin private file visibility'; END IF;
+ denied:=false;BEGIN UPDATE public.driver_documents SET status='approved',expires_at=today-1 WHERE id=license;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL expired approval'; END IF;
+ UPDATE public.driver_documents SET status='approved' WHERE driver_id=d;
+ IF (SELECT count(*) FROM public.driver_documents WHERE driver_id=d AND reviewed_by=admin_id AND reviewed_at IS NOT NULL)<>2 THEN RAISE EXCEPTION 'FAIL review provenance'; END IF;
+ UPDATE public.drivers SET is_verified=true WHERE id=d;
+ IF NOT EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND is_verified AND document_verification_required) THEN RAISE EXCEPTION 'FAIL admin verification'; END IF;
+ denied:=false;BEGIN UPDATE public.drivers SET document_verification_required=false WHERE id=d;EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL disable verification checks'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ UPDATE public.drivers SET is_online=true WHERE id=d;
+ IF NOT EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND is_online) THEN RAISE EXCEPTION 'FAIL verified driver online'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ UPDATE public.driver_documents SET status='rejected' WHERE id=insurance;
+ IF private.driver_documents_ready(d) THEN RAISE EXCEPTION 'FAIL revoked document dispatch'; END IF;
+ UPDATE public.driver_documents SET status='approved' WHERE id=insurance;
+ RESET ROLE;
+ -- Revocation must stop future dispatch without trapping the passenger in an active trip.
+ INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
+ VALUES(quote,customer,c,vt,'{"pickup_latitude":43.2,"pickup_longitude":25.6,"destination_latitude":43.21,"destination_longitude":25.61,"pickup_address":"Verification fixture","destination_address":"Verification fixture","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}');
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ PERFORM public.create_taxi_request(quote,ride,'cash');
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ PERFORM public.accept_taxi_request(ride);
+ UPDATE public.taxi_requests SET status='arrived' WHERE id=ride;
+ UPDATE public.taxi_requests SET status='in_progress' WHERE id=ride;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ denied:=false;BEGIN PERFORM public.save_driver_vehicle(car,c,NULL,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL assignment during active trip'; END IF;
+ UPDATE public.drivers SET is_verified=false WHERE id=d;
+ RESET ROLE;
+ IF EXISTS(SELECT 1 FROM private.eligible_drivers(c,vt,43.2,25.6) WHERE driver_id=d) THEN RAISE EXCEPTION 'FAIL revoked driver eligible'; END IF;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ UPDATE public.taxi_requests SET status='completed' WHERE id=ride;
+ RESET ROLE;
+ IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride AND status='completed') THEN RAISE EXCEPTION 'FAIL completion after revocation'; END IF;
+ IF EXISTS(SELECT 1 FROM private.eligible_drivers(c,vt,43.2,25.6) WHERE driver_id=d) THEN RAISE EXCEPTION 'FAIL revoked driver eligible after completion'; END IF;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ PERFORM public.save_driver_vehicle(car,c,NULL,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
+ IF EXISTS(SELECT 1 FROM public.drivers WHERE id=d AND vehicle_id=car) THEN RAISE EXCEPTION 'FAIL vehicle unassignment'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims','{}',true);
+ SET LOCAL ROLE anon;
+ IF EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE candidate||'/%') THEN RAISE EXCEPTION 'FAIL anonymous private file'; END IF;
+ denied:=false;BEGIN PERFORM public.review_driver_application(application,'approved','Anon');EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL anonymous RPC'; END IF;
+ RESET ROLE;
+ IF (SELECT count(*) FROM public.audit_log WHERE entity_id=d AND action IN ('driver_verified','driver_unverified'))<>2 THEN RAISE EXCEPTION 'FAIL verification audit'; END IF;
+ PERFORM set_config('leski.driver_test',jsonb_build_object('passed',true,'application','isolated and idempotent','documents','private, immutable, reviewed','verification','server enforced','vehicle','atomic assignment and unassignment')::text,true);
+END $test$;
+SELECT current_setting('leski.driver_test')::jsonb AS result;
+ROLLBACK;

@@ -27,6 +27,7 @@ BEGIN
  VALUES(ride,cid,customer_uid,did,vt,43.2,25.6,'Synthetic',43.21,25.61,'Synthetic','in_progress',now()-interval '10 minutes',now()-interval '8 minutes',NULL,20,NULL);
  UPDATE public.taxi_requests SET status='completed',completed_at=clock_timestamp(),final_price=20 WHERE id=ride;
 
+ INSERT INTO storage.objects(bucket_id,name,owner_id) SELECT 'driver-documents',duid||'/'||id||'.pdf',duid::text FROM unnest(ARRAY[license,insurance,renewal]) t(id);
  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
  EXECUTE 'SET LOCAL ROLE authenticated';
  acceptance:=public.accept_legal_versions('2026-10-03-draft.2','2026-10-04.2','continue');
@@ -43,10 +44,10 @@ BEGIN
   IF NOT denied THEN RAISE EXCEPTION 'FAIL expected rejection: %',stmt;END IF;
  END LOOP;
  INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at,reviewed_at,reviewed_by)
- VALUES(license,did,cid,'license','https://example.invalid/license','approved',today+30,now(),admin_uid);
+ VALUES(license,did,cid,'license','storage://driver-documents/'||duid||'/'||license||'.pdf','approved',today+30,now(),admin_uid);
  IF NOT EXISTS(SELECT 1 FROM public.driver_documents WHERE id=license AND status='pending' AND reviewed_at IS NULL AND reviewed_by IS NULL) THEN RAISE EXCEPTION 'FAIL forged driver approval'; END IF;
  INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at)
- VALUES(insurance,did,cid,'insurance','https://example.invalid/insurance','pending',today+30);
+ VALUES(insurance,did,cid,'insurance','storage://driver-documents/'||duid||'/'||insurance||'.pdf','pending',today+30);
  IF public.record_driver_money_verified(income,'income',12.50,'Measured cash',duid,ride)<>income THEN RAISE EXCEPTION 'FAIL income';END IF;
  PERFORM public.record_driver_money_verified(income,'income',12.50,'Measured cash',duid,ride);
  ticket:=public.request_personal_data('deletion');
@@ -108,7 +109,7 @@ BEGIN
  IF NOT denied THEN RAISE EXCEPTION 'FAIL expired document dispatch';END IF;
  EXECUTE 'RESET ROLE';
  INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at)
- VALUES(renewal,did,cid,'insurance','https://example.invalid/renewal','pending',today+30);
+ VALUES(renewal,did,cid,'insurance','storage://driver-documents/'||duid||'/'||renewal||'.pdf','pending',today+30);
  PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_uid,'role','authenticated')::text,true);
  EXECUTE 'SET LOCAL ROLE authenticated';
  UPDATE public.driver_documents SET status='approved' WHERE id=renewal;

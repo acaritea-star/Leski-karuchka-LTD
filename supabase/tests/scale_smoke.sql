@@ -31,6 +31,8 @@ INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registratio
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT s.driver,r.company,43.2+s.i*.000001,25.6,10,clock_timestamp()
  FROM scale_ids s CROSS JOIN scale_run r;
+UPDATE public.drivers d SET document_verification_required=false
+ FROM scale_ids s WHERE d.id=s.driver;
 UPDATE public.drivers d SET is_verified=true,is_online=true,vehicle_id=s.vehicle
  FROM scale_ids s WHERE d.id=s.driver;
 -- A short overlap window makes concurrent sessions observable, not a benchmark delay.

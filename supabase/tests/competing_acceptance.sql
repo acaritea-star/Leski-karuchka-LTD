@@ -12,6 +12,8 @@ INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registratio
  SELECT contender_vehicle,company,vehicle_type,'Test','Contender','TEST-'||left(contender_vehicle::text,8) FROM test_ids;
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT contender,company,42.6977,23.3219,10,clock_timestamp() FROM test_ids;
+UPDATE public.drivers SET document_verification_required=false FROM test_ids),is_online=true
+ WHERE id=(SELECT contender FROM test_ids);
 UPDATE public.drivers SET is_verified=true,vehicle_id=(SELECT contender_vehicle FROM test_ids),is_online=true
  WHERE id=(SELECT contender FROM test_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',contender_user,'role','authenticated')::text,true) FROM test_ids;

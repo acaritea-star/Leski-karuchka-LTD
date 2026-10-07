@@ -11,6 +11,7 @@ INSERT INTO public.vehicle_types(id,company_id,name) SELECT vehicle_type,company
 INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number) SELECT vehicle,company,vehicle_type,'Test','Test','TEST-'||left(vehicle::text,8) FROM test_ids;
 UPDATE public.profiles SET company_id=(SELECT company FROM test_ids),role='DRIVER' WHERE id=(SELECT driver_user FROM test_ids);
 UPDATE test_ids SET driver=(SELECT id FROM public.drivers WHERE user_id=test_ids.driver_user);
+UPDATE public.drivers SET document_verification_required=false FROM test_ids),is_online=false WHERE id=(SELECT driver FROM test_ids);
 UPDATE public.drivers SET is_verified=true,vehicle_id=(SELECT vehicle FROM test_ids),is_online=false WHERE id=(SELECT driver FROM test_ids);
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT driver,company,43.2,25.6,10,now() FROM test_ids;
