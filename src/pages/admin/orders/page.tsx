@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import type { Tables } from '@/lib/database.types';
+import { loadAdminOrders } from '@/lib/adminOrders';
+import { ADMIN_PAGE_SIZE } from '@/lib/adminData';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
-
-type Order = Tables<'taxi_requests'> & { customer_name: string; driver_name: string };
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: 'Търсене', color: 'text-primary-600', bg: 'bg-primary-100' },
@@ -18,83 +16,27 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   cancelled: { label: 'Отказано', color: 'text-red-500', bg: 'bg-red-50' },
 };
 
-const ACTIVE_STATUSES = ['pending', 'accepted', 'arrived', 'in_progress'];
-
 export default function AdminOrders() {
+  const { companyId } = useAdminCompany();
+  return <OrderList key={companyId ?? 'none'} />;
+}
+
+function OrderList() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
 
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
+  const [page, setPage] = useState(0);
   const ordersQuery = useQuery({
-    queryKey: companyId ? queryKeys.adminOrders(companyId) : ['taxi_requests', 'company', 'none'],
-    queryFn: async (): Promise<Order[]> => {
-      const { data: requests, error: reqErr } = await supabase
-        .from('taxi_requests')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('created_at', { ascending: false })
-        .limit(200);
-      if (reqErr) throw reqErr;
-
-      const list = requests ?? [];
-      const customerIds = [...new Set(list.map((r) => r.customer_id))];
-      const driverIds = list
-        .map((r) => r.driver_id)
-        .filter((id): id is string => !!id);
-
-      const customerMap: Record<string, string> = {};
-      if (customerIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name')
-          .in('id', customerIds);
-        for (const p of profiles ?? []) {
-          customerMap[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Клиент';
-        }
-      }
-
-      const driverUserMap: Record<string, string> = {};
-      const driverIdToUserId: Record<string, string> = {};
-      if (driverIds.length > 0) {
-        const { data: drivers } = await supabase
-          .from('drivers')
-          .select('id, user_id')
-          .in('id', driverIds);
-        const driverList = drivers ?? [];
-        for (const d of driverList) driverIdToUserId[d.id] = d.user_id;
-
-        const driverUserIds = driverList.map((d) => d.user_id);
-        if (driverUserIds.length > 0) {
-          const { data: driverProfiles } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .in('id', driverUserIds);
-          for (const u of driverProfiles ?? []) {
-            driverUserMap[u.id] = `${u.first_name || ''} ${u.last_name || ''}`.trim();
-          }
-        }
-      }
-
-      return list.map((r) => ({
-        ...r,
-        customer_name: customerMap[r.customer_id] || 'Клиент',
-        driver_name: driverUserMap[driverIdToUserId[r.driver_id || '']] || '—',
-      }));
-    },
-    enabled: !!companyId,
+    queryKey: [...queryKeys.adminOrders(companyId ?? 'none'), 'list', filter, page],
+    queryFn: ({ signal }) => loadAdminOrders(companyId!, filter, page, signal),
+    enabled: !!companyId, refetchInterval: filter === 'active' ? 10_000 : false,
   });
-
-  const orders = ordersQuery.data ?? [];
+  const filtered = ordersQuery.data?.rows ?? [];
+  const total = ordersQuery.data?.total ?? 0;
   const error = ordersQuery.error instanceof Error ? ordersQuery.error.message : '';
   const loading = ordersQuery.isLoading;
-
-  const filtered = orders.filter((o) => {
-    if (filter === 'active') return ACTIVE_STATUSES.includes(o.status);
-    if (filter === 'completed') return o.status === 'completed';
-    if (filter === 'cancelled') return o.status === 'cancelled';
-    return true;
-  });
 
   const tabs = [
     { key: 'all' as const, label: 'Всички' },
@@ -120,7 +62,7 @@ export default function AdminOrders() {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setFilter(tab.key)}
+            onClick={() => { setFilter(tab.key); setPage(0); }}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer ${
               filter === tab.key
                 ? 'bg-primary-500 text-white'
@@ -162,7 +104,7 @@ export default function AdminOrders() {
                     </span>
                   </div>
                   <span className="text-lg font-bold text-foreground-950 font-heading">
-                    {parseFloat(String(o.final_price || o.estimated_price || 0)).toFixed(2)} €
+                    {o.status === 'cancelled' ? 'Без начислен оборот' : `${Number(o.final_price ?? o.estimated_price ?? 0).toFixed(2)} €`}
                   </span>
                 </div>
 
@@ -197,6 +139,11 @@ export default function AdminOrders() {
           })}
         </div>
       )}
+      {total > ADMIN_PAGE_SIZE && <div className="mt-4 flex items-center justify-between text-sm">
+        <button className="text-primary-600 disabled:opacity-40" disabled={page === 0 || ordersQuery.isFetching} onClick={() => setPage(p => p - 1)}>Назад</button>
+        <span>Страница {page + 1} от {Math.ceil(total / ADMIN_PAGE_SIZE)}</span>
+        <button className="text-primary-600 disabled:opacity-40" disabled={(page + 1) * ADMIN_PAGE_SIZE >= total || ordersQuery.isFetching} onClick={() => setPage(p => p + 1)}>Напред</button>
+      </div>}
     </AdminLayout>
   );
 }

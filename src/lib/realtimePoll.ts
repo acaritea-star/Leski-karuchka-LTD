@@ -7,17 +7,18 @@ export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike
   const fallbackMs = options.fallbackMs ?? 5000, healthyMs = options.healthyMs ?? 30_000;
   const jitter = options.jitter ?? Math.random;
   const controller = new AbortController();
+  const paused = () => document.visibilityState === 'hidden' || navigator.onLine === false;
   let active = true, pending = false, healthy = false, failures = 0, reconcile = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const clear = () => { if (timer !== undefined) clearTimeout(timer); timer = undefined; };
   const schedule = (delay: number) => {
     clear();
-    if (!active || document.visibilityState === 'hidden') return;
+    if (!active || paused()) return;
     timer = setTimeout(() => { void run(); }, delay + Math.floor(Math.max(0, Math.min(1, jitter())) * delay * .2));
   };
   async function run() {
     clear();
-    if (!active || pending || document.visibilityState === 'hidden') return;
+    if (!active || pending || paused()) return;
     pending = true;
     try {
       const result = await withRequestTimeout(read, options.timeoutMs ?? 10_000, controller.signal);
@@ -33,12 +34,13 @@ export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike
     }
   }
   const resume = () => {
-    if (document.visibilityState === 'hidden') { clear(); return; }
+    if (paused()) { clear(); return; }
     if (pending) return;
     failures = 0; void run();
   };
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('online', resume);
+  window.addEventListener('offline', resume);
   window.addEventListener('pageshow', resume);
   void run();
   return {
@@ -55,6 +57,7 @@ export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike
       active = false; controller.abort(); clear();
       document.removeEventListener('visibilitychange', resume);
       window.removeEventListener('online', resume);
+      window.removeEventListener('offline', resume);
       window.removeEventListener('pageshow', resume);
     },
   };

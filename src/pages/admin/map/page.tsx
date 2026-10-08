@@ -1,21 +1,12 @@
-import { isFreshTimestamp } from '@/lib/driverLocation';
 /* global google */
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { loadFleet, fleetDriverOnline } from '@/lib/adminData';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { BULGARIA_CENTER } from '@/lib/geo';
 
-interface OnlineDriver {
-  id: string;
-  first_name: string;
-  last_name: string;
-  latitude: number;
-  longitude: number;
-  updated_at: string;
-  is_online: boolean;
-}
 
 const ONLINE_COLOR = '#0d9488';
 const OFFLINE_COLOR = '#9ca3af';
@@ -34,152 +25,75 @@ function driverIcon(online: boolean): google.maps.Icon {
 
 export default function AdminMap() {
   const { companyId } = useAdminCompany();
-  const [drivers, setDrivers] = useState<OnlineDriver[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  return <CompanyMap key={companyId ?? 'none'} />;
+}
 
-  const fetchDrivers = useCallback(async () => {
-    if (!companyId) return;
-    setLoading(true);
-    setError('');
-    try {
-      // driver_locations holds the live GPS; drivers holds is_online & user_id
-      const { data: locRows, error: locErr } = await supabase
-        .from('driver_locations')
-        .select('driver_id, latitude, longitude, updated_at')
-        .eq('company_id', companyId)
-        .order('updated_at', { ascending: false });
-
-      if (locErr) throw locErr;
-
-      // Keep only the latest location per driver
-      const seen = new Set<string>();
-      const latest = (locRows || []).filter((row) => {
-        if (seen.has(row.driver_id)) return false;
-        seen.add(row.driver_id);
-        return true;
-      });
-
-      if (latest.length === 0) {
-        setDrivers([]);
-        return;
-      }
-
-      const driverIds = latest.map((d) => d.driver_id);
-
-      const { data: drvRows } = await supabase
-        .from('drivers')
-        .select('id, user_id, is_online')
-        .in('id', driverIds)
-        .eq('company_id', companyId);
-
-      const drvMap = (drvRows || []).reduce<Record<string, { user_id: string; is_online: boolean }>>(
-        (acc, d) => ({ ...acc, [d.id]: { user_id: d.user_id, is_online: d.is_online } }),
-        {}
-      );
-
-      const userIds = latest
-        .map((d) => drvMap[d.driver_id]?.user_id)
-        .filter((uid): uid is string => !!uid);
-
-      let userMap: Record<string, { first_name: string; last_name: string }> = {};
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name')
-          .in('id', userIds);
-        userMap = (profiles || []).reduce(
-          (acc, u) => ({ ...acc, [u.id]: { first_name: u.first_name, last_name: u.last_name } }),
-          {}
-        );
-      }
-
-      const mapped = latest
-        .map((loc) => {
-          const drv = drvMap[loc.driver_id];
-          if (!drv) return null;
-          const profile = userMap[drv.user_id];
-          return {
-            id: loc.driver_id,
-            first_name: profile?.first_name || '—',
-            last_name: profile?.last_name || '',
-            latitude: loc.latitude as number,
-            longitude: loc.longitude as number,
-            updated_at: loc.updated_at || '',
-            is_online: drv.is_online && isFreshTimestamp(loc.updated_at),
-          };
-        })
-        .filter((d): d is OnlineDriver => d !== null);
-
-      setDrivers(mapped);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Грешка при зареждане';
-      setError(msg);
-      console.error('Map error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
+function CompanyMap() {
+  const { companyId, companyName } = useAdminCompany();
+  const [, tick] = useState(0);
+  const [mapError, setMapError] = useState('');
+  const query = useQuery({
+    queryKey: ['admin-fleet', companyId],
+    queryFn: ({ signal }) => loadFleet(companyId!, signal),
+    enabled: !!companyId, refetchInterval: 10_000, refetchOnWindowFocus: true, retry: 1,
+  });
   useEffect(() => {
-    fetchDrivers();
-  }, [fetchDrivers]);
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') tick(value => value + 1); }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+  const drivers = (query.data?.rows ?? []).map(driver => ({ ...driver, is_online: fleetDriverOnline(driver) }));
+  const loading = query.isLoading;
+  const error = mapError || (query.isError ? 'Локациите не се обновиха. Показаните позиции може да са остарели.' : '');
+  const fetchDrivers = () => { setMapError(''); void query.refetch(); tick(value => value + 1); };
 
-  // ── Google Maps (init + marker sync in one pass, runs on every drivers change) ──
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-
+  const markersRef = useRef(new Map<string, { marker: google.maps.Marker; lat: number; lng: number; online: boolean; title: string }>());
+  const framed = useRef(false);
   useEffect(() => {
     let cancelled = false;
-    loadGoogleMaps()
-      .then(() => {
-        if (cancelled) return;
-        const el = mapContainerRef.current;
-        if (!el) return;
-
-        if (!mapRef.current) {
-          mapRef.current = new google.maps.Map(el, {
-            center: { lat: BULGARIA_CENTER.lat, lng: BULGARIA_CENTER.lng },
-            zoom: 7,
-            disableDefaultUI: true,
-            gestureHandling: 'greedy',
-            fullscreenControl: false,
-          });
-        }
-        const map = mapRef.current;
-
-        markersRef.current.forEach((m) => m.setMap(null));
-        markersRef.current = [];
-
-        if (drivers.length === 0) return;
-
-        const bounds = new google.maps.LatLngBounds();
-        drivers.forEach((d) => {
-          const pos = { lat: d.latitude, lng: d.longitude };
-          bounds.extend(pos);
-          const marker = new google.maps.Marker({
-            position: pos,
-            map,
-            icon: driverIcon(d.is_online),
-            title: `${d.first_name} ${d.last_name}`,
-            zIndex: d.is_online ? 10 : 1,
-          });
-          markersRef.current.push(marker);
-        });
-        map.fitBounds(bounds, 50);
-      })
-      .catch(() => {
-        /* map failed to load */
+    void loadGoogleMaps().then(() => {
+      if (cancelled || !mapContainerRef.current) return;
+      const map = mapRef.current ??= new google.maps.Map(mapContainerRef.current, {
+        center: BULGARIA_CENTER, zoom: 7, disableDefaultUI: true, gestureHandling: 'greedy', fullscreenControl: false,
       });
-
-    return () => {
-      cancelled = true;
-    };
+      const ids = new Set(drivers.map(driver => driver.id));
+      for (const [id, item] of markersRef.current) {
+        if (!ids.has(id)) { item.marker.setMap(null); markersRef.current.delete(id); }
+      }
+      for (const driver of drivers) {
+        const title = `${driver.first_name} ${driver.last_name}`.trim();
+        const pos = { lat: driver.latitude, lng: driver.longitude };
+        const existing = markersRef.current.get(driver.id);
+        if (existing) {
+          if (existing.lat !== pos.lat || existing.lng !== pos.lng) existing.marker.setPosition(pos);
+          if (existing.online !== driver.is_online) existing.marker.setIcon(driverIcon(driver.is_online));
+          if (existing.title !== title) existing.marker.setTitle(title);
+          Object.assign(existing, { lat: pos.lat, lng: pos.lng, online: driver.is_online, title });
+        } else {
+          const marker = new google.maps.Marker({ position: pos, map, icon: driverIcon(driver.is_online), title, zIndex: driver.is_online ? 10 : 1 });
+          markersRef.current.set(driver.id, { marker, lat: pos.lat, lng: pos.lng, online: driver.is_online, title });
+        }
+      }
+      // Subsequent GPS refreshes must not fight the operator's zoom/pan.
+      if (!framed.current && drivers.length) {
+        framed.current = true;
+        if (drivers.length === 1) { map.setCenter({ lat: drivers[0].latitude, lng: drivers[0].longitude }); map.setZoom(14); }
+        else {
+          const bounds = new google.maps.LatLngBounds();
+          drivers.forEach(driver => bounds.extend({ lat: driver.latitude, lng: driver.longitude }));
+          map.fitBounds(bounds, 50);
+        }
+      }
+    }).catch(() => { if (!cancelled) setMapError('Картата не се зареди. Проверете връзката и опитайте отново.'); });
+    return () => { cancelled = true; };
   }, [drivers]);
-
-  const online = drivers.filter((d) => d.is_online);
-  const offline = drivers.filter((d) => !d.is_online);
+  useEffect(() => {
+    const markers = markersRef.current;
+    return () => { markers.forEach(item => item.marker.setMap(null)); markers.clear(); };
+  }, []);
+  const online = drivers.filter(driver => driver.is_online);
+  const offline = drivers.filter(driver => !driver.is_online);
 
   const formatTime = (dateStr: string) => {
     if (!dateStr) return '—';
@@ -207,14 +121,14 @@ export default function AdminMap() {
         <div className="xl:col-span-2 bg-white rounded-2xl border border-background-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground-950">Левски</h3>
+              <h3 className="font-semibold text-foreground-950">{companyName || 'Автопарк'}</h3>
               <p className="text-xs text-foreground-500">
                 {online.length} онлайн · {offline.length} офлайн
               </p>
             </div>
             <span className="flex items-center gap-1.5 text-xs text-accent-600 bg-accent-100 px-2.5 py-1 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
-              На живо
+              {query.isError ? 'Няма актуализация' : 'Обновяване през 10 сек'}
             </span>
           </div>
           <div className="h-[440px] relative">
@@ -269,6 +183,7 @@ export default function AdminMap() {
           </div>
         </div>
       </div>
+      {(query.data?.total ?? 0) > drivers.length && <p className="mt-3 text-xs text-foreground-500">Показани са {drivers.length} от {query.data?.total} шофьори с локация.</p>}
     </AdminLayout>
   );
 }

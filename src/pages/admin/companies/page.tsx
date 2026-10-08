@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
+import { useQueryClient } from '@tanstack/react-query';
+import { withRequestTimeout } from '@/lib/requestTimeout';
+import { companyPayload, createCompany } from '@/lib/companyAdmin';
+import { isAmbiguousWrite } from '@/lib/rideOperations';
 
 interface Company {
   id: string;
@@ -32,6 +36,9 @@ const emptyForm = {
 
 export default function AdminCompanies() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const savingRef = useRef(false);
+  const intent = useRef<{ id: string; form: string } | null>(null);
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,25 +52,12 @@ export default function AdminCompanies() {
     setLoading(true);
     setError('');
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('id, name, phone, email, address, currency, base_fare, price_per_km, price_per_minute, dispatch_radius_km, is_active, created_at')
-        .order('created_at', { ascending: false });
+        .select('id, name, phone, email, address, currency, base_fare, price_per_km, price_per_minute, dispatch_radius_km, is_active, created_at, drivers(count)')
+        .order('created_at', { ascending: false }).order('id').abortSignal(signal));
 
       if (err) throw err;
-
-      const companyIds = (data || []).map((c) => c.id);
-      let countMap: Record<string, number> = {};
-      if (companyIds.length > 0) {
-        const { data: drivers } = await supabase
-          .from('drivers')
-          .select('company_id')
-          .in('company_id', companyIds);
-        countMap = (drivers || []).reduce(
-          (acc, d) => ({ ...acc, [d.company_id]: (acc[d.company_id] || 0) + 1 }),
-          {} as Record<string, number>
-        );
-      }
 
       setCompanies(
         (data || []).map((c) => ({
@@ -72,7 +66,7 @@ export default function AdminCompanies() {
           price_per_km: parseFloat(String(c.price_per_km || 0)),
           price_per_minute: parseFloat(String(c.price_per_minute || 0)),
           dispatch_radius_km: parseFloat(String(c.dispatch_radius_km || 0)),
-          drivers_count: countMap[c.id] || 0,
+          drivers_count: c.drivers[0]?.count ?? 0,
         })) as Company[]
       );
     } catch (err: unknown) {
@@ -91,46 +85,32 @@ export default function AdminCompanies() {
   const setField = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError('');
     setSaved(false);
     try {
-      const slug = form.name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-
-      const { data, error: err } = await supabase
-        .from('companies')
-        .insert({
-          name: form.name.trim(),
-          slug: slug || 'company',
-          phone: form.phone.trim(),
-          email: form.email.trim(),
-          address: form.address.trim(),
-          currency: 'EUR',
-          base_fare: parseFloat(form.base_fare) || 2.0,
-          price_per_km: parseFloat(form.price_per_km) || 1.1,
-          price_per_minute: parseFloat(form.price_per_minute) || 0.28,
-          dispatch_radius_km: parseFloat(form.dispatch_radius_km) || 5,
-          is_active: true,
-        })
-        .select('id')
-        .single();
-
-      if (err) throw err;
+      const snapshot = JSON.stringify(form);
+      if (intent.current && intent.current.form !== snapshot) throw new Error('Има непотвърден запис. Върнете същите данни и повторете, за да не създадете дублирана фирма.');
+      const id = intent.current?.id ?? crypto.randomUUID();
+      const payload = companyPayload(form, id);
+      intent.current = { id, form: snapshot };
+      await createCompany({ ...payload, id });
+      intent.current = null;
 
       setForm(emptyForm);
       setShowForm(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      fetchCompanies();
+      void fetchCompanies();
+      void queryClient.invalidateQueries({ queryKey: ['admin-companies'] });
     } catch (err: unknown) {
+      if (!isAmbiguousWrite(err)) intent.current = null;
       const msg = err instanceof Error ? err.message : 'Грешка при запис';
       setError(msg);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

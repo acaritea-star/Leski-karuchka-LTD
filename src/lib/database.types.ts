@@ -1828,10 +1828,15 @@ export type Database = {
         Args: { p_job_id: string; p_lease_token: string }
         Returns: Json
       }
+      company_customers: {
+        Args: { p_company: string; p_page?: number; p_search?: string }
+        Returns: Json
+      }
       company_dashboard: {
         Args: { p_company_id: string; p_day?: string }
         Returns: Json
       }
+      company_fleet: { Args: { p_company: string }; Returns: Json }
       consume_api_budget: { Args: { p_user_id: string }; Returns: boolean }
       create_taxi_request: {
         Args: {

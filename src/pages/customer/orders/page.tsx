@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import type { Tables } from '@/lib/database.types';
 import AppMenu from '@/pages/customer/components/AppMenu';
 
@@ -37,13 +38,14 @@ export default function CustomerOrders() {
 
   const ordersQuery = useQuery({
     queryKey: customerId ? queryKeys.customerOrders(customerId) : ['taxi_requests', 'customer', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
         .eq('customer_id', customerId as string)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .order('id', { ascending: false })
+        .limit(50).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
@@ -331,7 +333,7 @@ export default function CustomerOrders() {
                       )}
                     </div>
                     <span className="text-sm font-bold text-foreground-950 font-heading">
-                      {(order.final_price || order.estimated_price)?.toFixed(2)} {t('lv')}
+                      {order.status === 'cancelled' ? '—' : `${(order.final_price ?? order.estimated_price ?? 0).toFixed(2)} ${t('lv')}`}
                     </span>
                   </div>
 

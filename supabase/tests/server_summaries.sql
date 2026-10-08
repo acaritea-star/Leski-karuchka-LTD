@@ -13,6 +13,8 @@ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=(SELECT company FROM 
 UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=(SELECT foreign_company FROM summary_ids) WHERE id=(SELECT foreign_admin FROM summary_ids);
 UPDATE public.profiles SET role='DRIVER',company_id=(SELECT company FROM summary_ids) WHERE id=(SELECT driver_user FROM summary_ids);
 UPDATE summary_ids SET driver=(SELECT id FROM public.drivers WHERE user_id=summary_ids.driver_user);
+-- This suite tests legacy report totals, not document onboarding (covered by driver_verification.sql).
+UPDATE public.drivers SET document_verification_required=false WHERE id=(SELECT driver FROM summary_ids);
 INSERT INTO public.vehicle_types(id,company_id,name) SELECT vehicle_type,company,'Summary test car' FROM summary_ids;
 INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number)
  SELECT vehicle,company,vehicle_type,'Test','Test','SUM-'||left(vehicle::text,8) FROM summary_ids;

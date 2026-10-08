@@ -21,6 +21,11 @@ interface CompanyProfile {
 }
 
 export default function AdminSettings() {
+  const { companyId } = useAdminCompany();
+  return <SettingsEditor key={companyId ?? 'none'} />;
+}
+
+function SettingsEditor() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
   const { user } = useAuth();

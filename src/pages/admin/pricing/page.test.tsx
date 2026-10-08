@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import '@/i18n';
 import Pricing from './page';
 import Settings from '../settings/page';
-const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), update: vi.fn() }));
+const api = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), update: vi.fn(), companyId: 'company' }));
 vi.mock('@/pages/admin/components/AdminLayout', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
-vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: 'company' }) }));
+vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: api.companyId }) }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'admin', role: 'COMPANY_ADMIN' } }) }));
 vi.mock('@/components/feature/PrivacyRequests', () => ({ default: () => null }));
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => {
@@ -18,6 +18,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: () => {
 } } }));
 beforeEach(() => {
   vi.clearAllMocks();
+  api.companyId = 'company';
   api.read.mockResolvedValue({ data: { name: 'Company', base_fare: 2, price_per_km: 1, price_per_minute: .2, dispatch_radius_km: 5, currency: 'EUR', document_checks_required: false }, error: null });
   api.write.mockResolvedValue({ data: { id: 'company' }, error: null });
 });
@@ -45,4 +46,16 @@ it('does not send two pricing writes for rapid repeated clicks', async () => {
   const button = await screen.findByRole('button', { name: 'Запази' });
   fireEvent.click(button); fireEvent.click(button);
   expect(api.update).toHaveBeenCalledTimes(1);
+});
+it.each([Pricing, Settings])('ignores an old company response after the operator changes company', async Page => {
+  let finish!: (value: unknown) => void;
+  api.read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const view = render(<Page />);
+  api.companyId = 'other-company';
+  api.read.mockResolvedValueOnce({ data: { name: 'New company', base_fare: 7, price_per_km: 1, price_per_minute: .2, dispatch_radius_km: 5, currency: 'EUR', document_checks_required: false }, error: null });
+  view.rerender(<Page />);
+  await screen.findByRole('button', { name: 'Запази' });
+  await act(async () => finish({ data: { name: 'OLD COMPANY', base_fare: 99 }, error: null }));
+  fireEvent.click(screen.getByRole('button', { name: 'Запази' }));
+  expect(api.update.mock.calls[0][0]).toMatchObject(Page === Pricing ? { base_fare: 7 } : { name: 'New company' });
 });

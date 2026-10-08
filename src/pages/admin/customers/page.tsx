@@ -1,67 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import type { Tables } from '@/lib/database.types';
+import { loadCustomers, ADMIN_PAGE_SIZE } from '@/lib/adminData';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 
-type Customer = Tables<'profiles'> & { totalTrips: number; totalSpent: number };
-
 export default function AdminCustomers() {
+  const { companyId } = useAdminCompany();
+  return <CustomerList key={companyId ?? 'none'} />;
+}
+
+function CustomerList() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
 
   const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearchTerm(search.trim()); setPage(0); }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const customersQuery = useQuery({
-    queryKey: companyId ? queryKeys.adminCustomers(companyId) : ['profiles', 'company', 'none', 'customers'],
-    queryFn: async (): Promise<Customer[]> => {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('company_id', companyId!)
-        .eq('role', 'CUSTOMER')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-
-      const list = profiles ?? [];
-      const ids = list.map((u) => u.id);
-
-      let tripMap: Record<string, { trips: number; spent: number }> = {};
-      if (ids.length > 0) {
-        const { data: requests } = await supabase
-          .from('taxi_requests')
-          .select('customer_id, status, final_price, estimated_price')
-          .in('customer_id', ids);
-        tripMap = (requests ?? []).reduce<Record<string, { trips: number; spent: number }>>((acc, r) => {
-          const entry = acc[r.customer_id] || { trips: 0, spent: 0 };
-          entry.trips += 1;
-          if (r.status === 'completed') {
-            entry.spent += Number(r.final_price ?? r.estimated_price ?? 0);
-          }
-          acc[r.customer_id] = entry;
-          return acc;
-        }, {});
-      }
-
-      return list.map((u) => ({
-        ...u,
-        totalTrips: tripMap[u.id]?.trips ?? 0,
-        totalSpent: tripMap[u.id]?.spent ?? 0,
-      }));
-    },
+    queryKey: [...queryKeys.adminCustomers(companyId ?? 'none'), searchTerm, page],
+    queryFn: ({ signal }) => loadCustomers(companyId!, searchTerm, page, signal),
     enabled: !!companyId,
   });
 
-  const customers = customersQuery.data ?? [];
+  const customers = customersQuery.data?.rows ?? [];
+  const total = customersQuery.data?.total ?? 0;
   const error = customersQuery.error instanceof Error ? customersQuery.error.message : '';
   const loading = customersQuery.isLoading;
 
-  const filtered = customers.filter((c) =>
-    `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = customers;
 
   return (
     <AdminLayout title={t('nav_customers')}>
@@ -80,14 +53,16 @@ export default function AdminCustomers() {
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
           <input
             type="text"
+            maxLength={80}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Търси по име..."
             className="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl border border-background-200 text-sm text-foreground-950 placeholder:text-foreground-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           />
         </div>
-        <div className="text-sm text-foreground-500 whitespace-nowrap">{customers.length} клиенти</div>
+        <div className="text-sm text-foreground-500 whitespace-nowrap">{total} клиенти</div>
       </div>
+      <p className="mb-4 text-xs text-foreground-500">Показани са завършените курсове към тази фирма. Стойността им е прогнозна, не доказателство за получени пари.</p>
 
       {loading ? (
         <div className="flex justify-center py-24">
@@ -106,8 +81,8 @@ export default function AdminCustomers() {
                 <tr className="text-left text-foreground-500 border-b border-background-100">
                   <th className="px-5 py-3 font-medium">Клиент</th>
                   <th className="px-5 py-3 font-medium">Телефон</th>
-                  <th className="px-5 py-3 font-medium text-center">Пътувания</th>
-                  <th className="px-5 py-3 font-medium text-right">Общо похарчено</th>
+                  <th className="px-5 py-3 font-medium text-center">Завършени курсове</th>
+                  <th className="px-5 py-3 font-medium text-right">Стойност на курсовете</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-background-100">
@@ -150,6 +125,11 @@ export default function AdminCustomers() {
           </div>
         </div>
       )}
+      {total > ADMIN_PAGE_SIZE && <div className="mt-4 flex items-center justify-between text-sm">
+        <button className="text-primary-600 disabled:opacity-40" disabled={page === 0 || customersQuery.isFetching} onClick={() => setPage(p => p - 1)}>Назад</button>
+        <span>Страница {page + 1} от {Math.ceil(total / ADMIN_PAGE_SIZE)}</span>
+        <button className="text-primary-600 disabled:opacity-40" disabled={(page + 1) * ADMIN_PAGE_SIZE >= total || customersQuery.isFetching} onClick={() => setPage(p => p + 1)}>Напред</button>
+      </div>}
     </AdminLayout>
   );
 }

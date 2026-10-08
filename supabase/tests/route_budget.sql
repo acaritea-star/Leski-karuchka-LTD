@@ -12,7 +12,7 @@ INSERT INTO auth.users(id,email) SELECT other_customer,'route-budget-'||other_cu
 INSERT INTO public.vehicle_types(id,company_id,name) SELECT vehicle_type,company,'Test car' FROM route_test_ids;
 INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number) SELECT vehicle,company,vehicle_type,'Test','Test','ROUTE-'||left(vehicle::text,8) FROM route_test_ids;
 UPDATE public.profiles SET company_id=(SELECT company FROM route_test_ids),role='DRIVER' WHERE id=(SELECT driver_user FROM route_test_ids);
-UPDATE public.drivers SET document_verification_required=false FROM route_test_ids) WHERE user_id=(SELECT driver_user FROM route_test_ids);
+UPDATE public.drivers SET document_verification_required=false WHERE user_id=(SELECT driver_user FROM route_test_ids);
 UPDATE public.drivers SET is_verified=true,vehicle_id=(SELECT vehicle FROM route_test_ids) WHERE user_id=(SELECT driver_user FROM route_test_ids);
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT d.id,t.company,43.2,25.6,8,clock_timestamp() FROM route_test_ids t JOIN public.drivers d ON d.user_id=t.driver_user;

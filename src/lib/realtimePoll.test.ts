@@ -5,9 +5,22 @@ let polls: Array<ReturnType<typeof createRealtimePoll>>;
 beforeEach(() => {
   vi.useFakeTimers(); polls = [];
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
 });
 afterEach(() => { polls.forEach(p => p.stop()); vi.useRealTimers(); });
 const flush = async () => { await vi.advanceTimersByTimeAsync(0); };
+it('does not start or repeat reads offline, and reconciles once when internet returns', async () => {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+  const read = vi.fn().mockResolvedValue(1);
+  const poll = createRealtimePoll(read, vi.fn(), { jitter: () => 0 }); polls.push(poll);
+  poll.setStatus('SUBSCRIBED');
+  await vi.advanceTimersByTimeAsync(60_000); expect(read).not.toHaveBeenCalled();
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  window.dispatchEvent(new Event('online')); await flush(); expect(read).toHaveBeenCalledOnce();
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+  window.dispatchEvent(new Event('offline'));
+  await vi.advanceTimersByTimeAsync(60_000); expect(read).toHaveBeenCalledOnce();
+});
 it('uses slow reconciliation on a healthy socket and fast reads immediately after disconnect', async () => {
   const read = vi.fn().mockResolvedValue(1), apply = vi.fn();
   const poll = createRealtimePoll(read, apply, { jitter: () => 0 }); polls.push(poll);

@@ -62,7 +62,9 @@ SELECT pg_temp.must_fail('SELECT public.accept_taxi_request((SELECT request FROM
 SELECT pg_temp.must_fail('UPDATE public.taxi_requests SET driver_id=(SELECT driver FROM test_ids),status=''accepted'' WHERE id=(SELECT request FROM test_ids)');
 SELECT pg_temp.must_fail('INSERT INTO public.notifications(user_id,company_id,title) SELECT other_customer,company,''Forged'' FROM test_ids');
 SELECT pg_temp.must_fail('INSERT INTO public.driver_documents(driver_id,company_id,type) SELECT driver,(SELECT id FROM public.companies WHERE name=''Other test company'' ORDER BY created_at DESC LIMIT 1),''license'' FROM test_ids');
-INSERT INTO public.driver_documents(driver_id,company_id,type) SELECT driver,company,'license' FROM test_ids;
+-- Document registration now requires the reviewed upload RPC; a raw INSERT
+-- must stay forbidden even within the driver's own company.
+SELECT pg_temp.must_fail('INSERT INTO public.driver_documents(driver_id,company_id,type) SELECT driver,company,''license'' FROM test_ids');
 RESET ROLE;
 DROP POLICY test_expiry_guard ON public.taxi_requests;
 SELECT public.expire_stale_requests();

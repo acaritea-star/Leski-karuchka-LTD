@@ -16,6 +16,11 @@ interface PricingConfig {
 }
 
 export default function AdminPricing() {
+  const { companyId } = useAdminCompany();
+  return <PricingEditor key={companyId ?? 'none'} />;
+}
+
+function PricingEditor() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
 

@@ -6,9 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
-import type { Tables } from '@/lib/database.types';
-
-type TripHistory = Tables<'taxi_requests'>;
+import { withRequestTimeout } from '@/lib/requestTimeout';
 
 const STATUS_LABELS: Record<string, string> = {
   completed: 'status_completed',
@@ -27,10 +25,10 @@ export default function DriverHistory() {
 
   const tripsQuery = useQuery({
     queryKey: driverId ? queryKeys.driverHistory(driverId, filter) : ['taxi_requests', 'driver', 'none', 'history', filter],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from('taxi_requests')
-        .select('*')
+        .select('id,status,completed_at,cancelled_at,pickup_address,destination_address,estimated_distance_km,estimated_duration_min,final_price,estimated_price')
         .eq('driver_id', driverId!);
       if (filter === 'completed') {
         query = query.eq('status', 'completed');
@@ -39,7 +37,8 @@ export default function DriverHistory() {
       } else {
         query = query.in('status', ['completed', 'cancelled']);
       }
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await withRequestTimeout(abort => query.order('created_at', { ascending: false })
+        .order('id', { ascending: false }).limit(50).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
@@ -48,6 +47,7 @@ export default function DriverHistory() {
 
   const trips = tripsQuery.data ?? [];
   const loading = driverQuery.isLoading || tripsQuery.isLoading;
+  const failed = driverQuery.isError || tripsQuery.isError;
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '';
@@ -86,7 +86,13 @@ export default function DriverHistory() {
           ))}
         </div>
 
-        {loading ? (
+        {failed ? (
+          <div role="alert" className="py-12 text-center">
+            <p className="text-sm text-red-600 mb-3">Историята не се зареди. Проверете връзката и опитайте отново.</p>
+            <button onClick={() => driverQuery.isError ? driverQuery.refetch() : tripsQuery.refetch()}
+              className="px-4 py-2 rounded-full bg-white text-sm text-foreground-600 cursor-pointer">{t('retry')}</button>
+          </div>
+        ) : loading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -134,15 +140,16 @@ export default function DriverHistory() {
                 {/* Bottom row */}
                 <div className="flex items-center justify-between pt-2 border-t border-background-100">
                   <div className="flex items-center gap-3 text-xs text-foreground-500">
-                    <span>{parseFloat(String(trip.estimated_distance_km)).toFixed(1)} {t('km')}</span>
+                    {trip.estimated_distance_km != null && <span>{trip.estimated_distance_km.toFixed(1)} {t('km')}</span>}
                     <span>{trip.estimated_duration_min} {t('min')}</span>
                   </div>
                   <span className="text-base font-bold text-foreground-950 font-heading">
-                    {parseFloat(String(trip.final_price || trip.estimated_price || 0)).toFixed(2)} {t('lv')}
+                    {trip.status === 'cancelled' ? '—' : `${(trip.final_price ?? trip.estimated_price ?? 0).toFixed(2)} ${t('lv')}`}
                   </span>
                 </div>
               </div>
             ))}
+            {trips.length === 50 && <p className="text-xs text-center text-foreground-500">Показани са последните 50 курса за избрания филтър. Пълните суми са в отчета.</p>}
           </div>
         )}
       </div>
