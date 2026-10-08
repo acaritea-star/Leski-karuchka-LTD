@@ -19,7 +19,7 @@ afterEach(()=>vi.unstubAllGlobals());
 it('reserves the authenticated actor and ride budget before the single Google call',async()=>{
   const response=await call();
   expect(response.status).toBe(200);
-  expect(fake.rpc).toHaveBeenCalledWith('reserve_route_request',expect.objectContaining({p_user_id:'22222222-2222-4222-8222-222222222222',p_request_id:body.request_id,p_purpose:'destination',p_quote:false}));
+  expect(fake.rpc).toHaveBeenCalledWith('reserve_route_request_v2',expect.objectContaining({p_user_id:'22222222-2222-4222-8222-222222222222',p_request_id:body.request_id,p_purpose:'destination',p_quote:false}));
   expect(fake.rpc.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(fetch).mock.invocationCallOrder[0]);
   expect(fetch).toHaveBeenCalledOnce();
   expect(await response.json()).toMatchObject({success:true,distance_km:3,duration_sec:600});
@@ -60,7 +60,7 @@ it('checks quote vehicle availability before calling Google',async()=>{
 });
 it('keeps old clients on the same authoritative budget by sending null route context',async()=>{
   expect((await call({origin:body.origin,destination:body.destination})).status).toBe(200);
-  expect(fake.rpc).toHaveBeenCalledWith('reserve_route_request',expect.objectContaining({p_request_id:null,p_purpose:null}));
+  expect(fake.rpc).toHaveBeenCalledWith('reserve_route_request_v2',expect.objectContaining({p_request_id:null,p_purpose:null}));
 });
 it('passes Google rate-limit retry guidance back to the browser',async()=>{
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({error:{message:'quota'}}),{status:429,headers:{'Retry-After':'120'}}));
