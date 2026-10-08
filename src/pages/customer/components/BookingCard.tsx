@@ -69,6 +69,7 @@ export default function BookingCard(props: BookingCardProps) {
         <span>{props.requestError || t('booking_quote_expired')}</span>
         {!props.creating && <button type="button" onClick={props.canRequest ? props.onRequest : props.onRefreshPrice}>{t('booking_retry')}</button>}
       </div>}
+      <p className="booking-fare-note">{t('booking_fixed_fare')}</p>
       <p className="text-xs text-foreground-700 leading-relaxed px-1 py-2">
         {t('booking_legal_notice')} <Link to="/terms" className="underline text-primary-700">{t('menu_terms')}</Link>
         {' · '}<Link to="/privacy" className="underline text-primary-700">{t('menu_privacy')}</Link>

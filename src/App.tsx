@@ -11,6 +11,7 @@ import { queryClient } from "@/lib/queryClient";
 
 import DriverGpsProvider from '@/components/feature/DriverGpsProvider';
 import CookieConsent from '@/components/feature/CookieConsent';
+import OperationTelemetry from '@/components/feature/OperationTelemetry';
 
 function RouteFallback() {
   return (
@@ -25,6 +26,7 @@ function App() {
     <ErrorBoundary><I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <OperationTelemetry />
           <BrowserRouter basename={__BASE_PATH__}>
             <DriverGpsProvider><AdminCompanyProvider>
               <Suspense fallback={<RouteFallback />}>

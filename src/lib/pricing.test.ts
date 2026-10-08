@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   DEFAULT_PRICING,
   DEFAULT_BASE_FARE,
@@ -11,6 +12,10 @@ import {
 } from '@/lib/pricing';
 
 describe('roundCurrency', () => {
+  it('handles exact decimal half cents without binary float drift', () => {
+    expect(roundCurrency(1.005)).toBe(1.01);
+    expect(roundCurrency(10.075)).toBe(10.08);
+  });
   it('rounds to two decimals', () => {
     expect(roundCurrency(2)).toBe(2);
     expect(roundCurrency(2.5)).toBe(2.5);
@@ -63,13 +68,13 @@ describe('calculateFare', () => {
 
   it('applies a vehicle multiplier end-to-end (comfort)', () => {
     const comfort = applyVehicleMultiplier(DEFAULT_PRICING, 1.4);
-    // 3 km, 6 min comfort → 2.80 + 3*1.54 + 6*0.39 = 9.76
+    // 3 km, 6 min comfort → (2 + 3*1.1 + 6*0.28) * 1.4 = 9.772 → 9.77
     const fare = calculateFare({ distanceKm: 3, durationMin: 6, config: comfort });
 
     expect(fare.baseFare).toBe(2.8);
     expect(fare.perKm).toBe(1.54);
-    expect(fare.perMin).toBe(0.39);
-    expect(fare.total).toBe(9.76);
+    expect(fare.perMin).toBe(0.392);
+    expect(fare.total).toBe(9.77);
   });
 });
 
@@ -96,7 +101,7 @@ describe('pricingFromRow', () => {
 describe('applyVehicleMultiplier', () => {
   it('scales every component by the multiplier', () => {
     expect(applyVehicleMultiplier(DEFAULT_PRICING, 1.4))
-      .toEqual({ baseFare: 2.8, perKm: 1.54, perMin: 0.39 });
+      .toEqual({ ...DEFAULT_PRICING, multiplier: 1.4 });
   });
 
   it('ignores invalid multipliers (falls back to 1x)', () => {
@@ -106,9 +111,23 @@ describe('applyVehicleMultiplier', () => {
   });
 });
 describe('server/client price parity', () => {
-  it('uses the database Comfort multiplier, including rounding each tariff', () => {
+  it('keeps the Readdy-safe frontend copy identical to the Edge calculation', () => {
+    expect(readFileSync('src/lib/pricing.ts','utf8')).toBe(readFileSync('supabase/functions/_shared/pricing.ts','utf8'));
+  });
+  it('uses raw metres and seconds and applies the minimum explicitly', () => {
+    const config = pricingFromRow({base_fare:2.2,price_per_km:0.79,price_per_minute:0.19,min_fare:3});
+    const tiny = calculateFare({distanceKm:1,durationMin:1,distanceMeters:10,durationSeconds:1,config});
+    expect(tiny.total).toBe(3); expect(tiny.minimumApplied).toBe(true);
+    const exact = calculateFare({distanceKm:100,durationMin:100,distanceMeters:1001,durationSeconds:61,config:{baseFare:0,perKm:1,perMin:1}});
+    expect(exact.total).toBe(2.02); // 1.001 + 61/60, never 1.01 + 2 whole minutes.
+  });
+  it('rounds the complete Comfort quote once, not the rate or the Eco total', () => {
+    const config = applyVehicleMultiplier(pricingFromRow({base_fare:2.2,price_per_km:.79,price_per_minute:.19}),1.3);
+    expect(calculateFare({distanceKm:62.97,durationMin:69,config}).total).toBe(84.57);
+  });
+  it('uses the database Comfort multiplier, without rounding each tariff', () => {
     const config = applyVehicleMultiplier(pricingFromRow({base_fare:2.2,price_per_km:0.79,price_per_minute:0.19}),1.3);
-    expect(calculateFare({distanceKm:10,durationMin:20,config}).total).toBe(18.16);
+    expect(calculateFare({distanceKm:10,durationMin:20,config}).total).toBe(18.07);
   });
   it('handles non-finite route values without NaN prices', () => {
     expect(Number.isFinite(calculateFare({distanceKm:NaN,durationMin:Infinity}).total)).toBe(true);

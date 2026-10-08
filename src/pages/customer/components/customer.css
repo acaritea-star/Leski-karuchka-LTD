@@ -11,6 +11,8 @@
   background: var(--paper); color: var(--ink); isolation: isolate;
 }
 .customer-map { position: absolute; inset: 0 0 calc(var(--panel-height) + 20px + env(safe-area-inset-bottom)); }
+.customer-experience[data-expanded=true] { --sheet-height: clamp(350px, 48svh, 440px); }
+.booking-fare-note { margin: 7px 1px 0; font-size: 11px; line-height: 1.4; color: var(--muted); }
 .customer-header {
   position: absolute; z-index: 30; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -127,6 +129,7 @@
 .tracking-rating i { color: #aa741c; }
 @media (min-width: 768px) {
   .customer-experience { --sheet-height: 336px; }
+  .customer-experience[data-expanded=true] { --sheet-height: 390px; }
   .customer-header { right: auto; width: 408px; left: 24px; top: 24px; }
   .customer-sheet { left: 24px; right: auto; bottom: 40px; width: 408px; }
   .customer-map { bottom: 0; }

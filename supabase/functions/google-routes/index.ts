@@ -14,7 +14,7 @@ function badRequest(message: string): Response {
   return json({ success: false, error: message }, 400);
 }
 
-Deno.serve(async (req) => {
+export async function googleRoutes(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -72,18 +72,22 @@ Deno.serve(async (req) => {
   // Validate pricing inputs before reserving budget or calling a paid API.
   let quoteOptions: Record<string,unknown> | null = null;
   let quoteCompany: (PricingRow & {id:string}) | null = null;
-  let vehicleMultiplier = 1;
+  let quoteVehicles: Array<{ id: string; multiplier: number }> = [];
   if (body.quote) {
     if (actor.role !== 'CUSTOMER' || requestId !== null || purpose !== null) return json({success:false,error:'Customer quote required'},403);
     quoteOptions = body.quote as Record<string,unknown>;
     const {data: vehicle,error: vehicleError} = await admin.from('vehicle_types').select('id,company_id,multiplier,is_active').eq('id',quoteOptions.vehicle_type_id).single();
     if (vehicleError || !vehicle?.is_active) return badRequest('Vehicle type unavailable');
-    const {data: company,error: companyError} = await admin.from('companies').select('id,base_fare,price_per_km,price_per_minute,currency,is_active').eq('id',vehicle.company_id).single();
+    const {data: company,error: companyError} = await admin.from('companies').select('id,base_fare,price_per_km,price_per_minute,min_fare,currency,is_active').eq('id',vehicle.company_id).single();
     if (companyError || !company?.is_active || company.currency !== 'EUR') return badRequest('Company unavailable');
-    quoteCompany = company; vehicleMultiplier = Number(vehicle.multiplier);
+    quoteCompany = company;
+    const { data: types, error: typesError } = await admin.from('vehicle_types')
+      .select('id,multiplier').eq('company_id', company.id).eq('is_active', true).order('id').limit(32);
+    if (typesError || !types?.length || !types.some(type => type.id === vehicle.id)) return json({success:false,error:'Vehicle tariffs unavailable'},503);
+    quoteVehicles = types;
   }
-  const {data: budget,error: budgetError} = await admin.rpc('reserve_route_request', {
-    p_user_id:actor.id,p_request_id:requestId,p_quote:!!quoteOptions,p_purpose:purpose,
+  const {data: budget,error: budgetError} = await admin.rpc('reserve_route_request_v2', {
+    p_user_id:actor.id,p_company_id:quoteCompany?.id ?? null,p_request_id:requestId,p_quote:!!quoteOptions,p_purpose:purpose,
     p_origin_lat:origin.lat,p_origin_lng:origin.lng,p_destination_lat:destination.lat,p_destination_lng:destination.lng,
   });
   if (budgetError || !budget) return json({success:false,error:'Route budget unavailable'},503,{'Retry-After':'30'});
@@ -136,21 +140,35 @@ Deno.serve(async (req) => {
       return json({ success: false, error: 'No route found' }, 404);
     }
 
-    const durationSec = parseInt(String(route.duration || '0').replace('s', ''), 10) || 0;
-    const distanceM = route.distanceMeters || 0;
+    const durationSec = typeof route.duration === 'string' && /^\d+(\.\d+)?s$/.test(route.duration) ? Number(route.duration.slice(0,-1)) : NaN;
+    const distanceM = Number(route.distanceMeters);
+    if (!Number.isFinite(durationSec) || durationSec < 0 || !Number.isFinite(distanceM) || distanceM < 0) {
+      return json({success:false,error:'Invalid route measurements'},502);
+    }
 
     let quote: Record<string, unknown> = {};
     if (quoteOptions && quoteCompany) {
       const company = quoteCompany;
       const options = quoteOptions;
-      const breakdown = calculateFare({distanceKm: +(distanceM/1000).toFixed(2),durationMin: Math.ceil(durationSec/60),config:applyVehicleMultiplier(pricingFromRow(company),vehicleMultiplier)});
-      const {data: saved,error: quoteError} = await admin.from('ride_quotes').insert({customer_id:actor.id,company_id:company.id,vehicle_type_id:options.vehicle_type_id,payload:{
-        pickup_latitude:origin.lat,pickup_longitude:origin.lng,destination_latitude:destination.lat,destination_longitude:destination.lng,
-        pickup_address:String(options.pickup_address ?? '').slice(0,500),destination_address:String(options.destination_address ?? '').slice(0,500),
-        distance_km:breakdown.distanceKm,duration_min:breakdown.durationMin,total:breakdown.total,breakdown,
-      }}).select('id,expires_at').single();
-      if (quoteError || !saved) return json({error:'Could not save quote'},503);
-      quote={quote_id:saved.id,quote_expires_at:saved.expires_at,price:breakdown.total,breakdown};
+      // One routing result creates the fixed offers for every active category.
+      // No long-lived Google route cache and no client-supplied pricing inputs.
+      const rows = quoteVehicles.map(type => {
+        const breakdown = calculateFare({distanceKm:distanceM/1000,durationMin:durationSec/60,
+          distanceMeters:distanceM,durationSeconds:durationSec,
+          config:applyVehicleMultiplier(pricingFromRow(company),Number(type.multiplier))});
+        return { id:crypto.randomUUID(),customer_id:actor.id,company_id:company.id,vehicle_type_id:type.id,payload:{
+          pickup_latitude:origin.lat,pickup_longitude:origin.lng,destination_latitude:destination.lat,destination_longitude:destination.lng,
+          pickup_address:String(options.pickup_address ?? '').slice(0,500),destination_address:String(options.destination_address ?? '').slice(0,500),
+          distance_km:breakdown.distanceKm,duration_min:Math.ceil(durationSec/60),total:breakdown.total,breakdown,
+        }};
+      });
+      const {data: saved,error: quoteError} = await admin.from('ride_quotes').insert(rows).select('id,expires_at');
+      if (quoteError || saved?.length !== rows.length) return json({error:'Could not save quotes'},503);
+      const quotes = rows.map(row => ({ vehicle_type_id:row.vehicle_type_id,quote_id:row.id,
+        quote_expires_at:saved.find(item => item.id === row.id)!.expires_at,
+        price:row.payload.total,breakdown:row.payload.breakdown }));
+      const selected = quotes.find(item => item.vehicle_type_id === options.vehicle_type_id)!;
+      quote={...selected,quotes};
     }
     return json({
       ...quote,
@@ -174,4 +192,6 @@ Deno.serve(async (req) => {
     const message = err instanceof Error ? err.message : 'Routes API failed';
     return json({ success: false, error: message }, 500);
   }
-});
+}
+
+Deno.serve(req => googleRoutes(req).catch(() => json({success:false,error:'Route service unavailable'},503)));

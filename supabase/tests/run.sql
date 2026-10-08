@@ -38,6 +38,10 @@ ROLLBACK TO regression_suite;
 RESET ROLE;
 SELECT set_config('request.jwt.claims','{}',true);
 \ir admin_read_models.sql
+ROLLBACK TO regression_suite;
+RESET ROLE;
+SELECT set_config('request.jwt.claims','{}',true);
+\ir ride_evidence.sql
 ROLLBACK;
 -- Independent suites own their rollback-only transactions.
 \ir driver_verification.sql

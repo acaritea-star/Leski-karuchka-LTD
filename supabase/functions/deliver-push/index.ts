@@ -1,5 +1,6 @@
 import { admin, json } from '../_shared/auth.ts';
 import { classifyPushFailure, isAllowedPushEndpoint, isUuid, pushTtl } from '../_shared/push.ts';
+// @deno-types="npm:@types/web-push@3.6.4"
 import webpush from 'npm:web-push@3.6.7';
 
 type Job = { id: string; recipient_id: string; payload: Record<string, unknown>; expires_at: string; lease_until: string };

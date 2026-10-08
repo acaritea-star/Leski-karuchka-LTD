@@ -19,6 +19,7 @@ import { measureRoute } from '@/lib/routeGeometry';
 import { remainingRouteEstimate } from '@/lib/routeProgress';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
+import RideStartConfirmation from './RideStartConfirmation';
 
 export interface TrackingRequest {
   id: string;
@@ -399,6 +400,7 @@ export default function DriverTracking({
           </div>
         </>}
         {cancelError && <p className="booking-error" role="alert">{cancelError}</p>}
+        {request.status==='in_progress' && <RideStartConfirmation key={request.id} requestId={request.id} />}
       </div>
       <div className="booking-status-actions">
         {driverInfo?.phone && <a className="booking-primary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}

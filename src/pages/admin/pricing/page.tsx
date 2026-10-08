@@ -9,6 +9,7 @@ import { calculateFare, DEFAULT_CURRENCY } from '@/lib/pricing';
 
 interface PricingConfig {
   base_fare: number;
+  min_fare: number;
   price_per_km: number;
   price_per_minute: number;
   dispatch_radius_km: number;
@@ -26,6 +27,7 @@ function PricingEditor() {
 
   const [config, setConfig] = useState<PricingConfig>({
     base_fare: 2.0,
+    min_fare: 0,
     price_per_km: 1.1,
     price_per_minute: 0.28,
     dispatch_radius_km: 5,
@@ -46,7 +48,7 @@ function PricingEditor() {
     try {
       const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('base_fare, price_per_km, price_per_minute, dispatch_radius_km, currency')
+        .select('base_fare, min_fare, price_per_km, price_per_minute, dispatch_radius_km, currency')
         .eq('id', companyId)
         .abortSignal(signal).single());
 
@@ -54,7 +56,8 @@ function PricingEditor() {
       if (data) {
         setLoaded(true);
         setConfig({
-          base_fare: parseFloat(String(data.base_fare || 0)),
+          base_fare: parseFloat(String(data.base_fare ?? 0)),
+          min_fare: parseFloat(String(data.min_fare ?? 0)),
           price_per_km: parseFloat(String(data.price_per_km || 0)),
           price_per_minute: parseFloat(String(data.price_per_minute || 0)),
           dispatch_radius_km: parseFloat(String(data.dispatch_radius_km || 0)),
@@ -76,8 +79,8 @@ function PricingEditor() {
 
   const handleSave = async () => {
     if (!companyId || !loaded || savingRef.current) return;
-    if (![config.base_fare, config.price_per_km, config.price_per_minute, config.dispatch_radius_km].every(Number.isFinite)
-      || config.base_fare < 0 || config.price_per_km < 0 || config.price_per_minute < 0 || config.dispatch_radius_km <= 0) {
+    if (![config.base_fare, config.min_fare, config.price_per_km, config.price_per_minute, config.dispatch_radius_km].every(Number.isFinite)
+      || config.min_fare < 0 || config.base_fare < 0 || config.price_per_km < 0 || config.price_per_minute < 0 || config.dispatch_radius_km <= 0) {
       setError('Въведи неотрицателни цени и радиус по-голям от нула.'); return;
     }
     savingRef.current = true;
@@ -89,6 +92,7 @@ function PricingEditor() {
         .from('companies')
         .update({
           base_fare: config.base_fare,
+          min_fare: config.min_fare,
           price_per_km: config.price_per_km,
           price_per_minute: config.price_per_minute,
           dispatch_radius_km: config.dispatch_radius_km,
@@ -141,7 +145,7 @@ function PricingEditor() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 bg-white rounded-2xl border border-background-100 p-6">
             <h3 className="font-semibold text-foreground-950 mb-1">Тарифи</h3>
-            <p className="text-sm text-foreground-500 mb-6">Тези стойности определят прогнозната цена на пътуване.</p>
+            <p className="text-sm text-foreground-500 mb-6">Цената се запазва при поръчване. Смята се по метри и секунди, с едно крайно закръгляне до евроцент. Множителят за категорията важи и за минималната цена.</p>
 
             <div className="space-y-5">
               <div>
@@ -165,7 +169,7 @@ function PricingEditor() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на минута ({config.currency})</label>
+                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на минута от маршрута ({config.currency})</label>
                 <input
                   type="number"
                   step="0.01"
@@ -173,6 +177,11 @@ function PricingEditor() {
                   onChange={(e) => setNum('price_per_minute', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 />
+              </div>
+              <div>
+                <label htmlFor="minimum-fare" className="text-sm font-medium text-foreground-700 block mb-1.5">Минимална цена ({config.currency})</label>
+                <input id="minimum-fare" type="number" min="0" step="0.01" value={config.min_fare} onChange={e => setNum('min_fare', e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200" />
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground-700 block mb-1.5">Радиус за диспечиране (км)</label>
@@ -206,6 +215,7 @@ function PricingEditor() {
                   durationMin: min,
                   config: {
                     baseFare: config.base_fare,
+                    minFare: config.min_fare,
                     perKm: config.price_per_km,
                     perMin: config.price_per_minute,
                   },

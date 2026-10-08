@@ -1,0 +1,29 @@
+{
+  "capturedAt": "2026-10-08",
+  "includedMigrations": [
+    "20260913120515_enterprise_core.sql",
+    "20260913120915_api_rate_limit.sql",
+    "20260913121928_legacy_insert_guard.sql",
+    "20261003142159_reliable_dispatch.sql",
+    "20261003182410_bulgaria_service_area.sql",
+    "20261003195418_request_accounting.sql",
+    "20261003205424_quote_service_area_permissions.sql",
+    "20261003221312_nearby_cars_and_road_cache.sql",
+    "20261003221436_nearby_geo_operator_scope.sql",
+    "20261004092612_route_request_budget.sql",
+    "20261004110928_scale_reconciliation_and_rls.sql",
+    "20261004152206_server_dashboard_summaries.sql",
+    "20261004211843_pwa_accounting_legal_workflow.sql",
+    "20261004213022_carrier_validity_and_creation_guard.sql",
+    "20261007153007_complete_driver_onboarding_and_verification.sql",
+    "20261007155125_preflight_approved_database_privileges_rollback_only.sql",
+    "20261007155222_verify_database_privilege_restore_rollback_only.sql",
+    "20261007155242_apply_approved_application_privilege_hardening.sql",
+    "20261007202117_explain_driver_verification_and_recover_document_uploads.sql",
+    "20261007203117_audit_driver_document_validity_changes.sql",
+    "20261008043818_preflight_admin_reads_and_rls_rollback_only.sql",
+    "20261008044308_bounded_admin_reports_and_rls_initplans.sql",
+    "20261008094240_preflight_inactive_admin_access_rollback_only.sql",
+    "20261008094300_deny_deactivated_admin_audit_and_ledger_reads.sql"
+  ]
+}

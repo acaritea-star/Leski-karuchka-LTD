@@ -1,5 +1,6 @@
 import { isInBulgaria } from './serviceArea';
 import { EdgeRequestError, invokeEdge } from './edgeRequest';
+import { metricNow, recordRequestMetric } from './requestMetrics';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Google Maps Platform — Frontend wrappers for Supabase Edge Functions
@@ -26,6 +27,7 @@ export interface GeocodeResult {
 }
 
 export interface RouteResult {
+  quotes?: Array<{ vehicle_type_id: string; quote_id?: string; quote_expires_at: string; price: number; breakdown: import('@/lib/pricing').FareBreakdown }>;
   quote_id?: string;
   quote_expires_at?: string;
   price?: number;
@@ -106,6 +108,7 @@ export async function computeRoute(
     quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string };
   }
 ): Promise<RouteResult | null> {
+  const started=metricNow();
   if (!isInBulgaria(origin.lat, origin.lng) || !isInBulgaria(destination.lat, destination.lng)
     || opts?.waypoints?.some(point => !isInBulgaria(point.lat, point.lng))) return null;
   try {
@@ -122,10 +125,12 @@ export async function computeRoute(
         waypoints: opts?.waypoints,
     }, 20_000);
     if (error) throw error;
+    recordRequestMetric('route.read',started,data?.success?'ok':'error');
     if (!data?.success) return null;
     return data as RouteResult;
   } catch (err) {
     console.error('computeRoute error:', err);
+    recordRequestMetric('route.read',started,'error');
     if (err instanceof EdgeRequestError) return {
       success: false, distance_km: 0, duration_min: 0, duration_sec: 0, polyline: '', legs: [], alternatives_count: 0,
       status: err.status, retry_after_sec: err.retryAfterSeconds, code: err.code, error: err.message,

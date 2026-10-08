@@ -128,11 +128,18 @@ export default function CustomerHome() {
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeInput, setRouteInput] = useState('');
+  const [routeVehicleType, setRouteVehicleType] = useState('');
   const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
-  const quoteInput = JSON.stringify([pickup, destination, vehicleType]);
-  const currentRoute = routeInput === quoteInput ? route : null;
+  const quoteCompany = vehicleTypes.find(type => type.id === vehicleType)?.company_id ?? user?.company_id;
+  const quoteInput = JSON.stringify([pickup, destination, quoteCompany]);
+  const quoteReady = !!vehicleType;
+  const requestedType = useRef(vehicleType);
+  requestedType.current = vehicleType;
+  const selectedQuote = route?.quotes?.find(quote => quote.vehicle_type_id === vehicleType);
+  const currentRoute = routeInput !== quoteInput ? null : selectedQuote ? { ...route!, ...selectedQuote }
+    : routeVehicleType === vehicleType ? route : null;
   const gpsRevision = useRef(0);
 
   // Network connectivity state
@@ -145,7 +152,8 @@ export default function CustomerHome() {
 
   useEffect(() => {
     if (!route?.quote_expires_at) return;
-    const timer = setTimeout(() => setRoute(current => current ? {...current,quote_id:undefined} : null), Math.max(0,Date.parse(route.quote_expires_at)-Date.now()));
+    const timer = setTimeout(() => setRoute(current => current ? {...current,quote_id:undefined,
+      quotes:current.quotes?.map(quote => ({...quote,quote_id:undefined}))} : null), Math.max(0,Date.parse(route.quote_expires_at)-Date.now()));
     return () => clearTimeout(timer);
   },[route?.quote_expires_at]);
 
@@ -281,8 +289,8 @@ export default function CustomerHome() {
 
   // Create taxi request
   const createRequest = async () => {
-    if (!user || !route?.quote_id || !canRequest || bookingInFlight.current) return;
-    const quoteId = route.quote_id;
+    if (!user || !currentRoute?.quote_id || !canRequest || bookingInFlight.current) return;
+    const quoteId = currentRoute.quote_id;
     bookingInFlight.current = true;
     setRequestStatus('creating'); setRequestError('');
     try {
@@ -354,20 +362,22 @@ export default function CustomerHome() {
 
   // Only a server-created quote can be booked. A failed route never becomes a guessed fare.
   useEffect(() => {
-    if (!pickup || !destination || !vehicleType || activeRequestId) return;
+    if (!pickup || !destination || !quoteReady || activeRequestId) return;
     let active = true;
+    const vehicleTypeForQuote = requestedType.current;
     setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
-      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleType,pickup_address:pickup.address,destination_address:destination.address}})
+      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
           setCalculating(false);
           if (!result?.quote_id || !result.quote_expires_at || !result.breakdown || !Number.isFinite(result.breakdown.total)) {
             setRoute(null);
-            setRequestError(t('route_failed'));
+            setRequestError(t(result?.code==='ROUTE_DAILY_LIMIT'?'route_daily_limit':result?.code==='ROUTE_USER_LIMIT'?'route_user_limit':result?.status===429?'route_rate_limit':'route_failed'));
           } else {
             setRoute(result);
+            setRouteVehicleType(vehicleTypeForQuote);
             setVisualRoute({ endpoints, route: result });
             setRouteInput(quoteInput);
             setRequestError('');
@@ -375,7 +385,7 @@ export default function CustomerHome() {
         });
     }, 350);
     return () => { active = false; clearTimeout(timer); };
-  }, [pickup, destination, vehicleType, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
+  }, [pickup, destination, quoteReady, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
 
   const cancelRequest = async () => {
     if (!activeRequest || cancelling || !['pending', 'accepted', 'arrived'].includes(activeRequest.status)) return;
@@ -469,6 +479,7 @@ export default function CustomerHome() {
     : destination;
 
   return <CustomerLayout
+    expanded={step === 'confirm' && !activeRequest}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={vehicleType || undefined} />}
     header={<>
       <div className="customer-brand">
@@ -500,7 +511,7 @@ export default function CustomerHome() {
             vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
             vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active }))}
             fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
-            calculating={calculating} priceExpired={!!fare && !currentRoute?.quote_id}
+            calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
             onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}

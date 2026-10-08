@@ -1,0 +1,7 @@
+{
+  "release": "2026.10.08-p1.1",
+  "baseCommit": "b081064cc908b927f3705223456376960070203a",
+  "databaseMigration": "p1_ride_evidence_and_operations",
+  "pricingVersion": "fixed-fare-v2",
+  "legalReleaseApproved": false
+}

@@ -15,6 +15,7 @@ const fake = vi.hoisted(() => ({
   readById: vi.fn(), notify: null as null | ((payload: { new: Record<string, unknown> }) => void),
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
+  vehicleTypes: [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }],
   user: { id: 'customer', company_id: 'company', first_name: 'Тест', email: 'test@example.test' },
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: fake.user, loading: false }) }));
@@ -26,11 +27,11 @@ vi.mock('@/components/feature/NotificationBell', () => ({ default: () => null })
 vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
 vi.mock('@/lib/places', () => ({ hasPlacesApi: () => false }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc: (...args: unknown[]) => ({ abortSignal: () => fake.rpc(...args) }), removeChannel: vi.fn(),
+  rpc: (...args: unknown[]) => ({ abortSignal: () => args[0] === 'carrier_identity' ? Promise.resolve({data:null,error:null}) : fake.rpc(...args) }), removeChannel: vi.fn(),
   channel: () => { const channel = { on: (_event: string, _filter: unknown, callback: typeof fake.notify) => { fake.notify = callback; return channel; }, subscribe: () => channel }; return channel; },
   from: (table: string) => {
     const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? { id: 'company' }
-      : [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true }],
+      : fake.vehicleTypes,
     error: table === 'taxi_requests' && fake.recoveryError ? { message: 'offline' } : null });
     let byId = false;
     const query = { select: () => query, abortSignal: () => query, eq: (field: string) => { if (field === 'id') byId = true; return query; }, in: () => query, order: () => query,
@@ -52,6 +53,7 @@ const chooseRoute = async () => {
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); fake.active = null; fake.recoveryError = false;
+  fake.vehicleTypes = [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }];
   fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
   fake.notify = null;
   fake.route.mockResolvedValue(quote());
@@ -68,6 +70,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); stopSharedGps(); localStorage.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('customer booking integration', () => {
+  it('switches category with no new routing call and books that category quote', async () => {
+    fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
+    const result = quote();
+    result.quotes = ['eco','comfort'].map((id,i) => ({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:result.quote_expires_at!,
+      price:5+i,breakdown:{...result.breakdown!,total:5+i}}));
+    fake.route.mockResolvedValue(result);
+    await mount(); await chooseRoute();
+    fireEvent.click(screen.getByRole('radio',{name:/Комфорт/}));
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(fake.route).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('6.00');
+    fireEvent.click(screen.getByRole('button',{name:/Поръчай каручка/}));
+    await act(async () => {});
+    expect(fake.rpc).toHaveBeenCalledWith('create_taxi_request',expect.objectContaining({p_quote_id:'quote-comfort'}));
+  });
+  it('expires all category offers together without silently buying another route', async () => {
+    fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
+    const result=quote();result.quotes=[{vehicle_type_id:'comfort',quote_id:'comfort-quote',quote_expires_at:result.quote_expires_at!,price:6,breakdown:{...result.breakdown!,total:6}}];
+    fake.route.mockResolvedValue(result); await mount(); await chooseRoute();
+    fireEvent.click(screen.getByRole('radio',{name:/Комфорт/}));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+    expect(fake.route).toHaveBeenCalledTimes(1);
+  });
   it('moves through three steps and sends one cash-only RPC on a double click', async () => {
     await mount();
     expect(screen.getByRole('heading', { name: 'Откъде тръгваш?' })).toBeTruthy();

@@ -1,0 +1,10 @@
+{
+  "sources": [
+    "src/config/legalOperator.json",
+    "src/pages/landing/terms/page.tsx",
+    "src/pages/landing/privacy/page.tsx"
+  ],
+  "sha256": "52861bb106fd986bdd8aa9ac52bb59ee44c0fd3947d32fadd4073d76cba98190",
+  "termsVersion": "2026-10-08-draft.3",
+  "privacyVersion": "2026-10-08.1"
+}

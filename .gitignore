@@ -4,3 +4,5 @@ supabase/.temp/
 .env.local
 .env.*.local
 coverage/
+test-results/
+playwright-report/

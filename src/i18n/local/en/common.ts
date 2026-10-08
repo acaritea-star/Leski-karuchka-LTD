@@ -1,7 +1,8 @@
 export default {
   menu_terms: 'Terms of use',
   cookie_settings: 'Cookie settings',
-  booking_legal_notice: "Leski Karuchka connects the customer with a carrier; the carrier is responsible for transport. Sending a request accepts its terms. The amount is an estimate; the tariff and taximeter determine the final fare.",
+  booking_fixed_fare: "Calculated route price, saved when you book. To the nearest cent, without rounding up to a whole amount.",
+  booking_legal_notice: "Leski Karuchka connects the customer with a carrier; the carrier is responsible for transport, statutory fare reporting and the payment receipt. Sending a request accepts its terms.",
   booking_meet_driver: 'Your driver is waiting at the pickup point.',
   booking_waiting_location: 'Waiting for the driver’s current location.',
   booking_pickup: "Where from?",
@@ -83,6 +84,9 @@ export default {
   pickup_search_title: 'Where are you leaving from?',
   dest_search_title: 'Where are you going?',
   request_failed_hint: "We couldn't place the order. Check your connection and try again.",
+  route_daily_limit: 'The daily route budget has been reached. New prices will be available after the budget resets.',
+  route_user_limit: 'This account has reached its daily route calculation limit.',
+  route_rate_limit: 'Route requests are temporarily limited. Please wait before retrying.',
   route_failed: "We couldn't calculate the route. Check your connection and try again.",
 
   // Auth
@@ -347,7 +351,7 @@ export default {
   push_new_request_body: 'From {{pickup}} → {{dest}}',
 
   // Admin
-  total_revenue: 'Total Revenue',
+  total_revenue: 'Booked value',
   active_taxis: 'Active Carriages',
   online_drivers: 'Online Drivers',
   active_orders: 'Active Orders',

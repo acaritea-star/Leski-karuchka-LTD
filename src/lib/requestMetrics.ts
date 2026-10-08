@@ -1,18 +1,24 @@
 export type RequestMetric = 'driver.read' | 'driver.online' | 'gps.read' | 'gps.write'
   | 'ride.accept' | 'ride.create' | 'ride.transition' | 'ride.cancel' | 'ride.reconcile'
-  | 'tracking.read' | 'dashboard.read';
+  | 'tracking.read' | 'dashboard.read' | 'route.read';
 type Outcome = 'ok' | 'error' | 'timeout' | 'aborted';
-type Sample = { name: RequestMetric; outcome: Outcome; ms: number };
+export type RequestSample = { name: RequestMetric; outcome: Outcome; ms: number };
+const listeners = new Set<(sample: RequestSample) => void>();
+export function observeRequestMetrics(listener: (sample: RequestSample) => void) {
+  listeners.add(listener); return () => { listeners.delete(listener); };
+}
+type Sample = RequestSample;
 const samples: Sample[] = [];
 const MAX_SAMPLES = 200;
 export const metricNow = () => typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-// Session-only diagnostics: fixed labels and timings, no URLs, IDs, coordinates,
-// tokens or error messages. No analytics request or database write is made.
+// Fixed diagnostic labels and timings only. The authenticated telemetry consumer
+// batches these once a minute; recording itself never waits for a network request.
 export function recordRequestMetric(name: RequestMetric, started: number, outcome: Outcome) {
   const ended = metricNow();
   samples.push({ name, outcome, ms: Math.max(0, ended - started) });
   if (samples.length > MAX_SAMPLES) samples.shift();
+  for (const listener of listeners) { try { listener(samples[samples.length - 1]); } catch { /* Diagnostics cannot interrupt work. */ } }
   try {
     const label = `leski:${name}:${outcome}`;
     // Keep at most one standard browser Performance entry per label.

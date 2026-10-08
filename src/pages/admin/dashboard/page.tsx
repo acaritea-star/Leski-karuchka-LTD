@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
+import OperationalHealth from '@/components/feature/OperationalHealth';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -48,6 +49,7 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout title={t('nav_dashboard')}>
+      {companyId && <OperationalHealth companyId={companyId} />}
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />

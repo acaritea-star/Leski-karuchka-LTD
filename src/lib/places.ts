@@ -1,4 +1,5 @@
 import type { LocationPreset } from '@/lib/geo';
+import { withRequestTimeout } from './requestTimeout';
 
 // Google Maps Platform API key — injected from the environment (public browser key)
 const API_KEY = (import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined) || '';
@@ -48,10 +49,10 @@ export async function searchPlaces(
   };
   if (sessionToken) body.sessionToken = sessionToken;
 
-  try {
+  return withRequestTimeout(async abort => {
     const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
       method: 'POST',
-      signal,
+      signal: abort,
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': API_KEY,
@@ -95,16 +96,15 @@ export async function searchPlaces(
         }
       )
       .filter((p: PlacePrediction | null): p is PlacePrediction => p !== null);
-  } catch (error) {
-    throw error;
-  }
+  }, 8000, signal);
 }
 
 // Place Details (New) — resolves a prediction to a precise address + coordinates
 export async function getPlaceDetails(
   placeId: string,
   sessionToken?: string,
-  language = 'bg'
+  language = 'bg',
+  signal?: AbortSignal,
 ): Promise<LocationPreset | null> {
   if (!API_KEY) return null;
 
@@ -112,9 +112,11 @@ export async function getPlaceDetails(
   if (sessionToken) params.set('sessionToken', sessionToken);
 
   try {
+    return await withRequestTimeout(async abort => {
     const res = await fetch(
       `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?${params.toString()}`,
       {
+        signal: abort,
         headers: {
           'X-Goog-Api-Key': API_KEY,
           'X-Goog-FieldMask': 'id,formattedAddress,location',
@@ -141,6 +143,7 @@ export async function getPlaceDetails(
       lat: loc.latitude,
       lng: loc.longitude,
     };
+    }, 8000, signal);
   } catch {
     return null;
   }

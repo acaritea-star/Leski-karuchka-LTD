@@ -14,6 +14,13 @@ export type Database = {
   }
   public: {
     Tables: {
+      ride_evidence: {
+        Row: { request_id:string; company_id:string; customer_id:string; driver_id:string; first_observed_at:string|null; last_observed_at:string|null; samples:number; good_samples:number; approach_meters:number; trip_meters:number; observed_seconds:number; stationary_seconds:number; flags:string[]; customer_confirmed_at:string|null; updated_at:string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+
       app_config: {
         Row: {
           created_at: string | null
@@ -1641,6 +1648,11 @@ export type Database = {
       }
     }
     Functions: {
+      confirm_ride_start: { Args: {p_request_id:string}; Returns:string }
+      ride_observations: { Args: {p_request_id:string;p_after?:string;p_limit?:number}; Returns:Json }
+      record_operation_metrics: { Args: {p_id:string;p_rows:Json}; Returns:boolean }
+      operational_health: { Args: {p_company_id:string}; Returns:Json }
+
       _postgis_deprecate: {
         Args: { newname: string; oldname: string; version: string }
         Returns: undefined

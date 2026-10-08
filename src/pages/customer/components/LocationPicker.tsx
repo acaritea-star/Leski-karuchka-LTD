@@ -24,12 +24,14 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
   const revision = useRef(0);
   const selection = useRef(false);
   const input = useRef<HTMLInputElement>(null);
+  const detailsRequest = useRef<AbortController | null>(null);
   const query = searchQuery.trim();
   const enabled = hasPlacesApi();
 
   useEffect(() => {
     const requestRevision = revision;
     const version = ++requestRevision.current;
+    detailsRequest.current?.abort();
     selection.current = false;
     setResolving(null); setError(''); setLoadingVisible(false);
     if (query.length < 2 || !enabled) { setResults([]); setResultQuery(''); setSearching(false); return; }
@@ -50,7 +52,7 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
   }, [query, enabled, retry, showCurrentLocation, t]);
   useEffect(() => {
     const lifetime = revision;
-    return () => { ++lifetime.current; };
+    return () => { ++lifetime.current; detailsRequest.current?.abort(); };
   }, []);
 
   const choose = (place: LocationPreset) => { if (!isInBulgaria(place.lat, place.lng)) { setError(SERVICE_AREA_ERROR); return; } session.current = crypto.randomUUID(); input.current?.blur(); onSelect(place); };
@@ -58,9 +60,12 @@ export default function LocationPicker({ searchQuery, onSearchChange, locating, 
     if (selection.current || locating || searching || resultQuery !== query) return;
     selection.current = true;
     const version = revision.current;
+    const controller = new AbortController();
+    detailsRequest.current?.abort();
+    detailsRequest.current = controller;
     setResolving(prediction.place_id); setError('');
     try {
-      const place = await getPlaceDetails(prediction.place_id, session.current);
+      const place = await getPlaceDetails(prediction.place_id, session.current, 'bg', controller.signal);
       if (version !== revision.current) return;
       if (place) choose(place); else setError(t('places_search_error'));
     } catch {

@@ -30,12 +30,12 @@ BEGIN
  INSERT INTO storage.objects(bucket_id,name,owner_id) SELECT 'driver-documents',duid||'/'||id||'.pdf',duid::text FROM unnest(ARRAY[license,insurance,renewal]) t(id);
  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
  EXECUTE 'SET LOCAL ROLE authenticated';
- acceptance:=public.accept_legal_versions('2026-10-03-draft.2','2026-10-04.2','continue');
- IF public.accept_legal_versions('2026-10-03-draft.2','2026-10-04.2','continue')<>acceptance THEN RAISE EXCEPTION 'FAIL duplicate acceptance'; END IF;
+ acceptance:=public.accept_legal_versions('2026-10-08-draft.3','2026-10-08.1','continue');
+ IF public.accept_legal_versions('2026-10-08-draft.3','2026-10-08.1','continue')<>acceptance THEN RAISE EXCEPTION 'FAIL duplicate acceptance'; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.legal_acceptances WHERE id=acceptance AND user_id=duid AND length(source_digest)=64 AND accepted_at BETWEEN now()-interval '1 minute' AND clock_timestamp()) THEN RAISE EXCEPTION 'FAIL server acceptance provenance'; END IF;
  FOREACH stmt IN ARRAY ARRAY[
   'SELECT public.accept_legal_versions(''old'',''old'',''continue'')',
-  'SELECT public.accept_legal_versions(''2026-10-03-draft.2'',''2026-10-04.2'',''advertising'')',
+  'SELECT public.accept_legal_versions(''2026-10-08-draft.3'',''2026-10-08.1'',''advertising'')',
   'DELETE FROM public.legal_acceptances',
   format('SELECT private.record_driver_money_core(%L,''income'',10,''Bypass'')',gen_random_uuid()),
   format('SELECT public.record_driver_money_verified(%L,''income'',10,''Wrong account'',%L)',gen_random_uuid(),admin_uid)
@@ -146,7 +146,7 @@ BEGIN
  EXECUTE 'RESET ROLE';
  EXECUTE 'SET LOCAL ROLE anon';
  FOREACH stmt IN ARRAY ARRAY[
-  'SELECT public.accept_legal_versions(''2026-10-03-draft.2'',''2026-10-04.2'',''continue'')',
+  'SELECT public.accept_legal_versions(''2026-10-08-draft.3'',''2026-10-08.1'',''continue'')',
   'SELECT public.export_my_basic_data()', 'SELECT public.request_personal_data(''export'')',
   'SELECT * FROM public.legal_acceptances','SELECT * FROM public.privacy_requests'
  ] LOOP

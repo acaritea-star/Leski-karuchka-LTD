@@ -1,6 +1,8 @@
+import { evidenceDescription, evidenceFlagLabels, type RideEvidence } from './rideEvidence';
 import { supabase } from './supabase';
 import { withRequestTimeout } from './requestTimeout';
 export interface Outcome {
+ evidence?: RideEvidence|null;
  id: string; request_id: string; driver_id: string | null; driver_name: string;
  outcome: 'completed' | 'cancelled'; previous_status: string; cancelled_by: string | null;
  cancel_reason: string | null; occurred_at: string; accepted_at: string | null;
@@ -54,8 +56,8 @@ export function csvCell(value: unknown): string {
  return `"${(/^[\s]*[=+@-]/.test(text) ? "'" : '') + text.replace(/"/g, '""')}"`;
 }
 export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[]): string {
- const rows: unknown[][] = [['Вид', 'Шофьор', 'Дата (Europe/Sofia)', 'Заявка', 'Етап/състояние', 'Автор на отказа', 'Сума EUR', 'Бележка', 'Идентификатор', 'Свързан запис', 'Източник на сверяване', 'Номер / референция']];
- for (const o of outcomes) rows.push([o.outcome === 'completed' ? 'Завършен курс' : 'Отменена заявка', o.driver_name || o.driver_id, new Date(o.occurred_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), o.request_id, stageLabels[o.previous_status] || o.previous_status, actorLabels[o.cancelled_by ?? ''] ?? '', o.outcome === 'completed' ? o.booked_amount : '', `${reasonLabels[o.cancel_reason ?? ''] ?? o.cancel_reason ?? ''}${o.reconstructed ? ' (възстановен стар запис)' : ''}`, o.id, '', 'Прогнозна стойност', '']);
+ const rows: unknown[][] = [['Вид', 'Шофьор', 'Дата (Europe/Sofia)', 'Заявка', 'Етап/състояние', 'Автор на отказа', 'Сума EUR', 'Бележка', 'Идентификатор', 'Свързан запис', 'Източник на сверяване', 'Номер / референция', 'GPS наблюдения', 'Сигнали за преглед', 'Начало, потвърдено от клиент']];
+ for (const o of outcomes) rows.push([o.outcome === 'completed' ? 'Завършен курс' : 'Отменена заявка', o.driver_name || o.driver_id, new Date(o.occurred_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), o.request_id, stageLabels[o.previous_status] || o.previous_status, actorLabels[o.cancelled_by ?? ''] ?? '', o.outcome === 'completed' ? o.booked_amount : '', `${reasonLabels[o.cancel_reason ?? ''] ?? o.cancel_reason ?? ''}${o.reconstructed ? ' (възстановен стар запис)' : ''}`, o.id, '', 'Записана цена на заявката', '', o.evidence ? evidenceDescription(o.evidence) : 'Няма наблюдения', o.evidence?.flags.map(f=>evidenceFlagLabels[f] ?? f).join(', ') ?? '', o.evidence?.customer_confirmed_at ?? '']);
  for (const e of entries) rows.push([kindLabels[e.kind], e.driver_name || e.driver_id, new Date(e.recorded_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), e.request_id, e.reversed ? 'С обратен запис' : e.confirmed ? 'Потвърдено' : 'Декларирано', '', e.amount, e.note, e.id, e.reference_id, evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source, e.evidence_reference]);
  return '\uFEFF' + rows.map(row => row.map(csvCell).join(';')).join('\r\n');
 }

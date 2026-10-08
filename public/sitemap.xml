@@ -56,7 +56,7 @@
   </url>
   <url>
     <loc>https://leskikaruchka.com/privacy</loc>
-    <lastmod>2026-08-14</lastmod>
+    <lastmod>2026-10-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
@@ -68,7 +68,7 @@
   </url>
   <url>
     <loc>https://leskikaruchka.com/terms</loc>
-    <lastmod>2026-08-14</lastmod>
+    <lastmod>2026-10-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
@@ -78,16 +78,4 @@
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
-  <url>
-    <loc>https://leskikaruchka.com/auth/login</loc>
-    <lastmod>2026-08-14</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://leskikaruchka.com/auth/register</loc>
-    <lastmod>2026-08-14</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-</urlset>
+  </urlset>

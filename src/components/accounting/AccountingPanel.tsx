@@ -1,3 +1,4 @@
+import { evidenceDescription, evidenceFlagLabels } from '@/lib/rideEvidence';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -93,7 +94,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
    <button className={buttonClass} disabled={!report || exporting} onClick={() => void exportCsv()}>{exporting ? 'Изтегляне…' : 'Изтегли CSV'}</button>
    <button className="text-sm text-primary-600 underline" disabled={query.isFetching} onClick={() => void query.refetch()}>Обнови</button>
   </div>
-  <p className="text-xs text-foreground-500">Стойността на курсовете е прогнозна. Приходите и разходите са декларирани; фирмата потвърждава сверяването на приходите и получаването на предадени пари. Отчетът не е фискален документ.</p>
+  <p className="text-xs text-foreground-500">Стойността на курсовете е записаната при поръчване цена. Тя не е доказателство за получени пари. Приходите и разходите са декларирани; фирмата потвърждава сверяването на приходите и получаването на предадени пари. Отчетът не е фискален документ.</p>
   {pending && <div className="bg-background-50 rounded-xl p-3 text-xs space-y-2"><p>Непотвърден запис: {pending.p_note} · {money(pending.p_amount)}</p><div className="flex gap-3"><button disabled={busy} className="underline text-primary-600" onClick={()=>void checkPending()}>Провери записа</button><button disabled={busy} className="underline text-primary-600" onClick={()=>{ const {p_id: _id,...payload}=pending;void write(payload); }}>Повтори същия запис</button></div></div>}
   {(error || query.isError) && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error || 'Отчетът не се зареди. Опитайте отново.'}</p>}
   {success && <p role="status" className="text-sm text-primary-600">{success}</p>}
@@ -101,7 +102,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
   {report && <>
    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
     {[
-     ['Прогнозна стойност на курсовете', money(report.totals.booked)],
+     ['Записана стойност на курсовете', money(report.totals.booked)],
      ['Завършени курсове', String(report.totals.completed)],
      ['Отменени заявки', String(report.totals.cancelled)],
      ['Прекратени след начало', String(report.totals.interrupted)],
@@ -137,8 +138,14 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     {report.outcomes.map(o => <article key={o.id} className="border-b border-background-100 py-3 last:border-0">
      <div className="flex justify-between gap-3"><p className="text-sm font-medium">{o.outcome === 'completed' ? 'Завършен курс' : o.previous_status === 'in_progress' ? 'Прекратено пътуване' : 'Отменена заявка'}{companyId && ` · ${o.driver_name || 'Без назначен шофьор'}`}</p><strong className="text-sm">{o.outcome === 'completed' ? money(o.booked_amount) : 'Без начислен оборот'}</strong></div>
      <p className="text-xs text-foreground-500 mt-1">{reportDate(o.occurred_at)} · Заявка {o.request_id.slice(0, 8)}{o.reconstructed && ' · Възстановен стар запис'}</p>
-     {report.reconciliation?.filter(r=>r.request_id===o.request_id).map(r=><p key={r.request_id} className="text-xs text-foreground-500 mt-1">Деклариран приход: {money(r.declared_income)}{r.declared_income!=null&&<> · {r.company_confirmed?'Сверен от фирмата':'Очаква сверяване'} · Разлика спрямо прогнозата: {money(r.difference)}</>}</p>)}
-     {o.outcome === 'cancelled' && o.accepted_at && <p className="text-xs text-foreground-500 mt-1">Време от приемането до отказа: {Math.max(0, Math.round((new Date(o.occurred_at).getTime() - new Date(o.accepted_at).getTime()) / 60000))} мин · Пробегът до отказа не е измерен</p>}
+     {report.reconciliation?.filter(r=>r.request_id===o.request_id).map(r=><p key={r.request_id} className="text-xs text-foreground-500 mt-1">Деклариран приход: {money(r.declared_income)}{r.declared_income!=null&&<> · {r.company_confirmed?'Сверен от фирмата':'Очаква сверяване'} · Разлика спрямо заявката: {money(r.difference)}</>}</p>)}
+     {o.outcome === 'cancelled' && o.accepted_at && <p className="text-xs text-foreground-500 mt-1">Време от приемането до отказа: {Math.max(0, Math.round((new Date(o.occurred_at).getTime() - new Date(o.accepted_at).getTime()) / 60000))} мин{!o.evidence && ' · Няма GPS наблюдения до отказа'}</p>}
+     {o.evidence && <div className="text-xs text-foreground-500 mt-1 space-y-1">
+      <p>{evidenceDescription(o.evidence)} · Наблюдаван престой: {(o.evidence.stationary_seconds/60).toFixed(1)} мин</p>
+      <p>{o.evidence.customer_confirmed_at ? 'Началото е потвърдено от клиента' : 'Няма потвърждение за начало от клиента'}</p>
+      {!!o.evidence.flags.length && <p className="text-amber-700">За преглед: {o.evidence.flags.map(f=>evidenceFlagLabels[f] ?? f).join(' · ')}</p>}
+      <p>GPS данните може да са непълни; сигналите не доказват нарушение или плащане.</p>
+     </div>}
      {o.outcome === 'cancelled' ? <p className="text-xs text-foreground-500 mt-1">{stageLabels[o.previous_status] || o.previous_status} · {actorLabels[o.cancelled_by ?? ''] || 'Неизвестен автор'} · {reasonLabels[o.cancel_reason ?? ''] || o.cancel_reason || 'Без причина'}</p> : o.estimated_distance_km != null && <p className="text-xs text-foreground-500 mt-1">Планиран маршрут: {Number(o.estimated_distance_km).toFixed(1)} км</p>}
     </article>)}
    </div>

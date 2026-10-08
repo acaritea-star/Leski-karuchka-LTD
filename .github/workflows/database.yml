@@ -1,0 +1,29 @@
+name: Database regression
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+permissions:
+  contents: read
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start disposable Supabase
+        run: |
+          mkdir -p "$RUNNER_TEMP/leski-db"
+          cd "$RUNNER_TEMP/leski-db"
+          npx --yes supabase@2.120.0 init
+          npx --yes supabase@2.120.0 start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Restore schema checkpoint, apply new migrations and run rollback tests
+        run: node scripts/test-database.mjs
+      - name: Stop test services
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/leski-db"
+          npx --yes supabase@2.120.0 stop --no-backup
