@@ -9,7 +9,7 @@ DECLARE
  vt uuid:=gen_random_uuid(); vehicle uuid:=gen_random_uuid(); ride uuid:=gen_random_uuid();
  license uuid:=gen_random_uuid(); insurance uuid:=gen_random_uuid(); renewal uuid:=gen_random_uuid();
  income uuid:=gen_random_uuid(); confirmation uuid:=gen_random_uuid(); acceptance uuid; ticket uuid; review_time timestamptz;
- today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; result jsonb; stmt text; denied boolean; row_count integer;
+ today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; result jsonb; stmt text; denied boolean; row_count integer; cutover_time timestamptz;
 BEGIN
  INSERT INTO public.companies(id,name,slug) VALUES(cid,'PWA regression','pwa-'||cid),(foreign_cid,'Other regression','pwa-'||foreign_cid);
  INSERT INTO auth.users(id,email) SELECT id,'pwa-'||id||'@example.invalid' FROM unnest(ARRAY[duid,admin_uid,foreign_uid,super_uid,customer_uid]) s(id);
@@ -33,6 +33,19 @@ BEGIN
  acceptance:=public.accept_legal_versions('2026-10-08-draft.3','2026-10-08.1','continue');
  IF public.accept_legal_versions('2026-10-08-draft.3','2026-10-08.1','continue')<>acceptance THEN RAISE EXCEPTION 'FAIL duplicate acceptance'; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.legal_acceptances WHERE id=acceptance AND user_id=duid AND length(source_digest)=64 AND accepted_at BETWEEN now()-interval '1 minute' AND clock_timestamp()) THEN RAISE EXCEPTION 'FAIL server acceptance provenance'; END IF;
+ acceptance:=public.accept_legal_versions('2026-10-03-draft.2','2026-10-04.2','continue');
+ IF NOT EXISTS(SELECT 1 FROM public.legal_acceptances WHERE id=acceptance AND privacy_version='2026-10-04.2') THEN RAISE EXCEPTION 'FAIL cached acceptance relabelled'; END IF;
+ EXECUTE 'RESET ROLE';
+ SELECT created_at INTO cutover_time FROM private.legal_versions WHERE is_current;
+ UPDATE private.legal_versions SET created_at=clock_timestamp()-interval '8 days' WHERE is_current;
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ denied:=false;
+ BEGIN PERFORM public.accept_legal_versions('2026-10-03-draft.2','2026-10-04.2','continue'); EXCEPTION WHEN OTHERS THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL expired legal cutover accepted'; END IF;
+ PERFORM public.accept_legal_versions('2026-10-08-draft.3','2026-10-08.1','continue');
+ EXECUTE 'RESET ROLE';
+ UPDATE private.legal_versions SET created_at=cutover_time WHERE is_current;
+ EXECUTE 'SET LOCAL ROLE authenticated';
  FOREACH stmt IN ARRAY ARRAY[
   'SELECT public.accept_legal_versions(''old'',''old'',''continue'')',
   'SELECT public.accept_legal_versions(''2026-10-08-draft.3'',''2026-10-08.1'',''advertising'')',
