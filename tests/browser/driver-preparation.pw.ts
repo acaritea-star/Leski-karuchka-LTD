@@ -26,7 +26,7 @@ test('driver completes training with one explicit acceptance and recovers a lost
     else if (url.pathname.endsWith('/profiles')) data = { id: account, role: 'DRIVER', company_id: company, is_active: true, first_name: 'Тест', last_name: 'Водач', email: user.email };
     else if (url.pathname.endsWith('/drivers')) data = { id: driver, user_id: account, company_id: company, is_verified: false, is_online: false, vehicle_id: null };
     else if (url.pathname.endsWith('/companies')) data = [{ id: company, is_active: true, name: 'Тестова фирма' }];
-    else if (url.pathname.endsWith('/driver_preparation_materials')) data = { driver_id: driver, document, content_hash: contentHash, receipt };
+    else if (url.pathname.endsWith('/driver_preparation_materials')) data = { driver_id: driver, user_id: account, company_id: company, document, content_hash: contentHash, receipt };
     else if (url.pathname.endsWith('/accept_driver_preparation')) {
       attempts++;
       const body = route.request().postDataJSON();

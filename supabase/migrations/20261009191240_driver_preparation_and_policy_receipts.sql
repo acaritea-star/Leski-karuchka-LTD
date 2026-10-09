@@ -179,7 +179,7 @@ BEGIN
  SELECT * INTO STRICT version FROM private.driver_policy_versions WHERE is_current;
  SELECT * INTO receipt FROM public.driver_preparation_acceptances WHERE driver_id=d.id AND user_id=d.user_id AND company_id=d.company_id
   AND terms_version=version.terms_version AND training_version=version.training_version AND content_hash=version.content_hash;
- RETURN jsonb_build_object('driver_id',d.id,'document',version.document,'content_hash',version.content_hash,
+ RETURN jsonb_build_object('driver_id',d.id,'user_id',d.user_id,'company_id',d.company_id,'document',version.document,'content_hash',version.content_hash,
   'receipt',CASE WHEN receipt.id IS NULL THEN NULL ELSE to_jsonb(receipt) END);
 END $function$;
 
@@ -272,7 +272,7 @@ BEGIN
  IF v.inspection_expiry_date<today THEN blockers:=blockers||jsonb_build_array(jsonb_build_object('code','vehicle_inspection','message','Срокът на техническия преглед на автомобила е изтекъл. Обновете го в „Автомобили“.'));
  ELSIF v.id IS NOT NULL AND v.inspection_expiry_date IS NULL THEN warnings:=warnings||jsonb_build_array(jsonb_build_object('code','vehicle_inspection','message','Не е въведен срок на техническия преглед на автомобила.')); END IF;
  RETURN jsonb_build_object('driver_id',d.id,'is_verified',d.is_verified,'can_verify',jsonb_array_length(blockers)=0,'blockers',blockers,'warnings',warnings,'documents',documents,'preparation',preparation);
-END $function$
+END $function$;
 
 
 
@@ -293,7 +293,7 @@ BEGIN
  'requests',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT id,status,created_at,pickup_address,destination_address,estimated_price FROM public.taxi_requests WHERE customer_id=uid ORDER BY created_at DESC LIMIT 1000)x),'[]'::jsonb),
  'scope','Basic account data, at most 1000 records per list. Request a full export for additional data.') INTO result;
  RETURN result;
-END $function$
+END $function$;
 
 
 NOTIFY pgrst, 'reload schema';

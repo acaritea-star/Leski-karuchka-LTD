@@ -19,7 +19,8 @@ function PreparationForm({ materials, userId }: { materials: DriverPreparationMa
   const download = () => {
     const url = URL.createObjectURL(new Blob([preparationCopy(materials)], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
-    link.href = url; link.download = 'leski-driver-' + d.termsVersion + '.txt'; link.click();
+    link.href = url; link.download = 'leski-driver-' + d.termsVersion + '.txt';
+    link.hidden = true; document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const accept = async () => {

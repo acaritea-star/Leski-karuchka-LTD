@@ -11,7 +11,7 @@ export type DriverPreparationReceipt = {
   accepted_at: string; training_completed_at: string;
 };
 export type DriverPreparationMaterials = {
-  driver_id: string; document: DriverPreparationDocument; content_hash: string;
+  driver_id: string; user_id: string; company_id: string; document: DriverPreparationDocument; content_hash: string;
   receipt: DriverPreparationReceipt | null;
 };
 export const preparationKey = (userId: string | undefined) => ['driver-preparation', userId] as const;
@@ -23,7 +23,7 @@ const uuid = (value: unknown): value is string => typeof value === 'string' && /
 
 export function parseDriverPreparation(value: unknown, driverId?: string): DriverPreparationMaterials {
   const fail = () => { throw new Error('Не успяхме да потвърдим подготовката. Обнови страницата.'); };
-  if (!object(value) || !uuid(value.driver_id) || (driverId && value.driver_id !== driverId) || !hash(value.content_hash) || !object(value.document)) return fail();
+  if (!object(value) || !uuid(value.driver_id) || !uuid(value.user_id) || !uuid(value.company_id) || (driverId && value.driver_id !== driverId) || !hash(value.content_hash) || !object(value.document)) return fail();
   const d = value.document;
   if (![d.termsVersion, d.trainingVersion, d.title, d.intro, d.updatedAt].every(text)) return fail();
   for (const key of ['sections', 'steps']) {
@@ -34,7 +34,10 @@ export function parseDriverPreparation(value: unknown, driverId?: string): Drive
   if (!Array.isArray(d.questions) || !d.questions.length || d.questions.length > 10 || !d.questions.every(item => object(item)
     && text(item.id) && text(item.title) && Array.isArray(item.options) && item.options.length >= 2
     && item.options.every(option => object(option) && text(option.id) && text(option.label)))) return fail();
-  if (value.receipt !== null) parsePreparationReceipt(value.receipt, value.driver_id, d.termsVersion as string, d.trainingVersion as string, value.content_hash);
+  if (value.receipt !== null) {
+    const receipt = parsePreparationReceipt(value.receipt, value.driver_id, d.termsVersion as string, d.trainingVersion as string, value.content_hash);
+    if (receipt.user_id !== value.user_id || receipt.company_id !== value.company_id) return fail();
+  }
   return value as unknown as DriverPreparationMaterials;
 }
 
@@ -54,7 +57,7 @@ export function driverPreparationOptions(userId: string | undefined) {
       const { data, error } = await withRequestTimeout(abort => supabase.rpc('driver_preparation_materials').abortSignal(abort), 10_000, signal);
       if (error) throw error;
       const materials = parseDriverPreparation(data);
-      if (materials.receipt && materials.receipt.user_id !== userId) throw new Error('Записът не е за текущия профил.');
+      if (materials.user_id !== userId) throw new Error('Подготовката не е за текущия профил.');
       return materials;
     },
   });
@@ -71,7 +74,7 @@ export async function completeDriverPreparation(materials: DriverPreparationMate
   }).abortSignal(signal), 10_000);
   if (error) throw error;
   const receipt = parsePreparationReceipt(data, materials.driver_id, d.termsVersion, d.trainingVersion, materials.content_hash);
-  if (receipt.user_id !== userId) throw new Error('Записът не е за текущия профил.');
+  if (receipt.user_id !== userId || receipt.company_id !== materials.company_id) throw new Error('Записът не е за текущия профил или фирма.');
   if (!object(data) || !uuid(data.general_acceptance_id)) throw new Error('Общите условия не са потвърдени.');
   const generalAcceptanceId = data.general_acceptance_id;
   return { receipt, generalAcceptanceId, legalKey: ['legal-acceptance', userId, legalOperator.termsVersion, legalOperator.privacyVersion] };
