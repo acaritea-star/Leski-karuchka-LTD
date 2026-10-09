@@ -64,7 +64,7 @@ BEGIN
  VALUES(uid,p_terms,p_privacy,digest,p_method) ON CONFLICT(user_id,terms_version,privacy_version) DO NOTHING;
  SELECT id INTO result FROM public.legal_acceptances WHERE user_id=uid AND terms_version=p_terms AND privacy_version=p_privacy;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.audit_document_validity_change()
  RETURNS trigger
@@ -80,7 +80,7 @@ BEGIN
    jsonb_build_object('expires_at',NEW.expires_at,'file_url',NEW.file_url));
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.can_read_driver_document(p_name text)
  RETURNS boolean
@@ -154,7 +154,7 @@ BEGIN
   DELETE FROM private.push_outbox
     WHERE status IN ('sent','failed','skipped') AND created_at<clock_timestamp()-interval '7 days';
   RETURN kicked;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.driver_documents_ready(p_driver uuid)
  RETURNS boolean
@@ -216,7 +216,7 @@ BEGIN
  IF v.inspection_expiry_date<today THEN blockers:=blockers||jsonb_build_array(jsonb_build_object('code','vehicle_inspection','message','Срокът на техническия преглед на автомобила е изтекъл. Обновете го в „Автомобили“.'));
  ELSIF v.id IS NOT NULL AND v.inspection_expiry_date IS NULL THEN warnings:=warnings||jsonb_build_array(jsonb_build_object('code','vehicle_inspection','message','Не е въведен срок на техническия преглед на автомобила.')); END IF;
  RETURN jsonb_build_object('driver_id',d.id,'is_verified',d.is_verified,'can_verify',jsonb_array_length(blockers)=0,'blockers',blockers,'warnings',warnings,'documents',documents);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.eligible_drivers(p_company uuid, p_type uuid, p_lat double precision, p_lng double precision, p_user uuid DEFAULT NULL::uuid)
  RETURNS TABLE(driver_id uuid, user_id uuid)
@@ -296,7 +296,7 @@ BEGIN
   END LOOP;
   PERFORM private.dispatch_push_outbox();
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_bulgaria_coordinates()
  RETURNS trigger
@@ -317,7 +317,7 @@ BEGIN
    RAISE EXCEPTION 'Услугата е достъпна само на територията на България.' USING ERRCODE='23514'; END IF;
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_bulgaria_online()
  RETURNS trigger
@@ -332,7 +332,7 @@ BEGIN
    AND l.accuracy BETWEEN 0 AND 100) THEN
   RAISE EXCEPTION 'За онлайн режим е необходима точна, актуална GPS позиция в България.' USING ERRCODE='23514'; END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_carrier_identity()
  RETURNS trigger
@@ -356,7 +356,7 @@ BEGIN
  ELSIF NEW.legal_verified_by IS DISTINCT FROM OLD.legal_verified_by THEN RAISE EXCEPTION 'Verification fields are protected' USING ERRCODE='42501';
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_cash_request()
  RETURNS trigger
@@ -368,7 +368,7 @@ BEGIN
     RAISE EXCEPTION 'Only cash payment is available';
   END IF;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_dispatch_documents()
  RETURNS trigger
@@ -382,7 +382,7 @@ BEGIN
   IF OLD.status='pending' AND NEW.status='accepted' AND NOT private.driver_documents_ready(NEW.driver_id) THEN RAISE EXCEPTION 'Driver documents require review'; END IF;
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_document_file()
  RETURNS trigger
@@ -400,7 +400,7 @@ BEGIN
    RAISE EXCEPTION 'Качете реалния документ в защитеното хранилище преди одобрение.'; END IF;
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_document_validity()
  RETURNS trigger
@@ -420,7 +420,7 @@ BEGIN
   ELSE NEW.reviewed_at:=OLD.reviewed_at; NEW.reviewed_by:=OLD.reviewed_by; END IF;
  ELSE NEW.reviewed_at:=NULL; NEW.reviewed_by:=NULL; END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_driver()
  RETURNS trigger
@@ -435,7 +435,7 @@ BEGIN
   NEW.status := CASE WHEN EXISTS(SELECT 1 FROM public.taxi_requests WHERE driver_id=NEW.id AND status IN ('accepted','arrived','in_progress'))
     THEN 'busy'::public.driver_status WHEN NEW.is_online THEN 'available'::public.driver_status ELSE 'offline'::public.driver_status END;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_driver_verification()
  RETURNS trigger
@@ -471,7 +471,7 @@ BEGIN
  IF NEW.is_online AND (TG_OP='INSERT' OR NOT OLD.is_online) AND NOT NEW.is_verified THEN
   RAISE EXCEPTION 'Профилът очаква верификация от администратор.'; END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_legacy_insert()
  RETURNS trigger
@@ -500,7 +500,7 @@ BEGIN
  NEW.created_at:=now();NEW.requested_at:=now();NEW.updated_at:=now();
  NEW.accepted_at:=NULL;NEW.arrived_at:=NULL;NEW.started_at:=NULL;NEW.completed_at:=NULL;NEW.cancelled_at:=NULL;NEW.cancelled_by:=NULL;NEW.cancel_reason:=NULL;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_location()
  RETURNS trigger
@@ -518,7 +518,7 @@ BEGIN
   IF TG_OP='UPDATE' AND OLD.position_at > NEW.position_at THEN RETURN NULL; END IF;
   NEW.updated_at := clock_timestamp();
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_profile()
  RETURNS trigger
@@ -537,7 +537,7 @@ BEGIN
     RAISE EXCEPTION 'Only personal profile fields may be edited' USING ERRCODE='42501';
   END IF;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_request()
  RETURNS trigger
@@ -586,7 +586,7 @@ BEGIN
   IF NEW.status<>'cancelled' THEN NEW.cancelled_at:=OLD.cancelled_at; NEW.cancelled_by:=OLD.cancelled_by; NEW.cancel_reason:=OLD.cancel_reason; END IF;
   NEW.final_price:=CASE WHEN NEW.status='completed' THEN OLD.estimated_price ELSE OLD.final_price END;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.guard_request_dispatch()
  RETURNS trigger
@@ -604,7 +604,7 @@ BEGIN
     END IF;
   END IF;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.in_bulgaria(p_lat double precision, p_lng double precision)
  RETURNS boolean
@@ -626,7 +626,7 @@ AS $function$
 BEGIN
   PERFORM public.expire_stale_requests();
   PERFORM private.dispatch_push_outbox();
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.nearby_cars(p_lat double precision, p_lng double precision, p_type uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -653,7 +653,7 @@ BEGIN
  ORDER BY l.geo OPERATOR(public.<->) public.st_setsrid(public.st_makepoint(p_lng,p_lat),4326)::public.geography LIMIT 12
  ) cars;
  RETURN jsonb_build_object('cars',result,'sampled_at',clock_timestamp());
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.record_driver_money(p_id uuid, p_kind text, p_amount numeric, p_note text, p_request_id uuid DEFAULT NULL::uuid, p_reference_id uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -666,7 +666,7 @@ BEGIN
   RAISE EXCEPTION 'Use the verified confirmation API with an evidence source' USING ERRCODE='42501';
  END IF;
  RETURN private.record_driver_money_core(p_id,p_kind,p_amount,p_note,p_request_id,p_reference_id);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.record_driver_money_core(p_id uuid, p_kind text, p_amount numeric, p_note text, p_request_id uuid DEFAULT NULL::uuid, p_reference_id uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -710,7 +710,7 @@ BEGIN
  END IF;
  INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,note,request_id,reference_id) VALUES(p_id,cid,did,owner_id,uid,p_kind,amt,btrim(p_note),p_request_id,p_reference_id);
  RETURN p_id;
-END; $function$
+END; $function$;
 
 CREATE OR REPLACE FUNCTION private.record_driver_money_verified(p_id uuid, p_kind text, p_amount numeric, p_note text, p_actor uuid, p_request_id uuid DEFAULT NULL::uuid, p_reference_id uuid DEFAULT NULL::uuid, p_source text DEFAULT 'declaration'::text, p_evidence_ref text DEFAULT NULL::text)
  RETURNS uuid
@@ -732,7 +732,7 @@ BEGIN
  result:=private.record_driver_money_core(p_id,p_kind,p_amount,p_note,p_request_id,p_reference_id);
  IF previous.id IS NULL THEN UPDATE public.driver_money_entries SET evidence_source=p_source,evidence_reference=ref WHERE id=result; END IF;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.record_request_outcome()
  RETURNS trigger
@@ -752,7 +752,7 @@ BEGIN
   ON CONFLICT(request_id) DO NOTHING;
  END IF;
  RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.request_personal_data(p_kind text)
  RETURNS uuid
@@ -768,7 +768,7 @@ BEGIN
  SELECT id INTO result FROM public.privacy_requests WHERE user_id=uid AND kind=p_kind AND status IN ('pending','in_progress');
  IF result IS NULL THEN INSERT INTO public.privacy_requests(user_id,kind) VALUES(uid,p_kind) RETURNING id INTO result; END IF;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.reserve_route_request(p_user_id uuid, p_request_id uuid, p_quote boolean, p_origin_lat double precision, p_origin_lng double precision, p_destination_lat double precision, p_destination_lng double precision, p_purpose text)
  RETURNS jsonb
@@ -867,7 +867,7 @@ BEGIN
  UPDATE private.route_budget_usage SET hits=hits+1,updated_at=clock_timestamp()
   WHERE (budget_day=day_key AND bucket IN ('global',user_bucket)) OR (budget_day='infinity' AND bucket=ride_bucket);
  RETURN jsonb_build_object('allowed',true,'request_id',CASE WHEN has_ride AND NOT p_quote THEN ride.id ELSE NULL END,'purpose',mode);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.resolve_privacy_request(p_id uuid, p_status text, p_note text)
  RETURNS void
@@ -881,7 +881,7 @@ BEGIN
  UPDATE public.privacy_requests SET status=p_status,resolution=btrim(p_note),resolved_at=CASE WHEN p_status IN ('completed','rejected') THEN clock_timestamp() ELSE NULL END
  WHERE id=p_id AND status IN ('pending','in_progress');
  IF NOT FOUND THEN RAISE EXCEPTION 'Privacy request is already closed or missing'; END IF;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION private.road_tile_cache(p_key text, p_roads jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
@@ -906,13 +906,13 @@ BEGIN
  DELETE FROM private.road_fetch_budget WHERE day<current_date-7;
  UPDATE private.road_tiles SET lease_until=clock_timestamp()+interval '60 seconds' WHERE key=p_key;
  RETURN jsonb_build_object('roads',COALESCE(tile.roads,'[]'::jsonb),'fetch',true);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.accept_legal_versions(p_terms text, p_privacy text, p_method text)
  RETURNS uuid
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.accept_legal_versions(p_terms,p_privacy,p_method); $function$
+AS $function$ SELECT private.accept_legal_versions(p_terms,p_privacy,p_method); $function$;
 
 CREATE OR REPLACE FUNCTION public.accept_taxi_request(p_request_id uuid)
  RETURNS taxi_requests
@@ -936,7 +936,7 @@ BEGIN
     WHERE id=r.id AND status='pending' RETURNING * INTO r;
   IF NOT FOUND THEN RAISE EXCEPTION 'Заявката вече не е налична. Обнови списъка.'; END IF;
   RETURN r;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.accounting_report(p_from date, p_until date, p_company_id uuid DEFAULT NULL::uuid, p_driver_id uuid DEFAULT NULL::uuid, p_page integer DEFAULT 0)
  RETURNS jsonb
@@ -982,7 +982,7 @@ BEGIN
  'entries',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT * FROM money ORDER BY recorded_at DESC,id LIMIT 25 OFFSET p_page*25) x),'[]'::jsonb),
  'drivers',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT driver_id,max(driver_name) driver_name,count(*) FILTER(WHERE outcome='completed') trips,count(*) FILTER(WHERE outcome='cancelled') cancelled,coalesce(sum(booked_amount),0) booked FROM outcomes GROUP BY driver_id ORDER BY sum(booked_amount) DESC NULLS LAST LIMIT 50) x),'[]'::jsonb)) INTO result;
  RETURN result;
-END; $function$
+END; $function$;
 
 CREATE OR REPLACE FUNCTION public.carrier_identity(p_company uuid)
  RETURNS jsonb
@@ -1016,7 +1016,7 @@ BEGIN
   END IF;
   UPDATE private.push_outbox SET claimed_at=clock_timestamp() WHERE id=j.id;
   RETURN jsonb_build_object('id',j.id,'recipient_id',j.recipient_id,'payload',j.payload,'expires_at',j.expires_at,'lease_until',j.lease_until);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.company_customers(p_company uuid, p_search text DEFAULT ''::text, p_page integer DEFAULT 0)
  RETURNS jsonb
@@ -1048,7 +1048,7 @@ BEGIN
  ) SELECT jsonb_build_object('total',(SELECT count(*) FROM matching),
    'rows',coalesce((SELECT jsonb_agg(to_jsonb(r) ORDER BY r.created_at DESC,r.id DESC) FROM rows r),'[]'::jsonb)) INTO result;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.company_dashboard(p_company_id uuid, p_day date DEFAULT NULL::date)
  RETURNS jsonb
@@ -1113,7 +1113,7 @@ BEGIN
  ) SELECT jsonb_build_object('total',(SELECT count(*) FROM visible),
   'rows',coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.is_online DESC,p.updated_at DESC,p.id) FROM page p),'[]'::jsonb)) INTO result;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.consume_api_budget(p_user_id uuid)
  RETURNS boolean
@@ -1129,7 +1129,7 @@ BEGIN
  window_at=CASE WHEN private.api_budget.window_at<now()-interval '1 minute' THEN now() ELSE private.api_budget.window_at END
  RETURNING hits INTO n;
  RETURN n<=60;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.create_taxi_request(p_quote_id uuid, p_request_id uuid, p_payment_method payment_method DEFAULT 'cash'::payment_method)
  RETURNS taxi_requests
@@ -1155,7 +1155,7 @@ BEGIN
     (b->>'duration_min')::integer,(b->>'total')::numeric,b->'breakdown',p_payment_method) RETURNING * INTO r;
   UPDATE public.ride_quotes SET request_id=r.id WHERE id=q.id;
   RETURN r;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.create_trip_on_complete()
  RETURNS trigger
@@ -1175,7 +1175,7 @@ BEGIN
       WHEN is_online THEN 'available'::public.driver_status ELSE 'offline'::public.driver_status END WHERE id=NEW.driver_id;
   END IF;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.driver_day_summary(p_driver_id uuid, p_day date DEFAULT NULL::date)
  RETURNS jsonb
@@ -1210,7 +1210,7 @@ BEGIN
  IF auth.uid() IS NULL OR NOT FOUND OR NOT(public.is_driver(d.id) OR public.is_company_admin(d.company_id) OR public.is_super_admin()) THEN
   RAISE EXCEPTION 'Нямате достъп до проверката на този шофьор.' USING ERRCODE='42501'; END IF;
  RETURN private.driver_verification_report(d.id,d.vehicle_id);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.expire_stale_requests()
  RETURNS void
@@ -1221,7 +1221,7 @@ AS $function$
 BEGIN
   UPDATE public.taxi_requests SET status='cancelled',cancelled_at=clock_timestamp(),cancelled_by='system',cancel_reason='no_driver'
     WHERE status='pending' AND COALESCE(expires_at,created_at+interval '2 minutes')<=clock_timestamp();
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.export_my_basic_data()
  RETURNS jsonb
@@ -1239,7 +1239,7 @@ BEGIN
  'requests',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT id,status,created_at,pickup_address,destination_address,estimated_price FROM public.taxi_requests WHERE customer_id=uid ORDER BY created_at DESC LIMIT 1000)x),'[]'::jsonb),
  'scope','Basic account data, at most 1000 records per list. Request a full export for additional data.') INTO result;
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.finish_push_job(p_job_id uuid, p_lease_token uuid, p_result text, p_error text DEFAULT NULL::text)
  RETURNS boolean
@@ -1259,7 +1259,7 @@ BEGIN
     available_at=clock_timestamp()+make_interval(secs=>LEAST(30,power(2,j.attempts)::integer)),
     lease_token=NULL,lease_until=NULL,last_error=left(p_error,80) WHERE id=j.id;
   RETURN true;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.handle_driver_role()
  RETURNS trigger
@@ -1296,7 +1296,7 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'last_name',''),COALESCE(NEW.raw_user_meta_data->>'phone',''),true)
   ON CONFLICT(id) DO NOTHING;
   RETURN NEW;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.increment_driver_trip_count()
  RETURNS trigger
@@ -1473,7 +1473,7 @@ CREATE OR REPLACE FUNCTION public.nearby_cars(p_lat double precision, p_lng doub
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.nearby_cars(p_lat,p_lng,p_type); $function$
+AS $function$ SELECT private.nearby_cars(p_lat,p_lng,p_type); $function$;
 
 CREATE OR REPLACE FUNCTION public.news_articles_set_updated_at_fn()
  RETURNS trigger
@@ -1490,13 +1490,13 @@ CREATE OR REPLACE FUNCTION public.record_driver_money(p_id uuid, p_kind text, p_
  RETURNS uuid
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.record_driver_money(p_id,p_kind,p_amount,p_note,p_request_id,p_reference_id); $function$
+AS $function$ SELECT private.record_driver_money(p_id,p_kind,p_amount,p_note,p_request_id,p_reference_id); $function$;
 
 CREATE OR REPLACE FUNCTION public.record_driver_money_verified(p_id uuid, p_kind text, p_amount numeric, p_note text, p_actor uuid, p_request_id uuid DEFAULT NULL::uuid, p_reference_id uuid DEFAULT NULL::uuid, p_source text DEFAULT 'declaration'::text, p_evidence_ref text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.record_driver_money_verified(p_id,p_kind,p_amount,p_note,p_actor,p_request_id,p_reference_id,p_source,p_evidence_ref); $function$
+AS $function$ SELECT private.record_driver_money_verified(p_id,p_kind,p_amount,p_note,p_actor,p_request_id,p_reference_id,p_source,p_evidence_ref); $function$;
 
 CREATE OR REPLACE FUNCTION public.register_driver_document(p_id uuid, p_type document_type, p_expires date, p_path text)
  RETURNS uuid
@@ -1524,7 +1524,7 @@ BEGIN
  INSERT INTO public.driver_documents(id,driver_id,company_id,type,file_url,status,expires_at)
  VALUES(p_id,d.id,d.company_id,p_type,'storage://driver-documents/'||p_path,'pending',p_expires);
  RETURN p_id;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.register_push_subscription(p_endpoint text, p_p256dh text, p_auth text, p_user_agent text DEFAULT NULL::text)
  RETURNS void
@@ -1549,13 +1549,13 @@ BEGIN
   VALUES(owner_id,p_endpoint,p_p256dh,p_auth,left(p_user_agent,1024),true,now())
   ON CONFLICT(user_id,endpoint) DO UPDATE SET p256dh=EXCLUDED.p256dh,auth=EXCLUDED.auth,
     user_agent=EXCLUDED.user_agent,is_active=true,updated_at=now();
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.request_personal_data(p_kind text)
  RETURNS uuid
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.request_personal_data(p_kind); $function$
+AS $function$ SELECT private.request_personal_data(p_kind); $function$;
 
 CREATE OR REPLACE FUNCTION public.request_push_recipients(p_request_id uuid)
  RETURNS TABLE(user_id uuid)
@@ -1581,7 +1581,7 @@ CREATE OR REPLACE FUNCTION public.resolve_privacy_request(p_id uuid, p_status te
  RETURNS void
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.resolve_privacy_request(p_id,p_status,p_note); $function$
+AS $function$ SELECT private.resolve_privacy_request(p_id,p_status,p_note); $function$;
 
 CREATE OR REPLACE FUNCTION public.review_driver_application(p_id uuid, p_decision text, p_note text DEFAULT ''::text)
  RETURNS uuid
@@ -1613,13 +1613,13 @@ BEGIN
  INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action,new_value)
  VALUES(a.company_id,uid,'driver_application',a.id,'application_'||p_decision,jsonb_build_object('status',p_decision));
  RETURN a.id;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.road_tile_cache(p_key text, p_roads jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
-AS $function$ SELECT private.road_tile_cache(p_key,p_roads); $function$
+AS $function$ SELECT private.road_tile_cache(p_key,p_roads); $function$;
 
 CREATE OR REPLACE FUNCTION public.save_driver_vehicle(p_id uuid, p_company uuid, p_driver uuid, p_expected_driver uuid, p_details jsonb)
  RETURNS uuid
@@ -1664,7 +1664,7 @@ BEGIN
  INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action,new_value)
  VALUES(p_company,auth.uid(),'vehicle',p_id,'vehicle_saved',jsonb_build_object('driver_id',p_driver));
  RETURN p_id;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger
@@ -1707,7 +1707,7 @@ BEGIN
  RETURNING id INTO result;
  INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action) VALUES(p_company,uid,'driver_application',result,'application_submitted');
  RETURN result;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.sweep_stuck_requests(max_age_minutes integer DEFAULT 30)
  RETURNS integer
@@ -1724,7 +1724,7 @@ BEGIN
  GET DIAGNOSTICS n=ROW_COUNT;
  DELETE FROM public.ride_quotes WHERE expires_at<now()-interval '1 day';
  RETURN n;
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.update_driver_rating()
  RETURNS trigger
@@ -1757,7 +1757,7 @@ BEGIN
     RAISE EXCEPTION 'Forbidden request' USING ERRCODE='42501';
   END IF;
   RETURN private.dispatch_push_outbox();
-END $function$
+END $function$;
 
 ALTER TABLE private.api_budget ADD CONSTRAINT api_budget_pkey PRIMARY KEY (user_id);
 ALTER TABLE private.legal_versions ADD CONSTRAINT legal_versions_pkey PRIMARY KEY (terms_version, privacy_version);
