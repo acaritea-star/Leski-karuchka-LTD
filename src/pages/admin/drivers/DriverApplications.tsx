@@ -45,7 +45,7 @@ export default function DriverApplications({ companyId }: { companyId: string })
   }
   return <div className="space-y-4 text-sm">
     <p>Кандидатът влиза със своя Google или Facebook профил и подава <a className="underline text-primary-700" href="/driver-join" target="_blank" rel="noopener noreferrer">кандидатура тук</a>, като избира вашата фирма.</p>
-    <p className="text-foreground-500">Одобрението го добавя като шофьор. Верифицирайте го отделно след проверка на документите и назначаване на автомобил.</p>
+    <p className="text-foreground-500">Одобрението го добавя като шофьор. Той лично приема условията и преминава подготовката в своя профил. Верифицирайте го отделно след това, проверка на документите и назначаване на автомобил.</p>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {notice && <p role="status" className="text-accent-700">{notice}</p>}
     <button disabled={busy || query.isFetching} onClick={() => void query.refetch()} className="underline text-primary-700">Обнови кандидатурите</button>

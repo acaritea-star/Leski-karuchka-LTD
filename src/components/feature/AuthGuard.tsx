@@ -9,6 +9,7 @@ interface AuthGuardProps {
   children: React.ReactNode;
   allowedRoles?: AppUser['role'][];
   redirectTo?: string;
+  showLegalNotice?: boolean;
 }
 
 function roleHome(user: AppUser | null): string {
@@ -18,7 +19,7 @@ function roleHome(user: AppUser | null): string {
   return '/customer/home';
 }
 
-export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: AuthGuardProps) {
+export default function AuthGuard({ children, allowedRoles, redirectTo = '/', showLegalNotice = true }: AuthGuardProps) {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
   const { companyId } = useAdminCompany();
   const [retrying, setRetrying] = useState(false);
@@ -86,5 +87,5 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/' }: 
 
   const scope = user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN' ? companyId : '';
   // Discard forms, dialogs and late component reads when account/company changes.
-  return <Fragment key={`${user.id}:${user.role}:${scope}`}><LegalAcceptanceNotice />{children}</Fragment>;
+  return <Fragment key={`${user.id}:${user.role}:${scope}`}>{showLegalNotice && <LegalAcceptanceNotice />}{children}</Fragment>;
 }

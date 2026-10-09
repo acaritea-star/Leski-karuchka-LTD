@@ -8,9 +8,10 @@ DECLARE
  admin_id uuid:=gen_random_uuid(); foreign_admin uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid();
  application uuid; d uuid; vt uuid:=gen_random_uuid(); car uuid:=gen_random_uuid();
  license uuid:=gen_random_uuid(); insurance uuid:=gen_random_uuid(); fake uuid:=gen_random_uuid(); quote uuid:=gen_random_uuid(); ride uuid:=gen_random_uuid();
- report jsonb;
+ report jsonb; materials jsonb; receipt jsonb; terms text; privacy text;
  today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; denied boolean; count_rows integer; stmt text; obj_path text;
 BEGIN
+ SELECT terms_version,privacy_version INTO STRICT terms,privacy FROM private.legal_versions WHERE is_current;
  INSERT INTO public.companies(id,name,slug) VALUES(c,'Verification fixture','verify-'||c),(other_c,'Foreign verification fixture','verify-'||other_c);
  INSERT INTO auth.users(id,email) SELECT id,'verify-'||id||'@example.invalid' FROM unnest(ARRAY[candidate,admin_id,foreign_admin,customer]) s(id);
  UPDATE public.profiles SET company_id=c WHERE id IN (candidate,customer);
@@ -99,6 +100,22 @@ BEGIN
  -- Requests from the earlier UI must preserve the dates when those JSON keys are omitted.
  PERFORM public.save_driver_vehicle(car,c,d,d,jsonb_build_object('make','Test','model','Fixture','registration_number','V-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
  IF NOT EXISTS(SELECT 1 FROM public.vehicles WHERE id=car AND insurance_expiry_date=today+60 AND inspection_expiry_date=today+30) THEN RAISE EXCEPTION 'FAIL vehicle dates persisted'; END IF;
+ report:=public.driver_verification_status(d);
+ IF (report->>'can_verify')::boolean OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(report->'blockers') x WHERE x->>'code'='preparation') THEN RAISE EXCEPTION 'FAIL missing personal preparation blocker %',report; END IF;
+ denied:=false;BEGIN UPDATE public.drivers SET is_verified=true WHERE id=d;EXCEPTION WHEN OTHERS THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL admin bypasses personal preparation'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
+ materials:=public.driver_preparation_materials();
+ receipt:=public.accept_driver_preparation(d,materials#>>'{document,termsVersion}',materials#>>'{document,trainingVersion}',materials->>'content_hash',
+  '{"background":"foreground","cash":"reconcile","responsibility":"carrier"}',terms,privacy);
+ IF receipt->>'id' IS NULL OR receipt->>'user_id'<>candidate::text THEN RAISE EXCEPTION 'FAIL own preparation receipt'; END IF;
+ report:=public.driver_verification_status(d);
+ IF NOT (report#>>'{preparation,complete}')::boolean THEN RAISE EXCEPTION 'FAIL driver preparation read'; END IF;
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
+ SET LOCAL ROLE authenticated;
  report:=public.driver_verification_status(d);
  IF NOT (report->>'can_verify')::boolean THEN RAISE EXCEPTION 'FAIL verification readiness %',report; END IF;
  RESET ROLE;

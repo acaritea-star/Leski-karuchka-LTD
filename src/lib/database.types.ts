@@ -1901,6 +1901,11 @@ export type Database = {
         Returns: Json
       }
       driver_verification_status: { Args: { p_driver: string }; Returns: Json }
+      driver_preparation_materials: { Args: never; Returns: Json }
+      accept_driver_preparation: {
+        Args: { p_driver: string; p_terms: string; p_training: string; p_hash: string; p_answers: Json; p_general_terms: string; p_general_privacy: string }
+        Returns: Json
+      }
       dropgeometrycolumn:
         | {
             Args: {

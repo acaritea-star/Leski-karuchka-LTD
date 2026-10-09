@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { beginDriverApplicationLogin } from '@/lib/authReturn';
+import DriverTermsPreview from '@/components/feature/DriverTermsPreview';
 
 export default function DriverJoinPage() {
   const { t } = useTranslation();
@@ -142,6 +143,7 @@ export default function DriverJoinPage() {
                   {t('landing.dj_form_title')}
                 </h3>
                 <p className="text-sm text-foreground-500 mb-6">{t('landing.dj_form_subtitle')}</p>
+                {user && (user.role === 'CUSTOMER' || user.role === 'DRIVER') && <DriverTermsPreview />}
 
                 {status === 'success' && (
                   <div className="flex items-start gap-3 bg-primary-50 text-primary-800 px-4 py-3.5 rounded-lg text-sm mb-5">

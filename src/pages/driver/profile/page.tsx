@@ -3,6 +3,7 @@ import { withRequestTimeout } from '@/lib/requestTimeout';
 import LocationSettings from '@/components/feature/LocationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
 import DriverDocuments from '@/components/feature/DriverDocuments';
+import DriverPreparationCard from '@/components/feature/DriverPreparationCard';
 import { useQuery } from '@tanstack/react-query';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,7 +51,7 @@ export default function DriverProfile() {
 
       <div className="p-4">
         {(profileQuery.isError || vehicleQuery.isError) && <p role="alert" className="mb-3 text-sm text-red-600">Не успяхме да заредим профила или автомобила. <button className="underline" onClick={() => { void profileQuery.refetch(); if (profile?.vehicle_id) void vehicleQuery.refetch(); }}>Опитай отново</button></p>}
-        {profile && !profile.is_verified && <p className="mb-3 text-sm text-foreground-600">Профилът очаква верификация. Качи документите си по-долу. Фирмата трябва да ги одобри и да назначи автомобил, преди да получаваш заявки.</p>}
+        {profile && !profile.is_verified && <p className="mb-3 text-sm text-foreground-600">Преди верификация: премини подготовката и приеми условията за шофьори, качи книжка и застраховка. Фирмата проверява документите и назначава автомобил, преди да получаваш заявки.</p>}
         {logoutError && <p role="alert" className="mb-3 text-sm text-red-600">{logoutError}</p>}
         {loading ? (
           <div className="flex justify-center py-16">
@@ -101,6 +102,7 @@ export default function DriverProfile() {
               </div>
             </div>
 
+            {profile && <DriverPreparationCard driverId={profile.id} />}
             <LocationSettings driver onOffline={() => void fetchProfile()} />
             <PrivacyRequests />
 

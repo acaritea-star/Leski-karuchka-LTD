@@ -35,6 +35,7 @@ const DriverRequests = lazy(() => import('@/pages/driver/requests/page'));
 const DriverHistory = lazy(() => import('@/pages/driver/history/page'));
 const DriverEarnings = lazy(() => import('@/pages/driver/earnings/page'));
 const DriverProfile = lazy(() => import('@/pages/driver/profile/page'));
+const DriverPreparation = lazy(() => import('@/pages/driver/preparation/page'));
 
 // Admin pages
 const AdminCompanies = lazy(() => import('@/pages/admin/companies/page'));
@@ -94,6 +95,7 @@ const routes: RouteObject[] = [
   { path: '/driver/history', element: <AuthGuard allowedRoles={['DRIVER']}><DriverHistory /></AuthGuard> },
   { path: '/driver/earnings', element: <AuthGuard allowedRoles={['DRIVER']}><DriverEarnings /></AuthGuard> },
   { path: '/driver/profile', element: <AuthGuard allowedRoles={['DRIVER']}><DriverProfile /></AuthGuard> },
+  { path: '/driver/preparation', element: <AuthGuard allowedRoles={['DRIVER']} showLegalNotice={false}><DriverPreparation /></AuthGuard> },
 
   // ─── Admin ────────────────────────────────────────────────────────────────
   { path: '/admin/companies', element: <AuthGuard allowedRoles={['SUPER_ADMIN']}><AdminCompanies /></AuthGuard> },

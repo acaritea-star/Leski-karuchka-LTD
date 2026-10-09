@@ -9,6 +9,7 @@ export default function DriverVerificationStatus({ driverId, includeDocuments = 
       <p className="font-medium">{report.can_verify ? report.is_verified ? 'Шофьорът е верифициран. Текущите проверки са изпълнени.' : 'Документите и текущите проверки са изпълнени. Остава верификация от фирмата.' : 'За верификация остава:'}</p>
       {issues.length > 0 && <ul className="list-disc pl-5 space-y-1 text-foreground-700">{issues.map(issue => <li key={issue.code}>{issue.message}</li>)}</ul>}
       {!includeDocuments && !report.can_verify && issues.length === 0 && <p>Качване и одобрение на документите по-долу.</p>}
+      {report.preparation?.complete && <p className="text-foreground-600">Лично приети условия {report.preparation.terms_version} и завършено обучение {report.preparation.training_version} · {new Date(report.preparation.accepted_at!).toLocaleString('bg-BG')}</p>}
       {report.warnings.length > 0 && <ul className="list-disc pl-5 space-y-1 text-foreground-500">{report.warnings.map(issue => <li key={issue.code}>{issue.message}</li>)}</ul>}
     </>}
     <button type="button" disabled={query.isFetching} onClick={() => void query.refetch()} className="underline text-primary-700 disabled:opacity-50">Обнови проверката</button>

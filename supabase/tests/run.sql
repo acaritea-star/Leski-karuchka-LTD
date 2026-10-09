@@ -45,6 +45,7 @@ SELECT set_config('request.jwt.claims','{}',true);
 ROLLBACK;
 -- Independent suites own their rollback-only transactions.
 \ir driver_verification.sql
+\ir driver_preparation.sql
 \ir pwa_accounting_legal.sql
 \ir audit_lifecycle.sql
 \ir bulgaria_service_area.sql

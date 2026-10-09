@@ -8,6 +8,10 @@ export type VerificationReport = {
   driver_id: string; is_verified: boolean; can_verify: boolean;
   blockers: VerificationIssue[]; warnings: VerificationIssue[];
   documents: Record<DocumentKind, { state: DocumentState; expires_at: string | null }>;
+  preparation?: {
+    complete: boolean; terms_version: string; training_version: string;
+    accepted_at: string | null; training_completed_at: string | null;
+  };
 };
 export const verificationKey = (driverId: string) => ['driver-verification', driverId] as const;
 const states = new Set<DocumentState>(['missing', 'missing_expiry', 'expired', 'rejected', 'pending', 'missing_file', 'approved']);
@@ -19,6 +23,14 @@ export function parseVerificationReport(value: unknown, driverId: string): Verif
     || !(['license', 'insurance'] as const).every(type => report.documents?.[type] && states.has(report.documents[type].state)
       && (report.documents[type].expires_at === null || /^\d{4}-\d{2}-\d{2}$/.test(report.documents[type].expires_at)))) {
     throw new Error('Не успяхме да потвърдим условията за верификация. Обнови проверката.');
+  }
+  const preparation = report.preparation;
+  if (preparation !== undefined && (!preparation || typeof preparation.complete !== 'boolean'
+    || typeof preparation.terms_version !== 'string' || !preparation.terms_version
+    || typeof preparation.training_version !== 'string' || !preparation.training_version
+    || ![preparation.accepted_at, preparation.training_completed_at].every(value => value === null || (typeof value === 'string' && Number.isFinite(Date.parse(value))))
+    || (preparation.complete && (!preparation.accepted_at || !preparation.training_completed_at)))) {
+    throw new Error('Не успяхме да потвърдим подготовката за верификация. Обнови проверката.');
   }
   return report;
 }
