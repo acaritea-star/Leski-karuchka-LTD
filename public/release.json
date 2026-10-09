@@ -10,9 +10,10 @@
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
-    "20261009191240_driver_preparation_and_policy_receipts"
+    "20261009193230_driver_preparation_and_policy_receipts"
   ],
   "driverTermsVersion": "2026-10-09-driver.1",
   "driverTrainingVersion": "2026-10-09.1",
-  "driverPreparationMigrationVersion": "20261009191240"
+  "driverPreparationMigrationVersion": "20261009193230",
+  "driverPreparationVerifiedSourceCommit": "e11339c23c4b1bda9066e84e1358163792a13edf"
 }

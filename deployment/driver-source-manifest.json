@@ -3,6 +3,8 @@
   "trainingVersion": "2026-10-09.1",
   "sha256": "5f4e2d7898ff8ca7197dc7929453db805b77cd88b501f8e8fc6a62f1f46f6d53",
   "source": "src/config/driverPreparation.json",
-  "migration": "20261009191240_driver_preparation_and_policy_receipts.sql",
-  "legalReleaseApproved": false
+  "migration": "20261009193230_driver_preparation_and_policy_receipts.sql",
+  "legalReleaseApproved": false,
+  "verifiedSourceCommit": "e11339c23c4b1bda9066e84e1358163792a13edf",
+  "databaseApplied": true
 }
