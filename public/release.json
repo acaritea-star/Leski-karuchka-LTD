@@ -1,10 +1,14 @@
 {
-  "release": "2026.10.09-p1.1",
+  "release": "2026.10.09-p1.2",
   "baseCommit": "b081064cc908b927f3705223456376960070203a",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261009074806",
   "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "4149a4161cd26c93f683b4139fca91e00f7a2885"
+  "verifiedSourceCommit": "1a09fe40ea9f427dc91bb7cb3e6c744377864b44",
+  "databaseMigrations": [
+    "20261009074806_p1_ride_evidence_and_operations",
+    "20261009075942_p1_evidence_access_and_indexes"
+  ]
 }

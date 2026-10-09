@@ -2,6 +2,8 @@
 
 Проект: `rzjyvxmfqnnxglmgnvma`. Обект: `public.spatial_ref_sys` от PostGIS.
 
+Официално обяснение на находката: [Supabase — RLS Disabled in Public](https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public).
+
 Предишната проверка установи клиентски права за запис и собственик `supabase_admin`, които наличната DB роля не може да промени. Не използваме подмяна на собственик, системни таблици или заобикаляне на ограниченията.
 
 Конкретно искане за Supabase support/project administrator: приложете поддържано ограничаване на INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER за `anon` и `authenticated` върху `public.spatial_ref_sys`, като запазите необходимия достъп на PostGIS. Потвърдете дали поддържаното решение е отнемане на правата или преместване на extension в неекспонирана схема. Не премествайте extension без проверка на зависимите географски функции.
