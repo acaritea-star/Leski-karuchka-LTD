@@ -49,3 +49,4 @@ ROLLBACK;
 \ir audit_lifecycle.sql
 \ir bulgaria_service_area.sql
 \ir admin_access.sql
+\ir p1_api_permissions.sql
