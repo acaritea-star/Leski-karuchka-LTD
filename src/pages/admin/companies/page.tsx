@@ -244,6 +244,8 @@ export default function AdminCompanies() {
               </button>
             </div>
 
+            <p className="px-5 pt-4 text-xs text-foreground-500">Новата фирма получава категория „Стандарт“ за 4 места, която използва въведената фирмена тарифа без увеличение.</p>
+
             <div className="p-5 space-y-3">
               <div>
                 <label className="text-xs font-medium text-foreground-500 block mb-1">Име на фирмата *</label>

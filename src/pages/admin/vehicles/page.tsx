@@ -27,6 +27,11 @@ const emptyForm = {
 };
 
 export default function AdminVehicles() {
+  const { companyId } = useAdminCompany();
+  return <VehiclesEditor key={companyId ?? 'none'} />;
+}
+
+function VehiclesEditor() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { companyId } = useAdminCompany();
@@ -41,47 +46,46 @@ export default function AdminVehicles() {
 
   const vehiclesQuery = useQuery({
     queryKey: companyId ? queryKeys.adminVehicles(companyId) : ['vehicles', 'company', 'none'],
-    queryFn: async (): Promise<{ vehicles: VehicleWithDriver[]; drivers: DriverOption[]; vehicleTypes: Tables<'vehicle_types'>[] }> => {
-      const { data: vehicles, error } = await withRequestTimeout(signal => supabase
+    queryFn: async ({ signal }): Promise<{ vehicles: VehicleWithDriver[]; drivers: DriverOption[]; vehicleTypes: Tables<'vehicle_types'>[] }> => {
+      const [vehicleResult, driverResult, typeResult] = await Promise.all([
+        withRequestTimeout(requestSignal => supabase
         .from('vehicles')
         .select('*')
         .eq('company_id', companyId!)
-        .order('created_at', { ascending: false }).abortSignal(signal));
-      if (error) throw error;
-
-      const { data: drivers, error: driverError } = await withRequestTimeout(signal => supabase
+        .order('created_at', { ascending: false }).abortSignal(requestSignal), 10_000, signal),
+        withRequestTimeout(requestSignal => supabase
         .from('drivers')
         .select('id, user_id, vehicle_id')
-        .eq('company_id', companyId!).abortSignal(signal));
-      if (driverError) throw driverError;
-      const driverList = drivers ?? [];
+        .eq('company_id', companyId!).abortSignal(requestSignal), 10_000, signal),
+        withRequestTimeout(requestSignal => supabase
+        .from('vehicle_types')
+        .select('*')
+        .eq('company_id', companyId!).order('name').abortSignal(requestSignal), 10_000, signal),
+      ]);
+      for (const result of [vehicleResult, driverResult, typeResult]) if (result.error) throw result.error;
+      const driverList = driverResult.data ?? [];
 
       const userIds = driverList.map((d) => d.user_id);
       const nameMap: Record<string, string> = {};
       if (userIds.length > 0) {
-        const { data: profiles, error: profileError } = await withRequestTimeout(signal => supabase
+        const { data: profiles, error: profileError } = await withRequestTimeout(requestSignal => supabase
           .from('profiles')
           .select('id, first_name, last_name')
-          .in('id', userIds).abortSignal(signal));
+          .in('id', userIds).abortSignal(requestSignal), 10_000, signal);
         if (profileError) throw profileError;
         for (const p of profiles ?? []) {
           nameMap[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Шофьор';
         }
       }
 
-      const { data: vehicleTypes, error: typeError } = await withRequestTimeout(signal => supabase
-        .from('vehicle_types')
-        .select('*')
-        .eq('company_id', companyId!).abortSignal(signal));
-      if (typeError) throw typeError;
-
       const driverOptions: DriverOption[] = driverList.map((d) => ({
         id: d.id,
         name: nameMap[d.user_id] || 'Шофьор',
       }));
 
-      const vehiclesWithDriver: VehicleWithDriver[] = (vehicles ?? []).map((v) => {
-        const assigned = driverList.find((d) => d.vehicle_id === v.id);
+      const assignedByVehicle = new Map(driverList.filter(d => d.vehicle_id).map(d => [d.vehicle_id, d]));
+      const vehiclesWithDriver: VehicleWithDriver[] = (vehicleResult.data ?? []).map((v) => {
+        const assigned = assignedByVehicle.get(v.id);
         return {
           ...v,
           driver_id: assigned?.id ?? null,
@@ -89,7 +93,7 @@ export default function AdminVehicles() {
         };
       });
 
-      return { vehicles: vehiclesWithDriver, drivers: driverOptions, vehicleTypes: vehicleTypes ?? [] };
+      return { vehicles: vehiclesWithDriver, drivers: driverOptions, vehicleTypes: typeResult.data ?? [] };
     },
     enabled: !!companyId,
   });
@@ -97,6 +101,7 @@ export default function AdminVehicles() {
   const vehicles = vehiclesQuery.data?.vehicles ?? [];
   const drivers = vehiclesQuery.data?.drivers ?? [];
   const vehicleTypes = useMemo(() => vehiclesQuery.data?.vehicleTypes ?? [], [vehiclesQuery.data?.vehicleTypes]);
+  const activeTypes = useMemo(() => vehicleTypes.filter(type => type.is_active), [vehicleTypes]);
   const loading = vehiclesQuery.isLoading;
   const queryError = vehiclesQuery.error ? workflowError(vehiclesQuery.error, 'Автомобилите не са заредени.') : '';
 
@@ -108,12 +113,14 @@ export default function AdminVehicles() {
 
   const openAdd = () => {
     saveId.current = crypto.randomUUID();
+    setError('');
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, vehicle_type_id: activeTypes.length === 1 ? activeTypes[0].id : '' });
     setShowForm(true);
   };
 
   const openEdit = (v: VehicleWithDriver) => {
+    setError('');
     setEditing(v);
     setForm({
       make: v.make,
@@ -184,15 +191,18 @@ export default function AdminVehicles() {
   });
 
   const handleSave = () => {
-    if (saveLatch.current || !form.make.trim() || !form.model.trim()) return;
-    if (!form.registration_number.trim() || !form.vehicle_type_id) { setError('Въведете регистрационен номер и категория.'); return; }
+    if (saveLatch.current || !companyId || loading || queryError) return;
+    if (!form.make.trim() || !form.model.trim()) { setError('Въведете марка и модел.'); return; }
+    if (!form.registration_number.trim()) { setError('Въведете регистрационен номер.'); return; }
+    if (!activeTypes.length) { setError('Фирмата няма активна категория автомобил. Обновете списъка или поискайте настройване на категория от администратор.'); return; }
+    if (!activeTypes.some(type => type.id === form.vehicle_type_id)) { setError('Изберете активна категория автомобил.'); return; }
     saveLatch.current = true;
     setError('');
     saveMutation.mutate({ editing, form });
   };
 
   const setField = (key: keyof typeof emptyForm, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+    { setError(''); setForm((prev) => ({ ...prev, [key]: value })); };
 
   return (
     <AdminLayout title={t('nav_vehicles')}>
@@ -200,17 +210,25 @@ export default function AdminVehicles() {
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
           {error || queryError}
+          {queryError && <button onClick={() => void vehiclesQuery.refetch()} className="underline whitespace-nowrap">Опитай отново</button>}
           <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
             <i className="ri-close-line text-red-400 text-xs" />
           </button>
         </div>
       )}
 
+      {!loading && !queryError && companyId && !activeTypes.length && (
+        <p role="status" className="mb-4 text-sm text-foreground-600">
+          Фирмата няма активна категория автомобил. Необходимо е администратор да добави или активира категория.
+        </p>
+      )}
+
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
         <div className="text-sm text-foreground-500">{vehicles.length} автомобила</div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer"
+          disabled={!companyId || loading || !!queryError || !activeTypes.length}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
         >
           <i className="ri-add-line" />
           Добави автомобил
@@ -311,11 +329,12 @@ export default function AdminVehicles() {
               </div>
               <p className="text-xs text-foreground-500">Въведете сроковете от действителните документи на автомобила. Изтекъл срок блокира верификацията и новите заявки.</p>
               {(documentExpired(form.insurance_expiry_date) || documentExpired(form.inspection_expiry_date)) && <p className="text-xs text-red-600">Поне един от въведените срокове е изтекъл.</p>}
-              {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+              {(error || queryError) && <p role="alert" className="text-sm text-red-600">{error || queryError}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Марка</label>
+                  <label htmlFor="vehicle-make" className="text-xs font-medium text-foreground-500 block mb-1">Марка</label>
                   <input
+                    id="vehicle-make"
                     type="text"
                     value={form.make}
                     onChange={(e) => setField('make', e.target.value)}
@@ -324,8 +343,9 @@ export default function AdminVehicles() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Модел</label>
+                  <label htmlFor="vehicle-model" className="text-xs font-medium text-foreground-500 block mb-1">Модел</label>
                   <input
+                    id="vehicle-model"
                     type="text"
                     value={form.model}
                     onChange={(e) => setField('model', e.target.value)}
@@ -359,8 +379,9 @@ export default function AdminVehicles() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-foreground-500 block mb-1">Рег. номер</label>
+                <label htmlFor="vehicle-registration" className="text-xs font-medium text-foreground-500 block mb-1">Рег. номер</label>
                 <input
+                  id="vehicle-registration"
                   type="text"
                   value={form.registration_number}
                   onChange={(e) => setField('registration_number', e.target.value)}
@@ -371,14 +392,19 @@ export default function AdminVehicles() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Тип</label>
+                  <label htmlFor="vehicle-type" className="text-xs font-medium text-foreground-500 block mb-1">Тип</label>
                   <select
+                    id="vehicle-type"
+                    disabled={!activeTypes.length}
                     value={form.vehicle_type_id}
                     onChange={(e) => setField('vehicle_type_id', e.target.value)}
                     className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                   >
-                    <option value="">Без тип</option>
-                    {vehicleTypes.map((vt) => (
+                    <option value="" disabled>{activeTypes.length ? 'Изберете категория' : 'Няма активни категории'}</option>
+                    {form.vehicle_type_id && !activeTypes.some(type => type.id === form.vehicle_type_id) && (
+                      <option value={form.vehicle_type_id} disabled>Категорията е неактивна — изберете друга</option>
+                    )}
+                    {activeTypes.map((vt) => (
                       <option key={vt.id} value={vt.id}>
                         {vt.name}
                       </option>
@@ -398,8 +424,9 @@ export default function AdminVehicles() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-foreground-500 block mb-1">Шофьор</label>
+                <label htmlFor="vehicle-driver" className="text-xs font-medium text-foreground-500 block mb-1">Шофьор</label>
                 <select
+                  id="vehicle-driver"
                   value={form.driver_id}
                   onChange={(e) => setField('driver_id', e.target.value)}
                   className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
@@ -422,7 +449,7 @@ export default function AdminVehicles() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saveMutation.isPending || !form.make.trim() || !form.model.trim()}
+                  disabled={saveMutation.isPending || loading || !!queryError || !activeTypes.length || !form.make.trim() || !form.model.trim()}
                   className="flex-1 py-2.5 bg-primary-500 text-white font-medium rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer text-sm disabled:opacity-50"
                 >
                   {saveMutation.isPending ? t('loading') : t('save')}

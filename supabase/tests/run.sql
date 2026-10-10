@@ -53,3 +53,4 @@ ROLLBACK;
 \ir p1_api_permissions.sql
 
 \ir financial_integrity.sql
+\ir company_vehicle_category.sql
