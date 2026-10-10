@@ -13,11 +13,20 @@ The vehicle modal required a category but offered only “Без тип” for a
 
 ## Verification and deployment
 
-Candidate migration: `20261010160932_company_vehicle_category_bootstrap.sql`. The local Supabase CLI is unavailable; the authorized MCP deployment records the actual version, which must replace the candidate filename before main is released.
+Applied production migration: `20261010162446_company_vehicle_category_bootstrap.sql`. The local Supabase CLI is unavailable; deployment used the authorized Supabase MCP migration tool and the repository filename matches its recorded version.
 
 Added seven component regression cases, a browser vehicle-and-driver assignment scenario for both mobile engines, and a rollback-only SQL suite using real database roles. Every browser network request outside the local synthetic backend is blocked. Database fixtures run only in the disposable GitHub CI database.
 
-Production deployment and exact-source CI results are recorded below after verification. GitHub publication does not by itself prove that the Readdy-hosted frontend has pulled and published this revision.
+Verified source: `700b96ad9a2611f55d9bd2fba20ae857dd284283`.
+
+- Check run `38067214418`: lint, 414 tests across 75 files, TypeScript/production build, legal-source check, Deno checks and all 10 mobile Chromium/WebKit browser scenarios passed.
+- Database regression run `38067214493`, attempt 2: full SQL regression suite and financial concurrency checks passed. The first attempt failed before tests because an infrastructure port was occupied. The identical migration also passed the initial source run `38066886958`.
+- The new browser scenario explicitly accepts the current legal notice through its normal UI before saving the vehicle; it does not force clicks through the notice.
+- Production postflight: КосиКар EOOD now has one active Стандарт category with capacity 4 and multiplier 1.00. Its tariff remains base 2.10 EUR, 1.22 EUR/km, 0.15 EUR/min and minimum 0. Existing Евро Такси category IDs, multipliers and tariff values match the preflight snapshot.
+- The deployed helper source matches the tested SQL byte for byte, uses security invoker, and denies direct execution to both anon and authenticated. The trigger is present on company insertion. Security advisor findings match the preflight categories/counts; existing unrelated findings remain.
+- No synthetic production profiles, vehicles, requests or financial entries were created during validation.
+
+Release marker: `2026.10.10-vehicle.1`. GitHub publication does not by itself prove that the Readdy-hosted frontend has pulled and published this revision.
 
 ## Rollback
 

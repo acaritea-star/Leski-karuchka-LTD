@@ -1,6 +1,6 @@
 {
-  "release": "2026.10.10-finance.1",
-  "baseCommit": "27c1a9a23d7670e6a7e810db5a9856b8c6be82cc",
+  "release": "2026.10.10-vehicle.1",
+  "baseCommit": "b4ea20125dc8ce626270cd4cf62bd4689a21a2b2",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
@@ -11,7 +11,8 @@
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
     "20261009193230_driver_preparation_and_policy_receipts",
-    "20261010045324_financial_posting_integrity"
+    "20261010045324_financial_posting_integrity",
+    "20261010162446_company_vehicle_category_bootstrap"
   ],
   "driverTermsVersion": "2026-10-09-driver.1",
   "driverTrainingVersion": "2026-10-09.1",
@@ -19,5 +20,7 @@
   "driverPreparationVerifiedSourceCommit": "e11339c23c4b1bda9066e84e1358163792a13edf",
   "financialReportVersion": 2,
   "financialMigrationVersion": "20261010045324",
-  "financialVerifiedSourceCommit": "105efbde47936e8d4fbd24fdce30c8653e08d231"
+  "financialVerifiedSourceCommit": "105efbde47936e8d4fbd24fdce30c8653e08d231",
+  "companyVehicleCategoryMigrationVersion": "20261010162446",
+  "companyVehicleCategoryVerifiedSourceCommit": "700b96ad9a2611f55d9bd2fba20ae857dd284283"
 }
