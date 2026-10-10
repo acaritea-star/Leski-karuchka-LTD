@@ -14,6 +14,9 @@ export type DriverPreparationMaterials = {
   driver_id: string; user_id: string; company_id: string; document: DriverPreparationDocument; content_hash: string;
   receipt: DriverPreparationReceipt | null;
 };
+export type PreparationContent = Pick<DriverPreparationMaterials, 'document' | 'content_hash'> & {
+  receipt: Pick<DriverPreparationReceipt, 'id' | 'user_id' | 'company_id' | 'terms_version' | 'training_version' | 'content_hash' | 'accepted_at' | 'training_completed_at'> | null;
+};
 export const preparationKey = (userId: string | undefined) => ['driver-preparation', userId] as const;
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
@@ -39,6 +42,22 @@ export function parseDriverPreparation(value: unknown, driverId?: string): Drive
     if (receipt.user_id !== value.user_id || receipt.company_id !== value.company_id) return fail();
   }
   return value as unknown as DriverPreparationMaterials;
+}
+
+export function parsePreparationContent(value: unknown): PreparationContent {
+  if (!object(value)) throw new Error('Подготовката не е заредена.');
+  // Reuse the full document validation without inventing a driver's identity.
+  const validationId = '00000000-0000-0000-0000-000000000000';
+  parseDriverPreparation({ ...value, driver_id: validationId, user_id: validationId, company_id: validationId, receipt: null });
+  if (value.receipt !== null) {
+    const r = value.receipt;
+    const d = value.document as DriverPreparationDocument;
+    if (!object(r) || !uuid(r.id) || !uuid(r.user_id) || !uuid(r.company_id) || r.terms_version !== d.termsVersion
+      || r.training_version !== d.trainingVersion || r.content_hash !== value.content_hash || !instant(r.accepted_at) || !instant(r.training_completed_at)) {
+      throw new Error('Приемането още не е потвърдено.');
+    }
+  }
+  return value as PreparationContent;
 }
 
 export function parsePreparationReceipt(value: unknown, driverId: string, terms: string, training: string, contentHash: string): DriverPreparationReceipt {
@@ -80,7 +99,7 @@ export async function completeDriverPreparation(materials: DriverPreparationMate
   return { receipt, generalAcceptanceId, legalKey: ['legal-acceptance', userId, legalOperator.termsVersion, legalOperator.privacyVersion] };
 }
 
-export function preparationCopy(materials: DriverPreparationMaterials): string {
+export function preparationCopy(materials: PreparationContent): string {
   const d = materials.document;
   return [
     d.title, 'leskikaruchka.com', 'Версия на условията: ' + d.termsVersion,

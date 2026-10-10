@@ -32,6 +32,8 @@ BEGIN
  denied:=false;BEGIN PERFORM public.review_driver_application(application,'approved','Foreign');EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
  IF NOT denied THEN RAISE EXCEPTION 'FAIL foreign review'; END IF;
  RESET ROLE;
+ -- Preserve coverage of pre-existing enrollments; new packages use unified_driver_onboarding.sql.
+ UPDATE public.driver_applications SET onboarding_required=false WHERE id=application;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
  PERFORM public.review_driver_application(application,'approved','Checked applicant');

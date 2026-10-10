@@ -5,7 +5,7 @@ export const DOCUMENT_BUCKET = 'driver-documents';
 const prefix = `storage://${DOCUMENT_BUCKET}/`;
 const mimeExtensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const pathPattern = new RegExp(`^${uuid}/${uuid}\\.(jpg|png|webp|pdf)$`);
+const pathPattern = new RegExp(`^${uuid}/(?:${uuid}/)?${uuid}\\.(jpg|png|webp|pdf)$`);
 export type DocumentUpload = { id: string; userId: string; type: 'license' | 'insurance'; expires: string; path: string; digest: string };
 const legacyKey = (userId: string) => `leski:document-upload:${userId}`;
 const key = (userId: string, type: DocumentUpload['type']) => `${legacyKey(userId)}:${type}`;

@@ -225,6 +225,10 @@ export type Database = {
       }
       driver_applications: {
         Row: {
+          onboarding_required: boolean
+          onboarding_revision: number
+          submitted_at: string | null
+          vehicle_details: Json | null
           company_id: string
           created_at: string
           email: string | null
@@ -242,6 +246,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          onboarding_required?: boolean
+          onboarding_revision?: number
+          submitted_at?: string | null
+          vehicle_details?: Json | null
           company_id: string
           created_at?: string
           email?: string | null
@@ -259,6 +267,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          onboarding_required?: boolean
+          onboarding_revision?: number
+          submitted_at?: string | null
+          vehicle_details?: Json | null
           company_id?: string
           created_at?: string
           email?: string | null
@@ -1648,6 +1660,12 @@ export type Database = {
       }
     }
     Functions: {
+      driver_onboarding: { Args: { p_application: string }; Returns: Json }
+      accept_application_preparation: { Args: { p_application: string; p_terms: string; p_training: string; p_hash: string; p_answers: Json; p_general_terms: string; p_general_privacy: string }; Returns: Json }
+      register_application_document: { Args: { p_application: string; p_id: string; p_type: Database["public"]["Enums"]["document_type"]; p_expires: string | null; p_path: string }; Returns: string }
+      save_application_vehicle: { Args: { p_application: string; p_has_vehicle: boolean; p_details: Json | null }; Returns: string }
+      submit_driver_onboarding: { Args: { p_application: string; p_revision: number }; Returns: string }
+      verify_driver_application: { Args: { p_application: string; p_revision: number; p_vehicle: string | null; p_category: string | null; p_checks_confirmed: boolean; p_note?: string }; Returns: string }
       confirm_ride_start: { Args: {p_request_id:string}; Returns:string }
       ride_observations: { Args: {p_request_id:string;p_after?:string;p_limit?:number}; Returns:Json }
       record_operation_metrics: { Args: {p_id:string;p_rows:Json}; Returns:boolean }

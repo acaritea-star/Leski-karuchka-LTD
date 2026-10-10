@@ -2,16 +2,20 @@ import { useTranslation } from 'react-i18next';
 import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
-import { beginDriverApplicationLogin } from '@/lib/authReturn';
+import { beginDriverApplicationLogin, invitationCompany } from '@/lib/authReturn';
+import DriverOnboarding from '@/components/feature/DriverOnboarding';
 import DriverTermsPreview from '@/components/feature/DriverTermsPreview';
 
 export default function DriverJoinPage() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const invitedCompany = invitationCompany(location.search);
+  const [companyId, setCompanyId] = useState(invitedCompany ?? '');
   const { user, loading, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
@@ -142,13 +146,13 @@ export default function DriverJoinPage() {
                 <h3 className="font-heading font-bold text-foreground-950 text-xl mb-1.5">
                   {t('landing.dj_form_title')}
                 </h3>
-                <p className="text-sm text-foreground-500 mb-6">{t('landing.dj_form_subtitle')}</p>
-                {user && (user.role === 'CUSTOMER' || user.role === 'DRIVER') && <DriverTermsPreview />}
+                <p className="text-sm text-foreground-500 mb-6">Попълни профила си, премини подготовката и качи документите. Фирмата разглежда целия пакет наведнъж.</p>
+                {user && !application.data && (user.role === 'CUSTOMER' || user.role === 'DRIVER') && <DriverTermsPreview />}
 
                 {status === 'success' && (
                   <div className="flex items-start gap-3 bg-primary-50 text-primary-800 px-4 py-3.5 rounded-lg text-sm mb-5">
                     <i className="ri-checkbox-circle-line text-lg mt-0.5" aria-hidden="true" />
-                    <span>{t('landing.dj_form_success')}</span>
+                    <span>Профилът за кандидатстване е запазен. Продължи с подготовката по-долу.</span>
                   </div>
                 )}
                 {status === 'error' && (
@@ -159,12 +163,12 @@ export default function DriverJoinPage() {
                 )}
 
                 {loading ? <p role="status">Зареждаме профила…</p> : !user ? (
-                  <Link to="/auth/login" onClick={beginDriverApplicationLogin} className="inline-flex py-3 px-5 rounded-full bg-primary-500 text-white font-bold text-sm">Влез с Google или Facebook, за да кандидатстваш</Link>
+                  <Link to="/auth/login" onClick={() => beginDriverApplicationLogin(invitedCompany)} className="inline-flex py-3 px-5 rounded-full bg-primary-500 text-white font-bold text-sm">Влез с Google или Facebook, за да кандидатстваш</Link>
                 ) : user.role === 'DRIVER' ? (
                   <Link to="/driver/profile" className="text-primary-700 underline">Към шофьорския профил и документите</Link>
                 ) : user.role !== 'CUSTOMER' ? <p>Този профил е административен. Кандидатът трябва да влезе със своя Google или Facebook профил.</p> : application.isPending ? <p role="status">Проверяваме кандидатурата…</p> : application.isError || companies.isError ? (
                   <p role="alert">Не успяхме да заредим данните. <button className="underline" onClick={() => { void application.refetch(); void companies.refetch(); }}>Опитай отново</button></p>
-                ) : application.data?.status === 'pending' || application.data?.status === 'approved' ? (
+                ) : application.data?.status === 'pending' && application.data.onboarding_required ? <DriverOnboarding applicationId={application.data.id} onReviewed={() => void application.refetch()} /> : application.data?.status === 'pending' || application.data?.status === 'approved' ? (
                   <div className="text-sm space-y-3">
                     <p>{application.data.status === 'approved' ? 'Кандидатурата е одобрена. Отвори шофьорския профил, за да качиш документите.' : 'Кандидатурата е приета и очаква преглед от избраната фирма.'}</p>
                     <button type="button" className="underline text-primary-700" onClick={() => { void application.refetch(); void refreshProfile(); }}>Обнови статуса</button>
@@ -176,11 +180,11 @@ export default function DriverJoinPage() {
                   {application.data?.status === 'rejected' && <p role="status" className="text-sm text-red-600">Кандидатурата е отхвърлена. {application.data.review_note} Можеш да кандидатстваш отново с коригирани данни.</p>}
                   <div>
                     <label htmlFor="driver-company" className="block text-xs font-semibold text-foreground-700 mb-1.5">Фирма, към която кандидатстваш</label>
-                    <select id="driver-company" name="company" required defaultValue="" className="w-full px-4 py-3 rounded-lg border border-background-200 bg-background-50 text-sm">
+                    <select id="driver-company" name="company" required value={companyId} onChange={e => setCompanyId(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-background-200 bg-background-50 text-sm">
                       <option value="" disabled>{companies.isPending ? 'Зареждане…' : 'Избери фирма'}</option>
-                      {(companies.data ?? []).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}
+                      {(companies.data ?? []).filter(company => !invitedCompany || company.id === invitedCompany).map(company => <option key={company.id} value={company.id}>{company.name}</option>)}
                     </select>
-                    {!companies.isPending && !companies.data?.length && <p className="text-sm mt-2">Няма активни фирми за кандидатстване.</p>}
+                    {!companies.isPending && (!companies.data?.length || (invitedCompany && !companies.data.some(c => c.id === invitedCompany))) && <p className="text-sm mt-2">Фирмата от поканата не е активна или няма фирми за кандидатстване.</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
@@ -284,7 +288,7 @@ export default function DriverJoinPage() {
 
                   <button
                     type="submit"
-                    disabled={status === 'submitting' || companies.isPending || !companies.data?.length}
+                    disabled={status === 'submitting' || companies.isPending || !companyId || !companies.data?.some(c => c.id === companyId)}
                     className="w-full py-3.5 rounded-full bg-primary-500 hover:bg-primary-600 active:scale-[0.98] text-white font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer inline-flex items-center justify-center gap-2"
                   >
                     {status === 'submitting' ? (
@@ -295,7 +299,7 @@ export default function DriverJoinPage() {
                     ) : (
                       <>
                         <i className="ri-send-plane-line" aria-hidden="true" />
-                        {t('landing.dj_form_submit')}
+                        Продължи към правата и подготовката
                       </>
                     )}
                   </button>

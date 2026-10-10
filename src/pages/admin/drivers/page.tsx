@@ -21,6 +21,7 @@ const DOC_LABELS: Record<string, string> = {
   license: 'Шофьорска книжка',
   id_card: 'Лична карта',
   insurance: 'Застраховка',
+  vehicle_registration: 'Регистрация на автомобила',
 };
 
 
@@ -152,7 +153,7 @@ export default function AdminDrivers() {
   return (
     <AdminLayout title={t('nav_drivers')}>
       {toggleVerifyMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">{workflowError(toggleVerifyMutation.error, 'Верификацията не е потвърдена.')}</p>}
-      <p className="mb-4 text-sm text-foreground-500">За верификация: шофьорът лично завършва подготовката и приема условията в своя профил. Одобрете валидни книжка и застраховка от „Детайли“ и назначете активен автомобил от „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
+      <p className="mb-4 text-sm text-foreground-500">Нов шофьор: от „Добави шофьор“ споделете фирмения линк. Той подготвя условията и документите; вие преглеждате и верифицирате целия пакет наведнъж. За по-ранни профили проверките остават в „Детайли“ и „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
