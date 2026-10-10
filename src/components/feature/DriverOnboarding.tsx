@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { acceptApplicationPreparation, onboardingOptions, saveApplicationVehicle, submitOnboarding, type Onboarding, type VehicleDetails } from '@/lib/driverOnboarding';
 import { documentExpired } from '@/lib/legalWorkflow';
 import { workflowError } from '@/lib/driverDocuments';
+import { supabase } from '@/lib/supabase';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import DriverPreparationForm from './DriverPreparationForm';
 import ApplicationDocumentCard from './ApplicationDocumentCard';
 
@@ -43,7 +45,14 @@ export default function DriverOnboarding({ applicationId, onReviewed }: { applic
   if (query.isPending) return <p role="status">Зареждаме подготовката…</p>;
   if (query.isError || !query.data) return <div role="alert"><p>Пакетът не е зареден.</p><button onClick={() => void refresh()} className="underline">Опитай отново</button></div>;
   const bundle = query.data, a = bundle.application, prepared = !!bundle.preparation.receipt;
-  if (a.status === 'rejected') return <div role="status"><p>Фирмата върна пакета за корекция. {a.review_note}</p><button onClick={onReviewed} className="underline text-primary-700">Коригирай кандидатурата</button></div>;
+  if (a.status === 'rejected') return <div className="space-y-3"><p role="status">Фирмата върна пакета за корекция. {a.review_note}</p>
+    {error && <p role="alert" className="text-red-600">{error}</p>}
+    <button disabled={busy} onClick={async () => {
+      if (latch.current) return; latch.current = true; setBusy(true); setError('');
+      try { const { data, error } = await withRequestTimeout(signal => supabase.rpc('reopen_driver_onboarding', { p_application: a.id }).abortSignal(signal));
+        if (error) throw error; if (data !== a.id) throw new Error('Корекцията не е потвърдена.'); await refresh(); onReviewed();
+      } catch (e) { setError(workflowError(e, 'Обнови статуса преди повторен опит.')); } finally { await refresh(); onReviewed(); latch.current = false; setBusy(false); }
+    }} className="underline text-primary-700">{busy ? 'Отваряме пакета…' : 'Коригирай пакета'}</button><p className="text-xs">Запазените условия и документи остават. Поправи необходимото и изпрати пакета отново.</p></div>;
   const required = a.has_vehicle ? ['license', 'insurance', 'vehicle_registration'] : ['license'];
   const ready = prepared && (!a.has_vehicle || !!a.vehicle_details) && required.every(type => bundle.documents.some(x => x.type === type && (type === 'vehicle_registration' || !documentExpired(x.expires_at))));
   return <div className="space-y-4">

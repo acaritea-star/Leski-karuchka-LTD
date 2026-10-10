@@ -7,7 +7,7 @@ DECLARE c uuid:=gen_random_uuid(); other_c uuid:=gen_random_uuid(); u uuid:=gen_
  car uuid:=gen_random_uuid(); licence uuid:=gen_random_uuid(); insurance uuid:=gen_random_uuid(); reg uuid:=gen_random_uuid();
  licence2 uuid:=gen_random_uuid(); insurance2 uuid:=gen_random_uuid(); bad_insurance uuid:=gen_random_uuid();
  today date:=(now() AT TIME ZONE 'Europe/Sofia')::date; terms text; privacy text; m jsonb; receipt jsonb; retry jsonb;
- bundle jsonb; revision integer; denied boolean; path text; kind text; id uuid; expires date;
+ bundle jsonb; revision integer; denied boolean; path text; kind text; doc_id uuid; expires date;
  answers jsonb:='{"background":"foreground","cash":"reconcile","responsibility":"carrier"}';
 BEGIN
  SELECT terms_version,privacy_version INTO STRICT terms,privacy FROM private.legal_versions WHERE is_current;
@@ -18,7 +18,7 @@ BEGIN
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=c WHERE id=admin_id;
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=other_c WHERE id=foreign_id;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',u,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
- a:=public.submit_driver_application(c,'Unified Driver','+359000000000','1–3',true,'');
+ a:=public.begin_driver_onboarding(c,'Unified Driver','+359000000000','1–3',true,'');
  IF EXISTS(SELECT 1 FROM public.drivers WHERE user_id=u) OR (SELECT role FROM public.profiles WHERE id=u)<>'CUSTOMER' THEN RAISE EXCEPTION 'FAIL invitation grants driver privileges'; END IF;
  bundle:=public.driver_onboarding(a); m:=bundle->'preparation';
  denied:=false;BEGIN PERFORM public.submit_driver_onboarding(a,0);EXCEPTION WHEN OTHERS THEN denied:=true;END;
@@ -32,12 +32,12 @@ BEGIN
  IF receipt IS DISTINCT FROM retry THEN RAISE EXCEPTION 'FAIL duplicate preparation'; END IF;
  PERFORM public.save_application_vehicle(a,true,jsonb_build_object('make','Test','model','Own','registration_number','U-'||left(a::text,8),'insurance_expiry_date',today+30,'inspection_expiry_date',today+60));
  FOREACH kind IN ARRAY ARRAY['license','insurance','vehicle_registration'] LOOP
-  id:=CASE kind WHEN 'license' THEN licence WHEN 'insurance' THEN insurance ELSE reg END;
+  doc_id:=CASE kind WHEN 'license' THEN licence WHEN 'insurance' THEN insurance ELSE reg END;
   expires:=CASE kind WHEN 'vehicle_registration' THEN NULL ELSE today+30 END;
-  path:=u||'/'||a||'/'||id||'.pdf';
+  path:=u||'/'||a||'/'||doc_id||'.pdf';
   INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',path,u::text,'{"mimetype":"application/pdf","size":100}');
-  PERFORM public.register_application_document(a,id,kind::public.document_type,expires,path);
-  PERFORM public.register_application_document(a,id,kind::public.document_type,expires,path);
+  PERFORM public.register_application_document(a,doc_id,kind::public.document_type,expires,path);
+  PERFORM public.register_application_document(a,doc_id,kind::public.document_type,expires,path);
  END LOOP;
  IF (SELECT count(*) FROM public.driver_application_documents WHERE application_id=a)<>3 THEN RAISE EXCEPTION 'FAIL duplicate files'; END IF;
  denied:=false;BEGIN UPDATE public.driver_application_documents SET expires_at=today+100 WHERE id=licence;EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
@@ -46,6 +46,15 @@ BEGIN
  denied:=false;BEGIN PERFORM public.submit_driver_onboarding(a,revision-1);EXCEPTION WHEN serialization_failure THEN denied:=true;END;
  IF NOT denied THEN RAISE EXCEPTION 'FAIL stale package submit'; END IF;
  PERFORM public.submit_driver_onboarding(a,revision); PERFORM public.submit_driver_onboarding(a,revision);
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.review_driver_application(a,'rejected','Проверете четливостта на книжката.');
+ RESET ROLE;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',u,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.reopen_driver_onboarding(a); PERFORM public.reopen_driver_onboarding(a);
+ bundle:=public.driver_onboarding(a); revision:=(bundle#>>'{application,onboarding_revision}')::integer;
+ IF bundle#>>'{application,submitted_at}' IS NOT NULL OR jsonb_array_length(bundle->'documents')<>3 OR bundle#>>'{preparation,receipt,id}' IS NULL THEN RAISE EXCEPTION 'FAIL correction discards preparation or keeps stale submission'; END IF;
+ PERFORM public.submit_driver_onboarding(a,revision);
  IF jsonb_array_length(public.export_my_basic_data()->'driver_application_documents')<>3 OR jsonb_array_length(public.export_my_basic_data()->'driver_application_acceptances')<>1 THEN RAISE EXCEPTION 'FAIL candidate data export'; END IF;
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',foreign_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
@@ -87,7 +96,7 @@ BEGIN
  INSERT INTO public.vehicles(id,company_id,make,model,registration_number,vehicle_type_id,insurance_expiry_date,inspection_expiry_date)
  VALUES(car,c,'Test','Company','C-'||left(car::text,8),category,today+30,today+60);
  PERFORM set_config('request.jwt.claims',json_build_object('sub',u2,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
- a2:=public.submit_driver_application(c,'No Car Driver','+359000000001','1–3',false,''); m:=public.driver_onboarding(a2)->'preparation';
+ a2:=public.begin_driver_onboarding(c,'No Car Driver','+359000000001','1–3',false,''); m:=public.driver_onboarding(a2)->'preparation';
  PERFORM public.accept_application_preparation(a2,m#>>'{document,termsVersion}',m#>>'{document,trainingVersion}',m->>'content_hash',answers,terms,privacy);
  path:=u2||'/'||a2||'/'||licence2||'.pdf';
  INSERT INTO storage.objects(bucket_id,name,owner_id,metadata) VALUES('driver-documents',path,u2::text,'{"mimetype":"application/pdf","size":100}');

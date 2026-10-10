@@ -38,7 +38,7 @@ test('invited candidate prepares a complete own-car package before any driver ro
     else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Поканилата фирма', is_active: true }, { id: category, name: 'Друга фирма', is_active: true }];
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
     else if (url.pathname.endsWith('/driver_applications')) data = a;
-    else if (url.pathname.endsWith('/submit_driver_application')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); data = application; }
+    else if (url.pathname.endsWith('/begin_driver_onboarding')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); data = application; }
     else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Поканилата фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: r } };
     else if (url.pathname.endsWith('/accept_application_preparation')) { accepts++; r = receipt(); a!.onboarding_revision++; return route.abort(); }
     else if (url.pathname.endsWith('/save_application_vehicle')) { a!.vehicle_details = route.request().postDataJSON().p_details; a!.onboarding_revision++; data = application; }

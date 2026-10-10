@@ -1661,6 +1661,8 @@ export type Database = {
     }
     Functions: {
       driver_onboarding: { Args: { p_application: string }; Returns: Json }
+      begin_driver_onboarding: { Args: { p_company: string; p_full_name: string; p_phone: string; p_experience: string; p_has_vehicle: boolean; p_message?: string }; Returns: string }
+      reopen_driver_onboarding: { Args: { p_application: string }; Returns: string }
       accept_application_preparation: { Args: { p_application: string; p_terms: string; p_training: string; p_hash: string; p_answers: Json; p_general_terms: string; p_general_privacy: string }; Returns: Json }
       register_application_document: { Args: { p_application: string; p_id: string; p_type: Database["public"]["Enums"]["document_type"]; p_expires: string | null; p_path: string }; Returns: string }
       save_application_vehicle: { Args: { p_application: string; p_has_vehicle: boolean; p_details: Json | null }; Returns: string }

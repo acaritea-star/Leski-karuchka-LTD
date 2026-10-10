@@ -6,7 +6,7 @@ ALTER TABLE public.driver_applications ADD COLUMN onboarding_required boolean NO
  ADD COLUMN onboarding_revision integer NOT NULL DEFAULT 0,
  ADD COLUMN submitted_at timestamptz,
  ADD COLUMN vehicle_details jsonb;
-ALTER TABLE public.driver_applications ALTER COLUMN onboarding_required SET DEFAULT true;
+-- Older published clients retain their guarded legacy enrollment. The new RPC explicitly starts bundle intake.
 ALTER TABLE public.driver_applications ADD CONSTRAINT application_vehicle_size CHECK(vehicle_details IS NULL OR
  (jsonb_typeof(vehicle_details)='object' AND octet_length(vehicle_details::text)<=5000));
 
@@ -42,15 +42,26 @@ CREATE POLICY application_acceptances_read ON public.driver_application_acceptan
  user_id=(SELECT auth.uid()) OR public.is_company_admin(company_id) OR public.is_super_admin());
 
 CREATE FUNCTION private.application_file_access(p_name text,p_write boolean) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $fn$
- SELECT p_name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|png|webp|pdf)$' AND EXISTS(
- SELECT 1 FROM public.driver_applications a JOIN public.profiles p ON p.id=a.user_id
- WHERE a.id::text=split_part(p_name,'/',2) AND a.user_id::text=split_part(p_name,'/',1)
- AND (NOT p_write OR (a.status='pending' AND p.is_active AND p.role='CUSTOMER'))
- AND ((a.user_id=auth.uid() AND p.is_active) OR public.is_super_admin() OR
- (public.is_company_admin(a.company_id) AND (p_write OR EXISTS(
-  SELECT 1 FROM public.driver_application_documents x WHERE x.application_id=a.id AND x.company_id=a.company_id
-   AND x.file_url='storage://driver-documents/'||p_name))))));
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE a public.driver_applications; p public.profiles;
+BEGIN
+ IF auth.uid() IS NULL OR p_name IS NULL OR p_name !~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|png|webp|pdf)$' THEN RETURN false; END IF;
+ SELECT * INTO a FROM public.driver_applications WHERE id::text=split_part(p_name,'/',2) AND user_id::text=split_part(p_name,'/',1);
+ IF NOT FOUND THEN RETURN false; END IF;
+ SELECT * INTO p FROM public.profiles WHERE id=a.user_id;
+ IF p_write THEN
+  IF a.status<>'pending' OR NOT a.onboarding_required OR NOT p.is_active OR p.role<>'CUSTOMER' OR
+   NOT EXISTS(SELECT 1 FROM public.companies WHERE id=a.company_id AND is_active) THEN RETURN false; END IF;
+  IF NOT(a.user_id=auth.uid() OR public.is_company_admin(a.company_id) OR public.is_super_admin()) THEN RETURN false; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.driver_application_acceptances r JOIN private.driver_policy_versions v USING(terms_version,training_version)
+   WHERE r.application_id=a.id AND r.company_id=a.company_id AND v.is_current AND r.content_hash=v.content_hash) THEN RETURN false; END IF;
+  -- Allow same-object reconciliation at the limit; clients have no overwrite or delete permission.
+  IF EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='driver-documents' AND name=p_name) THEN RETURN true; END IF;
+  RETURN (SELECT count(*)<12 FROM storage.objects WHERE bucket_id='driver-documents' AND name LIKE a.user_id::text||'/'||a.id::text||'/%');
+ END IF;
+ RETURN (a.user_id=auth.uid() AND p.is_active) OR public.is_super_admin() OR (public.is_company_admin(a.company_id) AND EXISTS(
+  SELECT 1 FROM public.driver_application_documents x WHERE x.application_id=a.id AND x.company_id=a.company_id AND x.file_url='storage://driver-documents/'||p_name));
+END;
 $fn$;
 REVOKE ALL ON FUNCTION private.application_file_access(text,boolean) FROM PUBLIC,anon,service_role;
 GRANT EXECUTE ON FUNCTION private.application_file_access(text,boolean) TO authenticated;
@@ -79,6 +90,22 @@ BEGIN
 END $fn$;
 CREATE FUNCTION public.driver_onboarding(p_application uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $fn$
  SELECT private.driver_onboarding(p_application); $fn$;
+
+CREATE FUNCTION private.begin_driver_onboarding(p_company uuid,p_full_name text,p_phone text,p_experience text,p_has_vehicle boolean,p_message text) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE result uuid;
+BEGIN
+ -- The existing application RPC pins and locks the active CUSTOMER profile and checks the company and fields.
+ result:=public.submit_driver_application(p_company,p_full_name,p_phone,p_experience,p_has_vehicle,p_message);
+ UPDATE public.driver_applications SET onboarding_required=true,onboarding_revision=onboarding_revision+1,submitted_at=NULL
+ WHERE id=result AND user_id=auth.uid() AND NOT onboarding_required;
+ RETURN result;
+END $fn$;
+CREATE FUNCTION public.begin_driver_onboarding(p_company uuid,p_full_name text,p_phone text,p_experience text,p_has_vehicle boolean,p_message text DEFAULT '') RETURNS uuid
+LANGUAGE sql SECURITY INVOKER SET search_path='' AS $fn$
+ SELECT private.begin_driver_onboarding(p_company,p_full_name,p_phone,p_experience,p_has_vehicle,p_message); $fn$;
+REVOKE ALL ON FUNCTION private.begin_driver_onboarding(uuid,text,text,text,boolean,text),public.begin_driver_onboarding(uuid,text,text,text,boolean,text) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION private.begin_driver_onboarding(uuid,text,text,text,boolean,text),public.begin_driver_onboarding(uuid,text,text,text,boolean,text) TO authenticated;
 
 CREATE FUNCTION private.accept_application_preparation(p_application uuid,p_terms text,p_training text,p_hash text,p_answers jsonb,p_general_terms text,p_general_privacy text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
@@ -188,12 +215,30 @@ BEGIN
  IF auth.uid() IS NULL OR NOT FOUND OR a.status<>'pending' OR NOT EXISTS(SELECT 1 FROM public.profiles WHERE id=a.user_id AND is_active AND role='CUSTOMER') THEN
   RAISE EXCEPTION 'Нямате права за тази кандидатура.' USING ERRCODE='42501'; END IF;
  IF p_revision IS NULL OR p_revision<>a.onboarding_revision THEN RAISE EXCEPTION 'Пакетът е променен. Обнови го преди изпращане.' USING ERRCODE='40001'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=a.company_id AND is_active) THEN RAISE EXCEPTION 'Фирмата вече не е активна.'; END IF;
  PERFORM private.check_application_package(a.id,false);
  UPDATE public.driver_applications SET submitted_at=coalesce(submitted_at,clock_timestamp()) WHERE id=a.id;
  RETURN a.id;
 END $fn$;
 CREATE FUNCTION public.submit_driver_onboarding(p_application uuid,p_revision integer) RETURNS uuid
 LANGUAGE sql SECURITY INVOKER SET search_path='' AS $fn$ SELECT private.submit_driver_onboarding(p_application,p_revision); $fn$;
+
+CREATE FUNCTION private.reopen_driver_onboarding(p_application uuid) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE a public.driver_applications;
+BEGIN
+ SELECT * INTO a FROM public.driver_applications WHERE id=p_application AND user_id=auth.uid() FOR UPDATE;
+ IF auth.uid() IS NULL OR NOT FOUND OR NOT a.onboarding_required OR a.status NOT IN ('pending','rejected') OR
+  NOT EXISTS(SELECT 1 FROM public.profiles WHERE id=a.user_id AND is_active AND role='CUSTOMER') OR
+  NOT EXISTS(SELECT 1 FROM public.companies WHERE id=a.company_id AND is_active) THEN
+  RAISE EXCEPTION 'Кандидатурата не може да бъде отворена от този профил.' USING ERRCODE='42501'; END IF;
+ IF a.status='rejected' THEN UPDATE public.driver_applications SET status='pending',submitted_at=NULL,onboarding_revision=onboarding_revision+1 WHERE id=a.id; END IF;
+ RETURN a.id;
+END $fn$;
+CREATE FUNCTION public.reopen_driver_onboarding(p_application uuid) RETURNS uuid
+LANGUAGE sql SECURITY INVOKER SET search_path='' AS $fn$ SELECT private.reopen_driver_onboarding(p_application); $fn$;
+REVOKE ALL ON FUNCTION private.reopen_driver_onboarding(uuid),public.reopen_driver_onboarding(uuid) FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION private.reopen_driver_onboarding(uuid),public.reopen_driver_onboarding(uuid) TO authenticated;
 
 CREATE FUNCTION private.verify_driver_application(p_application uuid,p_revision integer,p_vehicle uuid,p_category uuid,p_checks_confirmed boolean,p_note text)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
@@ -315,6 +360,7 @@ BEGIN
  IF uid IS NULL OR NOT FOUND OR NOT(public.is_company_admin(a.company_id) OR public.is_super_admin()) THEN
   RAISE EXCEPTION 'Нямате права за тази кандидатура.' USING ERRCODE='42501'; END IF;
  IF p_decision IS NULL OR p_decision NOT IN ('approved','rejected') OR length(coalesce(p_note,''))>500 THEN RAISE EXCEPTION 'Невалидно решение.'; END IF;
+ IF a.onboarding_required AND p_decision='rejected' AND length(btrim(coalesce(p_note,'')))<2 THEN RAISE EXCEPTION 'Посочете какво трябва да поправи кандидатът.'; END IF;
  IF a.status=p_decision THEN RETURN a.id; END IF;
  IF a.status<>'pending' THEN RAISE EXCEPTION 'Кандидатурата вече е разгледана. Обновете списъка.'; END IF;
  IF p_decision='approved' AND a.onboarding_required THEN RAISE EXCEPTION 'Прегледайте целия пакет и използвайте „Одобри и верифицирай“.'; END IF;
@@ -352,6 +398,38 @@ BEGIN
  'driver_application_documents',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT * FROM public.driver_application_documents WHERE user_id=uid ORDER BY created_at DESC LIMIT 1000)x),'[]'::jsonb),
  'driver_application_acceptances',coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM (SELECT * FROM public.driver_application_acceptances WHERE user_id=uid ORDER BY accepted_at DESC LIMIT 1000)x),'[]'::jsonb),
  'scope','Basic account data, at most 1000 records per list. Request a full export for additional data.') INTO result;
+ RETURN result;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public.submit_driver_application(p_company uuid, p_full_name text, p_phone text, p_experience text, p_has_vehicle boolean, p_message text DEFAULT ''::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE uid uuid:=auth.uid(); p public.profiles; a public.driver_applications; result uuid;
+BEGIN
+ SELECT * INTO p FROM public.profiles WHERE id=uid FOR UPDATE;
+ IF uid IS NULL OR NOT FOUND OR NOT p.is_active OR p.role<>'CUSTOMER' THEN
+  RAISE EXCEPTION 'Кандидатстването изисква активен клиентски профил.' USING ERRCODE='42501'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=p_company AND is_active) THEN RAISE EXCEPTION 'Изберете активна фирма.'; END IF;
+ IF p_full_name IS NULL OR length(btrim(p_full_name)) NOT BETWEEN 2 AND 120 OR p_phone IS NULL OR length(btrim(p_phone)) NOT BETWEEN 6 AND 30
+  OR p_experience IS NULL OR p_experience NOT IN ('1–3','3–5','5–10','10+') OR p_has_vehicle IS NULL OR length(coalesce(p_message,''))>500
+  THEN RAISE EXCEPTION 'Проверете данните в кандидатурата.'; END IF;
+ SELECT * INTO a FROM public.driver_applications WHERE user_id=uid FOR UPDATE;
+ IF FOUND AND a.status='pending' THEN
+  IF (a.company_id,a.full_name,a.phone,a.experience,a.has_vehicle,a.message) IS DISTINCT FROM
+    (p_company,btrim(p_full_name),btrim(p_phone),p_experience,p_has_vehicle,btrim(coalesce(p_message,''))) THEN
+   RAISE EXCEPTION 'Вече има изпратена кандидатура. Изчакайте решението на фирмата.'; END IF;
+  RETURN a.id;
+ ELSIF FOUND AND a.status='approved' THEN RAISE EXCEPTION 'Кандидатурата вече е одобрена.';
+ END IF;
+ INSERT INTO public.driver_applications(user_id,company_id,full_name,phone,email,experience,has_vehicle,message)
+ VALUES(uid,p_company,btrim(p_full_name),btrim(p_phone),p.email,p_experience,p_has_vehicle,btrim(coalesce(p_message,'')))
+ ON CONFLICT(user_id) DO UPDATE SET company_id=EXCLUDED.company_id,full_name=EXCLUDED.full_name,phone=EXCLUDED.phone,email=EXCLUDED.email,
+  experience=EXCLUDED.experience,has_vehicle=EXCLUDED.has_vehicle,message=EXCLUDED.message,status='pending',review_note=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=clock_timestamp(),onboarding_revision=public.driver_applications.onboarding_revision+1,submitted_at=NULL,vehicle_details=NULL
+ RETURNING id INTO result;
+ INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action) VALUES(p_company,uid,'driver_application',result,'application_submitted');
  RETURN result;
 END $function$
 ;

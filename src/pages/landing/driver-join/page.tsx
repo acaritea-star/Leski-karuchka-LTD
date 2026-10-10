@@ -66,7 +66,7 @@ export default function DriverJoinPage() {
     busy.current = true;
     setStatus('submitting'); setErrorMsg('');
     try {
-      const { error } = await withRequestTimeout(signal => supabase.rpc('submit_driver_application', {
+      const { error } = await withRequestTimeout(signal => supabase.rpc('begin_driver_onboarding', {
         p_company: String(form.get('company')), p_full_name: String(form.get('name') ?? '').trim(),
         p_phone: String(form.get('phone') ?? '').trim(), p_experience: String(form.get('experience')),
         p_has_vehicle: form.get('vehicle') === 'yes', p_message: String(form.get('message') ?? '').trim(),
@@ -168,7 +168,7 @@ export default function DriverJoinPage() {
                   <Link to="/driver/profile" className="text-primary-700 underline">Към шофьорския профил и документите</Link>
                 ) : user.role !== 'CUSTOMER' ? <p>Този профил е административен. Кандидатът трябва да влезе със своя Google или Facebook профил.</p> : application.isPending ? <p role="status">Проверяваме кандидатурата…</p> : application.isError || companies.isError ? (
                   <p role="alert">Не успяхме да заредим данните. <button className="underline" onClick={() => { void application.refetch(); void companies.refetch(); }}>Опитай отново</button></p>
-                ) : application.data?.status === 'pending' && application.data.onboarding_required ? <DriverOnboarding applicationId={application.data.id} onReviewed={() => void application.refetch()} /> : application.data?.status === 'pending' || application.data?.status === 'approved' ? (
+                ) : application.data && ['pending', 'rejected'].includes(application.data.status) && application.data.onboarding_required ? <DriverOnboarding applicationId={application.data.id} onReviewed={() => void application.refetch()} /> : application.data?.status === 'pending' || application.data?.status === 'approved' ? (
                   <div className="text-sm space-y-3">
                     <p>{application.data.status === 'approved' ? 'Кандидатурата е одобрена. Отвори шофьорския профил, за да качиш документите.' : 'Кандидатурата е приета и очаква преглед от избраната фирма.'}</p>
                     <button type="button" className="underline text-primary-700" onClick={() => { void application.refetch(); void refreshProfile(); }}>Обнови статуса</button>
