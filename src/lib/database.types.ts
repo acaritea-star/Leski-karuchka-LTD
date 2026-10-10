@@ -1787,6 +1787,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      accounting_export: {
+        Args: { p_company_id?: string; p_driver_id?: string; p_from: string; p_until: string }
+        Returns: Json
+      }
       accounting_report: {
         Args: {
           p_company_id?: string

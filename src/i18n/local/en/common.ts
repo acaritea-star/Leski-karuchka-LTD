@@ -271,7 +271,7 @@ export default {
   navigate: 'Navigate',
   // Driver - new keys
   todays_trips: 'Trips Today',
-  todays_earnings: 'Earnings Today',
+  todays_earnings: 'Booked trips today',
   driver_rating: 'Your Rating',
   no_incoming_requests: 'No incoming requests',
   go_online_to_receive: 'Go online to receive ride requests',

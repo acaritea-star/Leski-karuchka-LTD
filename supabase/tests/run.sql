@@ -51,3 +51,5 @@ ROLLBACK;
 \ir bulgaria_service_area.sql
 \ir admin_access.sql
 \ir p1_api_permissions.sql
+
+\ir financial_integrity.sql

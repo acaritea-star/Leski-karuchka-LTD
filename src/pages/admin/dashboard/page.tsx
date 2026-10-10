@@ -42,7 +42,7 @@ export default function AdminDashboard() {
     {
       icon: 'ri-money-dollar-circle-line',
       label: t('total_revenue'),
-      value: `${stats.totalRevenue.toFixed(2)} €`,
+      value: dashboardQuery.data ? `${stats.totalRevenue.toFixed(2)} €` : '—',
       color: 'bg-secondary-500',
     },
   ];
@@ -103,11 +103,11 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-xl p-5 md:p-6 border border-background-100">
-              <h3 className="font-semibold text-foreground-950 mb-4">Приходи (7 дни)</h3>
+              <h3 className="font-semibold text-foreground-950 mb-4">Стойност на завършените курсове (7 дни)</h3>
               <div className="flex items-end gap-2 h-44">
                 {chartData.map((d, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-xs text-foreground-500">{d.revenue.toFixed(0)}</span>
+                    <span className="text-xs text-foreground-500">{d.revenue.toFixed(2)}</span>
                     <div
                       className="w-full max-w-[40px] rounded-t-md bg-primary-500 transition-all duration-500"
                       style={{ height: `${(d.revenue / maxRevenue) * 130}px` }}

@@ -47,8 +47,8 @@ SELECT pg_temp.must_fail('SELECT public.record_driver_money(gen_random_uuid(),''
 RESET ROLE;
 SELECT set_config('request.jwt.claims',json_build_object('sub',admin_user,'role','authenticated')::text,true) FROM money_test;
 SET LOCAL ROLE authenticated;
-SELECT public.record_driver_money(confirmation,'confirmation',0,'Cash received',NULL,handover) FROM money_test;
-SELECT public.record_driver_money(confirmation,'confirmation',0,'Cash received',NULL,handover) FROM money_test;
+SELECT public.record_driver_money_verified(confirmation,'confirmation',0,'Cash received',admin_user,NULL,handover,'cash_count') FROM money_test;
+SELECT public.record_driver_money_verified(confirmation,'confirmation',0,'Cash received',admin_user,NULL,handover,'cash_count') FROM money_test;
 SELECT pg_temp.must_fail('SELECT public.record_driver_money(gen_random_uuid(),''confirmation'',0,''Duplicate confirmation'',NULL,handover) FROM money_test');
 DO $$ DECLARE report jsonb; BEGIN
  report:=public.accounting_report((now() AT TIME ZONE 'Europe/Sofia')::date,(now() AT TIME ZONE 'Europe/Sofia')::date+1,(SELECT company FROM test_ids));

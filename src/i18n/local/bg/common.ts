@@ -271,7 +271,7 @@ export default {
   navigate: 'Навигирай',
   // Driver - new keys
   todays_trips: 'Пътувания днес',
-  todays_earnings: 'Приходи днес',
+  todays_earnings: 'Стойност на курсовете днес',
   driver_rating: 'Твой рейтинг',
   no_incoming_requests: 'Няма входящи заявки',
   go_online_to_receive: 'Включете се онлайн, за да получавате заявки',

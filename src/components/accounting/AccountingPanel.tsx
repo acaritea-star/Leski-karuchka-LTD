@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { clearMoneyIntent, findMoneyOperation, prepareMoneyIntent, readMoneyIntent, writeMoneyOperation, type MoneyCommand } from '@/lib/pendingMoney';
 import { isAmbiguousWrite } from '@/lib/rideOperations';
-import { actorLabels, evidenceLabels, kindLabels, loadAccounting, money, parseMoney, reasonLabels, reportCsv, reportDate, sofiaMonth, stageLabels, type MoneyEntry } from '@/lib/accounting';
+import { actorLabels, evidenceLabels, kindLabels, loadAccounting, exportAccounting, money, parseMoney, reasonLabels, reportCsv, reportDate, sofiaMonth, stageLabels, type MoneyEntry } from '@/lib/accounting';
 
 type Command = MoneyCommand;
 const inputClass = 'w-full rounded-lg border border-background-200 bg-white px-3 py-2 text-sm';
@@ -28,6 +28,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
  const [success, setSuccess] = useState('');
  const [pending, setPending] = useState<Command | null>(null);
  const inFlight = useRef(false);
+ const entryForm = useRef<HTMLFormElement>(null);
  const scope = { companyId, driverId };
  const scopeKey = `${companyId ?? ''}:${driverId ?? ''}`;
  useEffect(() => { const saved = user?.id ? readMoneyIntent(user.id) : null; setPending(saved?.scope === scopeKey ? saved.command : null); }, [user?.id, scopeKey]);
@@ -45,18 +46,18 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
    command = prepareMoneyIntent(user.id, scopeKey, payload); setPending(command);
    await writeMoneyOperation(command, user.id);
    clearMoneyIntent(user.id, command.p_id); setPending(null); setAmount(''); setNote(''); setRequestId(''); setAction(null); setActionNote('');
-   setSuccess('Записът е запазен.');
+   setMonth(sofiaMonth()); setPage(0); setSuccess('Записът е запазен.');
    await client.invalidateQueries({ queryKey: ['accounting'] });
   } catch (err) {
    if (command && !isAmbiguousWrite(err)) { clearMoneyIntent(user.id, command.p_id); setPending(null); }
    const message = err && typeof err === 'object' && 'message' in err ? String(err.message) : '';
-   setError(message.includes('already recorded') ? 'За този курс вече има приход. Първо коригирайте предишния запис.' : message.includes('already reversed') ? 'Записът вече е коригиран. Обновете отчета.' : message.includes('Confirmed handover') ? 'Получаването вече е потвърдено и не може да бъде отменено от шофьора.' : err instanceof Error ? err.message : 'Записът не е потвърден. Повторете със същите данни.');
+   setError(message.includes('already recorded') ? 'За този курс вече има приход. Първо коригирайте предишния запис.' : message.includes('already reversed') ? 'Записът вече е коригиран. Обновете отчета.' : message.includes('Confirmed entry') ? 'Получаването вече е потвърдено и не може да бъде отменено от шофьора.' : err instanceof Error ? err.message : 'Записът не е потвърден. Повторете със същите данни.');
   } finally { inFlight.current = false; setBusy(false); }
  };
  const checkPending = async () => {
   if (!pending || !user || busy) return;
   setBusy(true); setError('');
-  try { if (await findMoneyOperation(pending.p_id,user.id)) { clearMoneyIntent(user.id,pending.p_id);setPending(null);setSuccess('Записът е потвърден.');await query.refetch(); }
+  try { if (await findMoneyOperation(pending.p_id,user.id)) { clearMoneyIntent(user.id,pending.p_id);setPending(null);setMonth(sofiaMonth());setPage(0);setAction(null);setSuccess('Записът е потвърден.');await client.invalidateQueries({queryKey:['accounting']}); }
    else setError('Няма потвърждение за този запис. Повторете със същите данни.');
   } catch { setError('Проверката се забави. Записът остава за безопасно повторение.'); }
   finally { setBusy(false); }
@@ -72,18 +73,12 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
   if (!report || exporting) return;
   setExporting(true); setError('');
   try {
-   const first = await loadAccounting(month, scope);
-   const pages = Math.ceil(Math.max(first.outcome_count, first.entry_count) / 25);
-   if (pages > 400) throw new Error('Периодът съдържа над 10 000 записа. За този обем е нужен отделен сървърен експорт.');
-   const outcomes = [...first.outcomes], entries = [...first.entries];
-   for (let i = 1; i < pages; i++) {
-    const next = await loadAccounting(month, scope, i);
-    if (next.outcome_count !== first.outcome_count || next.entry_count !== first.entry_count) throw new Error('Отчетът се промени по време на експорта. Опитайте отново.');
-    outcomes.push(...next.outcomes); entries.push(...next.entries);
-   }
-   if (new Set(outcomes.map(o => o.id)).size !== first.outcome_count || new Set(entries.map(e => e.id)).size !== first.entry_count) throw new Error('Отчетът се промени по време на експорта. Опитайте отново.');
-   const url = URL.createObjectURL(new Blob([reportCsv(outcomes, entries)], { type: 'text/csv;charset=utf-8' }));
-   const a = document.createElement('a'); a.href = url; a.download = `leski-report-${month}.csv`; a.click(); URL.revokeObjectURL(url);
+   const snapshot = await exportAccounting(month, scope);
+   const url = URL.createObjectURL(new Blob([reportCsv(snapshot.outcomes, snapshot.entries, snapshot)], { type: 'text/csv;charset=utf-8' }));
+   const a = document.createElement('a'); a.href = url; a.download = `leski-report-${month}.csv`;
+   document.body.append(a); a.click(); a.remove();
+   // Allow Safari to consume the object URL before releasing it.
+   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (err) { setError(err instanceof Error ? err.message : 'Експортът не успя. Опитайте отново.'); }
   finally { setExporting(false); }
  };
@@ -91,7 +86,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
  return <section className="space-y-4" aria-label="Отчет и сметки">
   <div className="flex flex-wrap items-end gap-3">
    <label className="text-xs text-foreground-500">Месец (българско време)<input aria-label="Месец на отчета" type="month" value={month} disabled={busy || exporting} onChange={e => { if (e.target.value) { setMonth(e.target.value); setPage(0); setAction(null); setError(''); } }} className={`${inputClass} mt-1`} /></label>
-   <button className={buttonClass} disabled={!report || exporting} onClick={() => void exportCsv()}>{exporting ? 'Изтегляне…' : 'Изтегли CSV'}</button>
+   <button className={buttonClass} disabled={!report || exporting || busy || query.isError} onClick={() => void exportCsv()}>{exporting ? 'Изтегляне…' : 'Изтегли CSV'}</button>
    <button className="text-sm text-primary-600 underline" disabled={query.isFetching} onClick={() => void query.refetch()}>Обнови</button>
   </div>
   <p className="text-xs text-foreground-500">Стойността на курсовете е записаната при поръчване цена. Тя не е доказателство за получени пари. Приходите и разходите са декларирани; фирмата потвърждава сверяването на приходите и получаването на предадени пари. Отчетът не е фискален документ.</p>
@@ -107,15 +102,22 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
      ['Отменени заявки', String(report.totals.cancelled)],
      ['Прекратени след начало', String(report.totals.interrupted)],
      ['Декларирани приходи', money(report.finances.income)],
-     ['Приходи, сверени от фирмата', money(report.finances.confirmed_income ?? 0)],
+     ['Приходи, сверени през периода (нето)', money(report.finances.confirmed_income)],
      ['Декларирани разходи', money(report.finances.expenses)],
-     ['Приходи минус разходи', money(report.finances.income - report.finances.expenses)],
-     ['Предаване: декларирано / потвърдено', `${money(report.finances.handed_over)} / ${money(report.finances.confirmed_handover)}`],
+     ['Приходи минус разходи', money(report.finances.net_income)],
+     ['Предаване / сверяване през периода (нето)', `${money(report.finances.handed_over)} / ${money(report.finances.confirmed_handover)}`],
     ].map(([label, value]) => <div key={label} className="bg-white rounded-xl border border-background-100 p-4"><p className="text-lg font-bold text-foreground-950 font-heading">{value}</p><p className="mt-1 text-xs text-foreground-500">{label}</p></div>)}
    </div>
-   <p className="text-xs text-foreground-500">Приходите минус разходите са лична сметка по въведените данни, преди данъци и неотчетени задължения. Предаването не е разход. Потвържденията се отнасят към месеца на първоначалния финансов запис.</p>
+   <p className="text-xs text-foreground-500">Приходите минус разходите са лична сметка по въведените данни, преди данъци и неотчетени задължения. Предаването не е разход. Корекциите и сверяванията влизат в месеца на извършването им и могат да се отнасят за по-стар запис. Отрицателна сума означава корекция. Историята на записите и сверяването на курсовете показват текущото им състояние.</p>
+   <div className="bg-white rounded-xl border border-background-100 p-4 space-y-2">
+    <h2 className="font-semibold text-foreground-950">Остатък по въведените сметки</h2>
+    <p className="text-sm">Начален: {money(report.balance.opening)} · Движение: {money(report.balance.movement)} · Краен: <strong>{money(report.balance.closing)}</strong></p>
+    <p className="text-xs text-foreground-500">Приходи минус разходи и предавания от началото на записите. Това не е измерена касова наличност, данъчна печалба или дължима заплата.</p>
+    <p className="text-xs text-foreground-500">Несверени към края на периода: приходи {money(report.balance.unconfirmed_income)} · предавания {money(report.balance.unconfirmed_handover)}</p>
+   </div>
+   {!!report.totals.unreported_completed && <p className="text-sm text-amber-700">{report.totals.unreported_completed} завършени курса нямат въведено плащане. Стойността им не се добавя автоматично към получените пари.</p>}
    {!!report.totals.missing_amounts && <p className="text-sm text-amber-700">{report.totals.missing_amounts} завършени курса са без записана крайна сума и не участват в сбора.</p>}
-   {driverId && <form onSubmit={submit} className="bg-white rounded-xl border border-background-100 p-4 space-y-3">
+   {driverId && <form ref={entryForm} onSubmit={submit} className="bg-white rounded-xl border border-background-100 p-4 space-y-3">
     <h2 className="font-semibold text-foreground-950">Моите сметки</h2>
     <p className="text-xs text-foreground-500">Записът е с текуща дата и е видим за вашата фирма. За външен курс изберете „Без връзка с курс“. Получените пари не се добавят автоматично от стойността на заявката.</p>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -126,10 +128,10 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     <label className="block text-xs text-foreground-500">Описание<input className={inputClass} value={note} disabled={busy} onChange={e => setNote(e.target.value)} maxLength={500} placeholder="Например: гориво, външен курс, предаване на каса" required /></label>
     <button className={buttonClass} disabled={busy}>{busy ? 'Запазване…' : 'Добави запис'}</button>
    </form>}
-   {action && <form className="bg-white rounded-xl border border-background-100 p-4 space-y-3" onSubmit={e => { e.preventDefault(); if (actionNote.trim()) void write({ p_kind: action.kind, p_amount: action.entry.amount, p_note: actionNote.trim(), p_reference_id: action.entry.id, ...(action.kind === 'confirmation' ? {p_source:evidenceSource,p_evidence_ref:evidenceReference.trim() || undefined} : {}) }); }}>
+   {action && <form className="bg-white rounded-xl border border-background-100 p-4 space-y-3" onSubmit={e => { e.preventDefault(); if (actionNote.trim()) void write({ p_kind: action.kind, p_amount: action.entry.amount, p_note: actionNote.trim(), p_reference_id: action.entry.id, ...(action.kind === 'confirmation' || companyId && action.entry.confirmed ? {p_source:evidenceSource,p_evidence_ref:evidenceReference.trim() || undefined} : {}) }); }}>
     <h3 className="font-semibold">{action.kind === 'confirmation' ? action.entry.kind === 'income' ? 'Потвърдете сверения приход' : 'Потвърдете действително получените пари' : 'Коригирайте с обратен запис'} — {money(action.entry.amount)}</h3>
     <label className="block text-xs text-foreground-500">Основание<input className={inputClass} required value={actionNote} onChange={e => setActionNote(e.target.value)} maxLength={500} disabled={busy} /></label>
-    {action.kind === 'confirmation' && <><label className="block text-xs text-foreground-500">Източник<select className={inputClass} value={evidenceSource} onChange={e=>setEvidenceSource(e.target.value)} disabled={busy}><option value="cash_count">Преброени пари</option><option value="cash_book">Касов разчет</option><option value="receipt">Разписка / документ</option><option value="bank_record">Платежен запис</option></select></label><label className="block text-xs text-foreground-500">Номер / референция<input className={inputClass} maxLength={160} required={evidenceSource !== 'cash_count'} value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)} disabled={busy}/></label></>}
+    {(action.kind === 'confirmation' || companyId && action.entry.confirmed) && <><label className="block text-xs text-foreground-500">Източник<select className={inputClass} value={evidenceSource} onChange={e=>setEvidenceSource(e.target.value)} disabled={busy}><option value="cash_count">Преброени пари</option><option value="cash_book">Касов разчет</option><option value="receipt">Разписка / документ</option><option value="bank_record">Платежен запис</option></select></label><label className="block text-xs text-foreground-500">Номер / референция<input className={inputClass} maxLength={160} required={evidenceSource !== 'cash_count'} value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)} disabled={busy}/></label></>}
     <div className="flex gap-3"><button className={buttonClass} disabled={busy}>Потвърди</button><button type="button" disabled={busy} className="text-sm text-foreground-500" onClick={() => setAction(null)}>Откажи</button></div>
    </form>}
    <div className="bg-white rounded-xl border border-background-100 p-4 space-y-3">
@@ -138,7 +140,13 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     {report.outcomes.map(o => <article key={o.id} className="border-b border-background-100 py-3 last:border-0">
      <div className="flex justify-between gap-3"><p className="text-sm font-medium">{o.outcome === 'completed' ? 'Завършен курс' : o.previous_status === 'in_progress' ? 'Прекратено пътуване' : 'Отменена заявка'}{companyId && ` · ${o.driver_name || 'Без назначен шофьор'}`}</p><strong className="text-sm">{o.outcome === 'completed' ? money(o.booked_amount) : 'Без начислен оборот'}</strong></div>
      <p className="text-xs text-foreground-500 mt-1">{reportDate(o.occurred_at)} · Заявка {o.request_id.slice(0, 8)}{o.reconstructed && ' · Възстановен стар запис'}</p>
-     {report.reconciliation?.filter(r=>r.request_id===o.request_id).map(r=><p key={r.request_id} className="text-xs text-foreground-500 mt-1">Деклариран приход: {money(r.declared_income)}{r.declared_income!=null&&<> · {r.company_confirmed?'Сверен от фирмата':'Очаква сверяване'} · Разлика спрямо заявката: {money(r.difference)}</>}</p>)}
+     {report.reconciliation.filter(r=>r.request_id===o.request_id).map(r=><p key={r.request_id} className="text-xs text-foreground-500 mt-1">Деклариран приход: {money(r.declared_income)}{r.declared_income!=null&&<> · {r.company_confirmed?'Сверен от фирмата':'Очаква сверяване'} · Разлика спрямо заявката: {money(r.difference)}</>}</p>)}
+     {driverId && o.outcome === 'completed' && !report.reconciliation.find(r => r.request_id === o.request_id)?.declared_income && <button type="button" className="mt-2 text-xs text-primary-600 underline" disabled={busy || !!pending} onClick={() => {
+      setKind('income'); setRequestId(o.request_id); setAmount(o.booked_amount?.toFixed(2) ?? ''); setNote(`Плащане по курс ${o.request_id.slice(0, 8)}`);
+      setSuccess('Проверете действително получената сума и добавете записа.');
+      entryForm.current?.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      entryForm.current?.querySelector<HTMLInputElement>('input[inputmode="decimal"]')?.focus({ preventScroll: true });
+     }}>Отчети плащането</button>}
      {o.outcome === 'cancelled' && o.accepted_at && <p className="text-xs text-foreground-500 mt-1">Време от приемането до отказа: {Math.max(0, Math.round((new Date(o.occurred_at).getTime() - new Date(o.accepted_at).getTime()) / 60000))} мин{!o.evidence && ' · Няма GPS наблюдения до отказа'}</p>}
      {o.evidence && <div className="text-xs text-foreground-500 mt-1 space-y-1">
       <p>{evidenceDescription(o.evidence)} · Наблюдаван престой: {(o.evidence.stationary_seconds/60).toFixed(1)} мин</p>
@@ -153,15 +161,18 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     <h2 className="font-semibold text-foreground-950">История на сметките</h2>
     {!report.entries.length && <p className="text-sm text-foreground-400">Няма въведени суми за тази страница и период.</p>}
     {report.entries.map(e => <article key={e.id} className="border-b border-background-100 py-3 last:border-0">
-     <div className="flex justify-between gap-3"><p className="text-sm font-medium">{kindLabels[e.kind]}{companyId && ` · ${e.driver_name || e.driver_id?.slice(0, 8) || 'Шофьор'}`}</p><strong className="text-sm">{money(e.amount)}</strong></div>
+     <div className="flex justify-between gap-3"><p className="text-sm font-medium">{kindLabels[e.kind]}{companyId && ` · ${e.driver_name || e.driver_id?.slice(0, 8) || 'Шофьор'}`}</p><strong className="text-sm">{money(e.kind === 'reversal' ? -e.amount : e.amount)}</strong></div>
      <p className="text-xs text-foreground-500 mt-1">{reportDate(e.recorded_at)} · {e.note}{e.reversed ? ' · Коригиран с обратен запис' : e.confirmed ? e.kind === 'income' ? ' · Приходът е сверен от фирмата' : ' · Получаването е потвърдено' : ''}</p>
-     {e.kind === 'confirmation' && <p className="text-xs text-foreground-500">Източник: {evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source}{e.evidence_reference && ` · ${e.evidence_reference}`}</p>}
+     {e.reference_kind && <p className="text-xs text-foreground-500">Към: {kindLabels[e.reference_kind]} · {e.reference_id?.slice(0, 8)}{e.reference_recorded_at && ` · ${reportDate(e.reference_recorded_at)}`}</p>}
+     {e.reversed_at && <p className="text-xs text-foreground-500">Дата на корекцията: {reportDate(e.reversed_at)}</p>}
+     {e.evidence_source !== 'declaration' && <p className="text-xs text-foreground-500">Източник: {evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source}{e.evidence_reference && ` · ${e.evidence_reference}`}</p>}
      {e.request_id && <p className="text-xs text-foreground-400">Заявка {e.request_id.slice(0, 8)}</p>}
      {!e.reversed && !e.confirmed && ['income','expense','handover'].includes(e.kind) && driverId && e.actor_id === user?.id && <button className="mt-2 text-xs text-primary-600 underline" disabled={busy} onClick={() => { setAction({ entry: e, kind: 'reversal' }); setActionNote(''); }}>Коригирай</button>}
+     {companyId && ['handover','income'].includes(e.kind) && !e.reversed && e.confirmed && e.actor_id !== user?.id && <button className="mt-2 text-xs text-primary-600 underline" disabled={busy} onClick={() => { setAction({ entry: e, kind: 'reversal' }); setActionNote(''); setEvidenceSource('cash_count'); setEvidenceReference(''); }}>Коригирай сверения запис</button>}
      {companyId && ['handover','income'].includes(e.kind) && !e.reversed && !e.confirmed && e.actor_id !== user?.id && <button className="mt-2 text-xs text-primary-600 underline" disabled={busy} onClick={() => { setAction({ entry: e, kind: 'confirmation' }); setActionNote('');setEvidenceSource('cash_count');setEvidenceReference(''); }}>{e.kind === 'income' ? 'Свери приход' : 'Потвърди получаване'}</button>}
     </article>)}
    </div>
-   {companyId && report.drivers.length > 0 && <div className="bg-white rounded-xl border border-background-100 p-4"><h2 className="font-semibold mb-3">По шофьор — избран месец</h2>{report.drivers.map(d => <p key={d.driver_id ?? 'unassigned'} className="text-sm py-2 border-b border-background-100">{d.driver_name || 'Без назначен шофьор'} · {d.trips} завършени · {d.cancelled} отменени · {money(d.booked)}</p>)}{report.drivers.length === 50 && <p className="text-xs text-foreground-500">Показани са първите 50 групи. Пълните записи са в CSV.</p>}</div>}
+   {companyId && report.drivers.length > 0 && <div className="bg-white rounded-xl border border-background-100 p-4"><h2 className="font-semibold mb-3">По шофьор — избран месец</h2>{report.drivers.map(d => <div key={d.driver_id ?? 'unassigned'} className="text-sm py-2 border-b border-background-100 space-y-1"><p>{d.driver_name || 'Без назначен шофьор'} · {d.trips} завършени · {d.cancelled} отменени · Стойност: {money(d.booked)}</p><p className="text-xs text-foreground-500">Приходи: {money(d.income)} · Разходи: {money(d.expenses)} · Предавания: {money(d.handed_over)} · Сверени приходи / предавания: {money(d.confirmed_income)} / {money(d.confirmed_handover)} · Краен остатък по записите: {money(d.closing)}</p></div>)}{report.driver_count > report.drivers.length && <p className="text-xs text-foreground-500">Показани са първите 50 групи. Пълните записи са в CSV.</p>}</div>}
    <div className="flex items-center justify-between text-sm"><button disabled={page === 0 || query.isFetching} className="text-primary-600 disabled:opacity-40" onClick={() => setPage(p => p - 1)}>Назад</button><span>Страница {page + 1} от {maxPages}</span><button disabled={page + 1 >= maxPages || query.isFetching} className="text-primary-600 disabled:opacity-40" onClick={() => setPage(p => p + 1)}>Напред</button></div>
   </>}
  </section>;

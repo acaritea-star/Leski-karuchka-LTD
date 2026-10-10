@@ -14,3 +14,6 @@ for(const file of readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql'
  if(!manifest.includedMigrations.includes(file)) run(`supabase/migrations/${file}`);
 }
 run('supabase/tests/run.sql');
+
+const concurrency = spawnSync(process.execPath,['scripts/test-money-concurrency.mjs'],{stdio:'inherit'});
+if(concurrency.status!==0) process.exit(concurrency.status||1);

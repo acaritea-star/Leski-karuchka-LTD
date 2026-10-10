@@ -499,12 +499,12 @@ export default function DriverHome() {
               {/* Stats row — refined */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-background-50 rounded-xl p-3 text-center">
-                  <p className="text-lg font-bold text-foreground-950 font-heading">{todayStats.trips}</p>
+                  <p className="text-lg font-bold text-foreground-950 font-heading">{todayStatsQuery.data ? todayStats.trips : '—'}</p>
                   <p className="text-[10px] text-foreground-500">{t('todays_trips')}</p>
                 </div>
                 <div className="bg-background-50 rounded-xl p-3 text-center">
                   <p className="text-lg font-bold text-foreground-950 font-heading">
-                    {todayStats.earnings.toFixed(0)}<span className="text-xs font-normal text-foreground-400"> {t('lv')}</span>
+                    {todayStatsQuery.data ? todayStats.earnings.toFixed(2) : '—'}<span className="text-xs font-normal text-foreground-400"> {t('lv')}</span>
                   </p>
                   <p className="text-[10px] text-foreground-500">{t('todays_earnings')}</p>
                 </div>
