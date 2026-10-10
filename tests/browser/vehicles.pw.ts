@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 const company='11111111-2222-4333-8444-555555555555', category='22222222-2222-4333-8444-555555555555', driver='33333333-2222-4333-8444-555555555555', driverUser='44444444-2222-4333-8444-555555555555';
 test('new-company admin saves a vehicle with its base category and driver without paid traffic', async ({ page }) => {
  const pageErrors: string[]=[]; page.on('pageerror', error => pageErrors.push(error.message));
- let writes=0; const cars: Record<string,unknown>[]=[];
+ let writes=0, legalReceipts=0; const cars: Record<string,unknown>[]=[];
  const user={id:'55555555-2222-4333-8444-555555555555',email:'synthetic-admin@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
  await page.addInitScript(user => {
   const token=[btoa(JSON.stringify({alg:'HS256'})),btoa(JSON.stringify({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})),'synthetic'].join('.');
@@ -23,6 +23,11 @@ test('new-company admin saves a vehicle with its base category and driver withou
   else if(url.pathname.endsWith('/vehicle_types')) data=[{id:category,company_id:company,name:'Стандарт',capacity:4,multiplier:1,is_active:true}];
   else if(url.pathname.endsWith('/drivers')) data=[{id:driver,user_id:driverUser,vehicle_id:cars[0]?.id??null}];
   else if(url.pathname.endsWith('/vehicles')) data=cars;
+  else if(url.pathname.endsWith('/legal_acceptances')) data=null;
+  else if(url.pathname.endsWith('/accept_legal_versions')) {
+   expect(route.request().postDataJSON().p_method).toBe('continue');
+   legalReceipts++;data='66666666-2222-4333-8444-555555555555';
+  }
   else if(url.pathname.endsWith('/save_driver_vehicle')) {
    writes++;const body=route.request().postDataJSON();
    expect(body.p_company).toBe(company);expect(body.p_driver).toBe(driver);expect(body.p_details.vehicle_type_id).toBe(category);
@@ -32,6 +37,10 @@ test('new-company admin saves a vehicle with its base category and driver withou
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data),headers:{'access-control-allow-origin':'*'}});
  });
  await page.goto('/admin/vehicles');
+ const legalNotice=page.getByRole('complementary',{name:'Условия и поверителност'});
+ await expect(legalNotice).toBeVisible();
+ await legalNotice.getByRole('button',{name:'Продължи',exact:true}).click();
+ await expect(legalNotice).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Добави автомобил',exact:true})).toBeEnabled();
  await page.getByRole('button',{name:'Добави автомобил',exact:true}).click();
  await expect(page.getByLabel('Тип',{exact:true})).toHaveValue(category);
@@ -44,5 +53,5 @@ test('new-company admin saves a vehicle with its base category and driver withou
  await expect(page.getByText('A2255KX',{exact:true})).toBeVisible();
  await expect(page.getByText('Тест Водач',{exact:true})).toBeVisible();
  await expect(page.getByText('Стандарт',{exact:true})).toBeVisible();
- expect(writes).toBe(1);expect(pageErrors).toEqual([]);
+ expect(writes).toBe(1);expect(legalReceipts).toBe(1);expect(pageErrors).toEqual([]);
 });
