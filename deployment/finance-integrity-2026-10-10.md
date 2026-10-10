@@ -36,7 +36,16 @@ The browser verifies the report version, scope, period, collection completeness 
 
 ## Test/deployment evidence
 
-Status and exact successful CI/deployment identifiers are added after verification. Tests use only the disposable localhost Supabase and blocked/mocked browser network; they do not call Google or write synthetic financial data to the live project.
+Verified source: `105efbde47936e8d4fbd24fdce30c8653e08d231`.
+
+- [Check run 38025486227](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/38025486227): lint, 407 unit/component tests, type-check/build, legal source digest, Edge Function Deno checks, Chromium/WebKit browser scenarios.
+- [Database run 38025486295](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/38025486295): all SQL suites and actual concurrent-connection checks passed.
+- The 506-entry export plus paged-report checks took 64 ms in the disposable test database. This is a small synthetic check, not a production-scale load guarantee.
+- Production migration `20261010045324_financial_posting_integrity` was applied successfully at 2026-10-10 04:53 UTC. All six deployed function body hashes match the tested migration. Anonymous execution is denied and the privileged write core remains inaccessible to authenticated clients.
+- Existing financial entry count was zero before deployment. No synthetic financial data was written to production.
+- Advisor findings remain on pre-existing schema areas; the deployment does not claim a warning-free project. The financial table's pre-existing missing actor foreign-key index remains a performance advisory for future actor deletion workloads; current report indexes and amounts were not altered.
+
+The first database attempt stopped on missing IDs in synthetic volume fixtures; this was corrected and the entire suite rerun successfully. The financial calculation and permission scenarios had already passed before that fixture insertion. Tests use only the disposable localhost Supabase and blocked/mocked browser network; they do not call Google or write synthetic financial data to the live project.
 
 Coverage includes cross-month reversals, confirmed corrections, proof bypass attempts, rights/isolation, exact cents, Sofia/DST boundaries, 506-entry export and pagination, refusal above the export cap, 12 concurrent retries and a same-ride race, lost-response recovery and CSV download in Chromium/WebKit.
 
