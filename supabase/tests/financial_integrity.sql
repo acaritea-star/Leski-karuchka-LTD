@@ -112,10 +112,10 @@ BEGIN
  EXECUTE 'RESET ROLE';
  UPDATE public.driver_money_entries SET recorded_at='2026-10-03 12:00+03' WHERE id=replacement;
  -- Modest synthetic volume: test exact cents and complete multi-page export.
- INSERT INTO public.driver_money_entries(company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
- SELECT cid,did,duid,duid,'expense',0.01,'Synthetic cent '||n,'2026-10-03 13:00+03'::timestamptz+n*interval '1 millisecond' FROM generate_series(1,500) n;
- INSERT INTO public.driver_money_entries(company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
- VALUES(cid,did2,duid2,duid2,'income',25.35,'External ride','2026-10-03 14:00+03');
+ INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
+ SELECT gen_random_uuid(),cid,did,duid,duid,'expense',0.01,'Synthetic cent '||n,'2026-10-03 13:00+03'::timestamptz+n*interval '1 millisecond' FROM generate_series(1,500) n;
+ INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
+ VALUES(gen_random_uuid(),cid,did2,duid2,duid2,'income',25.35,'External ride','2026-10-03 14:00+03');
  PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_uid,'role','authenticated')::text,true);
  EXECUTE 'SET LOCAL ROLE authenticated';
  measured_at:=clock_timestamp();
@@ -133,8 +133,8 @@ BEGIN
 
  -- DST changes still define local midnight correctly. These four cents must
  -- split as one before October, two in October, one after October.
- INSERT INTO public.driver_money_entries(company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
- SELECT cid,did2,duid2,duid2,'expense',0.01,'Sofia boundary',t FROM unnest(ARRAY[
+ INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
+ SELECT gen_random_uuid(),cid,did2,duid2,duid2,'expense',0.01,'Sofia boundary',t FROM unnest(ARRAY[
  '2026-09-30 20:59:59+00'::timestamptz,'2026-09-30 21:00:00+00'::timestamptz,
  '2026-10-31 21:59:59+00'::timestamptz,'2026-10-31 22:00:00+00'::timestamptz]) t;
  EXECUTE 'SET LOCAL ROLE authenticated';
@@ -143,8 +143,8 @@ BEGIN
  OR (result#>>'{balance,closing}')::numeric<>25.32 THEN RAISE EXCEPTION 'FAIL Sofia/DST bounds'; END IF;
  EXECUTE 'RESET ROLE';
  -- An export over the explicit cap must fail, never silently omit lines.
- INSERT INTO public.driver_money_entries(company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
- SELECT cid,did2,duid2,duid2,'expense',0.01,'Export bound '||n,'2026-10-04 12:00+03' FROM generate_series(1,10000) n;
+ INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,note,recorded_at)
+ SELECT gen_random_uuid(),cid,did2,duid2,duid2,'expense',0.01,'Export bound '||n,'2026-10-04 12:00+03' FROM generate_series(1,10000) n;
  EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM pg_temp.finance_denied(format('SELECT public.accounting_export(''2026-10-01'',''2026-11-01'',%L)',cid));
  EXECUTE 'RESET ROLE';
