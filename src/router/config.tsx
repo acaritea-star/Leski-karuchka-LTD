@@ -10,6 +10,7 @@ import LandingHome from '@/pages/landing/home/page';
 // marketing pages; the heavy customer/driver/admin code never loads for visitors).
 const AboutPage = lazy(() => import('@/pages/landing/about/page'));
 const PricingPage = lazy(() => import('@/pages/landing/pricing/page'));
+const CompanyPartnerPage = lazy(() => import('@/pages/landing/company-partner/page'));
 const DriverJoinPage = lazy(() => import('@/pages/landing/driver-join/page'));
 const ContactPage = lazy(() => import('@/pages/landing/contact/page'));
 const TermsPage = lazy(() => import('@/pages/landing/terms/page'));
@@ -65,6 +66,7 @@ const routes: RouteObject[] = [
       { index: true, element: <LandingHome /> },
       { path: 'about', element: <AboutPage /> },
       { path: 'pricing', element: <PricingPage /> },
+      { path: 'company-partner', element: <CompanyPartnerPage /> },
       { path: 'driver-join', element: <DriverJoinPage /> },
       { path: 'contact', element: <ContactPage /> },
       { path: 'novini', element: <NewsListPage /> },

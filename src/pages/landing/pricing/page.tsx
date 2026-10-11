@@ -23,6 +23,11 @@ export default function PricingPage() {
             </article>
           </Reveal>)}
         </div>
+        <div className="mt-10 rounded-2xl border border-background-200 bg-white p-6 md:p-8">
+          <h2 className="font-heading text-xl font-semibold text-foreground-950">Имаш таксиметрова фирма?</h2>
+          <p className="mt-3 text-base leading-relaxed text-foreground-700">Такса за обслужване към Лески Каручка: 8–12% за завършените и платени курсове, доведени от платформата. По-голям оборот, по-нисък договорен процент.</p>
+          <Link to="/company-partner" className="mt-4 inline-block font-semibold text-primary-700 underline">Стани фирма партньор — виж условията</Link>
+        </div>
         <div className="text-center mt-10">
           <Link to="/app" className="inline-block rounded-full bg-primary-600 px-6 py-3 text-white font-semibold">{t('landing.nav_order')}</Link>
           <p className="mt-5 text-sm text-foreground-700">

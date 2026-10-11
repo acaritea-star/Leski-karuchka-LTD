@@ -16,7 +16,13 @@ async function session(page: Page, id: string) {
   return user;
 }
 async function train(page: Page) {
-  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Продължи', exact: true }).click();
+  for (let i = 0; i < document.steps.length - 1; i++) {
+    if (document.steps[i].id === 'service-fee') {
+      await expect(page.getByRole('heading', { name: 'Как работи таксата 8–12%' })).toBeVisible();
+      await expect(page.getByText(/Пример: при 100 € платен оборот/)).toBeVisible();
+    }
+    await page.getByRole('button', { name: 'Продължи', exact: true }).click();
+  }
   await page.getByRole('button', { name: 'Към кратката проверка' }).click();
   await page.getByRole('radio', { name: 'Не. Държа приложението отворено и проверявам връзката и GPS.' }).check();
   await page.getByRole('radio', { name: 'Не. Записвам реалното плащане и го сверявам с документите.' }).check();

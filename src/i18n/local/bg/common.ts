@@ -408,6 +408,7 @@ export default {
     nav_about: 'За нас',
     nav_pricing: 'Цени',
     nav_driver: 'Стани шофьор',
+    nav_partner: 'Фирми',
     nav_contact: 'Контакти',
     nav_news: 'Новини',
     nav_login: 'Вход',

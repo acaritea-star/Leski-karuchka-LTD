@@ -38,7 +38,7 @@ export default function DriverPreparationForm({ materials, acceptPreparation, on
         <p className="text-sm text-foreground-600">Записана на {new Date(receipt.accepted_at).toLocaleString('bg-BG')}. Фирмата може да продължи проверката на документите и автомобила.</p>
         {next}
       </div> : <>
-        <p className="text-sm text-foreground-600">Около 3 минути. Премини петте теми и отговори на трите въпроса. Приемането е лично; фирмата не може да го направи вместо теб.</p>
+        <p className="text-sm text-foreground-600">Няколко минути. Теми: {d.steps.length}. Въпроси: {d.questions.length}. Приемането е лично; фирмата не може да го направи вместо теб.</p>
         <ol className="flex gap-2" aria-label="Напредък на обучението">{d.steps.map((s, i) => <li key={s.id} className="flex-1">
           <span className={`block h-1 rounded-full ${i <= step ? 'bg-primary-500' : 'bg-background-200'}`} aria-current={i === step ? 'step' : undefined}><span className="sr-only">{s.title}</span></span>
         </li>)}</ol>

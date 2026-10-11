@@ -1,10 +1,9 @@
 {
-  "termsVersion": "2026-10-09-driver.1",
-  "trainingVersion": "2026-10-09.1",
-  "sha256": "5f4e2d7898ff8ca7197dc7929453db805b77cd88b501f8e8fc6a62f1f46f6d53",
+  "termsVersion": "2026-10-11-driver.1",
+  "trainingVersion": "2026-10-11.1",
+  "sha256": "f2f994314fedf8d908b2ea1bbaa40268bc2ba58f4492ea6c066194930e4fd367",
   "source": "src/config/driverPreparation.json",
-  "migration": "20261009193230_driver_preparation_and_policy_receipts.sql",
+  "migration": "20261011080142_partner_service_fee_training.sql",
   "legalReleaseApproved": false,
-  "verifiedSourceCommit": "e11339c23c4b1bda9066e84e1358163792a13edf",
-  "databaseApplied": true
+  "databaseApplied": false
 }

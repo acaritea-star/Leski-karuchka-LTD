@@ -46,6 +46,7 @@ ROLLBACK;
 -- Independent suites own their rollback-only transactions.
 \ir driver_verification.sql
 \ir driver_preparation.sql
+\ir driver_preparation_version_history.sql
 \ir unified_driver_onboarding.sql
 \ir pwa_accounting_legal.sql
 \ir audit_lifecycle.sql

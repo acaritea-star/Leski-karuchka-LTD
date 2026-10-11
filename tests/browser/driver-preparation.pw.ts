@@ -42,7 +42,13 @@ test('driver completes training with one explicit acceptance and recovers a lost
   });
   await page.goto('/driver/preparation');
   await expect(page.getByRole('heading', { name: 'Подготовка за шофьори' })).toBeVisible();
-  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Продължи', exact: true }).click();
+  for (let i = 0; i < document.steps.length - 1; i++) {
+    if (document.steps[i].id === 'service-fee') {
+      await expect(page.getByRole('heading', { name: 'Как работи таксата 8–12%' })).toBeVisible();
+      await expect(page.getByText(/Пример: при 100 € платен оборот/)).toBeVisible();
+    }
+    await page.getByRole('button', { name: 'Продължи', exact: true }).click();
+  }
   await page.getByRole('button', { name: 'Към кратката проверка' }).click();
   const accept = page.getByRole('button', { name: 'Приеми условията и завърши подготовката' });
   await expect(accept).toBeDisabled();

@@ -408,6 +408,7 @@ export default {
     nav_about: 'About',
     nav_pricing: 'Pricing',
     nav_driver: 'Become a Driver',
+    nav_partner: 'Companies',
     nav_contact: 'Contact',
     nav_news: 'News',
     nav_login: 'Sign in',

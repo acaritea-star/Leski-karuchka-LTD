@@ -33,6 +33,7 @@ export default function LandingLayout() {
     { to: '/about', label: t('landing.nav_about') },
     { to: '/pricing', label: t('landing.nav_pricing') },
     { to: '/driver-join', label: t('landing.nav_driver') },
+    { to: '/company-partner', label: t('landing.nav_partner') },
     { to: '/novini', label: t('landing.nav_news') },
     { to: '/contact', label: t('landing.nav_contact') },
   ];
@@ -56,7 +57,7 @@ export default function LandingLayout() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-9">
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-7">
             {links.map((link) => (
               <NavLink
                 key={link.to}

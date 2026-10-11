@@ -48,6 +48,12 @@ function clearJsonLd() {
   document.head.querySelectorAll('script[id^="seo-jsonld-"]').forEach((el) => el.remove());
 }
 
+const managedSelector = [
+  ...['description', 'robots', 'twitter:card', 'twitter:title', 'twitter:description', 'twitter:image'].map(key => `meta[name="${key}"]`),
+  ...['og:title', 'og:description', 'og:url', 'og:type', 'og:site_name', 'og:locale', 'og:image', 'article:published_time', 'article:modified_time', 'article:author'].map(key => `meta[property="${key}"]`),
+  'link[rel="canonical"]', 'script[id^="seo-jsonld-"]',
+].join(',');
+
 /**
  * Client-side SEO head manager for the SPA. Sets title, meta description,
  * canonical, Open Graph, Twitter card and JSON-LD structured data.
@@ -60,6 +66,11 @@ function clearJsonLd() {
 export function useDocumentHead(head: SeoHead | null) {
   useEffect(() => {
     if (!head) return;
+
+    // A route owns its metadata only while mounted. Restore the preceding head
+    // when navigating to public pages which still use the static site defaults.
+    const previousTitle = document.title;
+    const previousNodes = [...document.head.querySelectorAll(managedSelector)].map(node => node.cloneNode(true));
 
     document.title = head.title;
 
@@ -90,5 +101,11 @@ export function useDocumentHead(head: SeoHead | null) {
     if (head.jsonLd && head.jsonLd.length) {
       head.jsonLd.forEach((data, i) => setJsonLd(`seo-jsonld-${i}`, data));
     }
+
+    return () => {
+      document.head.querySelectorAll(managedSelector).forEach(node => node.remove());
+      previousNodes.forEach(node => document.head.appendChild(node));
+      document.title = previousTitle;
+    };
   }, [head]);
 }

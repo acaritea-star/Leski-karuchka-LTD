@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useFormSubmit } from '@/pages/landing/components/useFormSubmit';
@@ -8,6 +9,8 @@ const CONTACT_FORM_URL = 'https://readdy.ai/api/form/d9urfm1kngcel2k3j9e0';
 
 export default function ContactPage() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const partnerInquiry = searchParams.get('subject') === 'partner';
   const { status, errorMsg, submit } = useFormSubmit(CONTACT_FORM_URL, 'company_alt');
 
   const infoCards = [
@@ -132,15 +135,18 @@ export default function ContactPage() {
                         {t('landing.contact_form_subject')}
                       </label>
                       <select
+                        aria-label={t('landing.contact_form_subject')}
+                        key={partnerInquiry ? 'partner' : 'general'}
                         name="subject"
                         required
-                        defaultValue=""
+                        defaultValue={partnerInquiry ? 'partner' : ''}
                         className="w-full px-4 py-3 rounded-lg border border-background-200 bg-background-50 text-foreground-950 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/15 transition-all"
                       >
                         <option value="" disabled>
                           —
                         </option>
                         <option value="order">Поръчка</option>
+                        <option value="partner">Фирмено партньорство</option>
                         <option value="question">Въпрос</option>
                         <option value="issue">Проблем с пътуване</option>
                         <option value="other">Друго</option>
