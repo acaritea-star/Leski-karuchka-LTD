@@ -2998,3 +2998,22 @@ export const Constants = {
       document_type: [
         "license",
         "id_card",
+        "insurance",
+        "vehicle_registration",
+      ],
+      driver_status: ["available", "busy", "offline"],
+      payment_method: ["cash", "card", "online"],
+      payment_status: ["pending", "paid", "refunded"],
+      request_status: [
+        "pending",
+        "accepted",
+        "arrived",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      transaction_status: ["pending", "completed", "failed", "refunded"],
+      user_role: ["CUSTOMER", "DRIVER", "COMPANY_ADMIN", "SUPER_ADMIN"],
+    },
+  },
+} as const
