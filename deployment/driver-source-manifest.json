@@ -3,7 +3,8 @@
   "trainingVersion": "2026-10-11.1",
   "sha256": "f2f994314fedf8d908b2ea1bbaa40268bc2ba58f4492ea6c066194930e4fd367",
   "source": "src/config/driverPreparation.json",
-  "migration": "20261011080142_partner_service_fee_training.sql",
+  "migration": "20261011081118_partner_service_fee_training.sql",
   "legalReleaseApproved": false,
-  "databaseApplied": false
+  "databaseApplied": true,
+  "verifiedSourceCommit": "3563ac0883b3a2fd0177dab221ee509b4f544d49"
 }
