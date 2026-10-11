@@ -43,7 +43,7 @@ DECLARE before_row jsonb;after_row jsonb;r public.taxi_requests;
 BEGIN
  SELECT to_jsonb(t) INTO before_row FROM public.taxi_requests t WHERE id=(SELECT request FROM test_ids);
  r:=public.accept_taxi_request((SELECT request FROM test_ids));
- IF r.status<>expected THEN RAISE EXCEPTION 'FAIL retry returned wrong phase: %',r.status; END IF;
+ IF r.id IS DISTINCT FROM (SELECT request FROM test_ids) OR r.status::text IS DISTINCT FROM expected THEN RAISE EXCEPTION 'FAIL retry returned wrong phase: %',r.status; END IF;
  r:=public.accept_taxi_request((SELECT request FROM test_ids));
  SELECT to_jsonb(t) INTO after_row FROM public.taxi_requests t WHERE id=(SELECT request FROM test_ids);
  IF before_row IS DISTINCT FROM after_row THEN RAISE EXCEPTION 'FAIL retry rewrote ride'; END IF;
