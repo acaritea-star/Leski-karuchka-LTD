@@ -104,7 +104,7 @@ test('company admin reviews files and verifies a complete package with one actio
       else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Тестова фирма', is_active: true }];
       else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
       else if (url.pathname.endsWith('/driver_applications')) data = verified ? [] : [a];
-      else if (url.pathname.endsWith('/drivers')) data = verified ? [{ id: driver, user_id: account, company_id: company, is_verified: true, is_online: false, total_trips: 0, rating: 5, document_verification_required: true }] : [];
+      else if (url.pathname.endsWith('/company_driver_page')) data = { total: verified ? 1 : 0, rows: verified ? [{ id: driver, user_id: account, company_id: company, is_verified: true, is_online: false, online_now: false, gps_received_at: null, gps_position_at: null, total_trips: 0, rating: 5, document_verification_required: true, first_name: 'Тест', last_name: 'Водач' }] : [] };
       else if (url.pathname.endsWith('/vehicle_types')) data = [{ id: category, name: 'Стандарт' }];
       else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Тестова фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: receipt() } };
       else if (url.pathname.includes('/storage/v1/object/sign/')) data = { signedURL: '/object/sign/driver-documents/fixture.pdf?token=synthetic' };

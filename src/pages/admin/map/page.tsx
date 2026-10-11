@@ -6,6 +6,7 @@ import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { BULGARIA_CENTER } from '@/lib/geo';
+import { useFleetClock } from '@/hooks/useFleetClock';
 
 
 const ONLINE_COLOR = '#0d9488';
@@ -30,27 +31,24 @@ export default function AdminMap() {
 
 function CompanyMap() {
   const { companyId, companyName } = useAdminCompany();
-  const [, tick] = useState(0);
+  const now = useFleetClock();
   const [mapError, setMapError] = useState('');
   const query = useQuery({
     queryKey: ['admin-fleet', companyId],
     queryFn: ({ signal }) => loadFleet(companyId!, signal),
     enabled: !!companyId, refetchInterval: 10_000, refetchOnWindowFocus: true, retry: 1,
   });
-  useEffect(() => {
-    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') tick(value => value + 1); }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-  const drivers = (query.data?.rows ?? []).map(driver => ({ ...driver, is_online: fleetDriverOnline(driver) }));
+  const drivers = (query.data?.rows ?? []).map(driver => ({ ...driver, is_online: fleetDriverOnline(driver, now) }));
   const loading = query.isLoading;
   const error = mapError || (query.isError ? 'Локациите не се обновиха. Показаните позиции може да са остарели.' : '');
-  const fetchDrivers = () => { setMapError(''); void query.refetch(); tick(value => value + 1); };
+  const fetchDrivers = () => { setMapError(''); void query.refetch(); };
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef(new Map<string, { marker: google.maps.Marker; lat: number; lng: number; online: boolean; title: string }>());
   const framed = useRef(false);
   useEffect(() => {
+    if (!companyId) return;
     let cancelled = false;
     void loadGoogleMaps().then(() => {
       if (cancelled || !mapContainerRef.current) return;
@@ -67,7 +65,7 @@ function CompanyMap() {
         const existing = markersRef.current.get(driver.id);
         if (existing) {
           if (existing.lat !== pos.lat || existing.lng !== pos.lng) existing.marker.setPosition(pos);
-          if (existing.online !== driver.is_online) existing.marker.setIcon(driverIcon(driver.is_online));
+          if (existing.online !== driver.is_online) { existing.marker.setIcon(driverIcon(driver.is_online)); existing.marker.setZIndex(driver.is_online ? 10 : 1); }
           if (existing.title !== title) existing.marker.setTitle(title);
           Object.assign(existing, { lat: pos.lat, lng: pos.lng, online: driver.is_online, title });
         } else {
@@ -87,7 +85,7 @@ function CompanyMap() {
       }
     }).catch(() => { if (!cancelled) setMapError('Картата не се зареди. Проверете връзката и опитайте отново.'); });
     return () => { cancelled = true; };
-  }, [drivers]);
+  }, [drivers, companyId]);
   useEffect(() => {
     const markers = markersRef.current;
     return () => { markers.forEach(item => item.marker.setMap(null)); markers.clear(); };

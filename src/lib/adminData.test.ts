@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 vi.mock('./supabase', () => ({ supabase: {} }));
-import { parseCustomers, parseFleet, fleetDriverOnline } from './adminData';
+import { parseCustomers, parseFleet, fleetDriverOnline, parseAdminDrivers, adminDriverOnline } from './adminData';
 const customer = { id: 'customer', first_name: 'Иван', last_name: '', phone: null, avatar_url: null, created_at: '2026-10-08T01:00:00Z', totalTrips: 1201, totalSpent: 1215 };
 const driver = { id: 'driver', first_name: 'Иван', last_name: '', latitude: 43.2, longitude: 25.6, is_online: true, updated_at: new Date().toISOString(), position_at: new Date().toISOString() };
 it('accepts exact customer totals above the REST row cap', () => {
@@ -14,3 +14,23 @@ it('does not present an old GPS fix with a recent heartbeat as online', () => {
   expect(fleetDriverOnline({ ...driver, is_online: false })).toBe(false);
 });
 it.each([{ ...driver, latitude: NaN }, { ...driver, longitude: 181 }, { ...driver, position_at: 'wrong' }, { ...driver, is_online: 'yes' }])('rejects invalid fleet data', row => expect(() => parseFleet({ rows: [row], total: 1 })).toThrow());
+it('keeps a legacy location without a device timestamp visible as offline', () => {
+  const row = parseFleet({ rows: [{ ...driver, position_at: null }], total: 1 }).rows[0];
+  expect(fleetDriverOnline(row)).toBe(false);
+});
+const adminDriver = { id: 'driver', user_id: 'user', company_id: 'firm', first_name: 'Иван', last_name: '', is_online: true,
+  online_now: true, is_verified: true, document_verification_required: false, rating: 4.5, total_trips: 0,
+  gps_received_at: driver.updated_at, gps_position_at: driver.position_at };
+it('accepts bounded company driver pages with exact totals', () => {
+  expect(parseAdminDrivers({ rows: [adminDriver], total: 1201 }, 'firm')).toEqual({ rows: [adminDriver], total: 1201 });
+});
+it.each([{ ...adminDriver, company_id: 'foreign' }, { ...adminDriver, online_now: 'yes' }, { ...adminDriver, gps_position_at: 'invalid' }, { ...adminDriver, rating: 6 }])('rejects foreign or unconfirmed driver rows', row => {
+  expect(() => parseAdminDrivers({ rows: [row], total: 1 }, 'firm')).toThrow();
+});
+it('expires an online driver locally when updates stop', () => {
+  const now = Date.parse(adminDriver.gps_position_at);
+  expect(adminDriverOnline(adminDriver, now)).toBe(true);
+  expect(adminDriverOnline(adminDriver, now + 45_000)).toBe(false);
+  expect(adminDriverOnline({ ...adminDriver, gps_position_at: null }, now)).toBe(false);
+  expect(adminDriverOnline({ ...adminDriver, online_now: false }, now)).toBe(false);
+});

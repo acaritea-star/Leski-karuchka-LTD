@@ -41,7 +41,7 @@ export default function PartnerEntry({ kind }: { kind: PartnerKind | 'any' }) {
       <p role="alert" className="text-sm text-foreground-600">{problem}</p><p className="text-sm break-all">{user?.email}</p>
       <button onClick={() => { latch.current = false; setRedirectError(''); void query.refetch(); }} className="text-primary-700 underline">Провери отново</button>
       <button onClick={logout} disabled={pending} className="block w-full rounded-xl bg-primary-500 text-white px-4 py-3 disabled:opacity-60">{pending ? 'Излизане…' : 'Влез с друг акаунт'}</button>
-      <Link to="/contact" className="block underline">Свържи се с нас</Link><Link to="/customer/home" className="block text-xs underline">Към клиентския профил</Link>
+      <Link to="/contact" className="block underline">Свържи се с нас</Link><Link to="/app" className="block text-xs underline">Към твоя профил</Link>
     </> : <p role="status">Проверяваме достъпа…</p>}
     {logoutError && <p role="alert">{logoutError}</p>}
   </div></main>;

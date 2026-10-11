@@ -58,3 +58,4 @@ ROLLBACK;
 \ir company_vehicle_category.sql
 
 \ir partner_invitations.sql
+\ir tenant_reliability.sql
