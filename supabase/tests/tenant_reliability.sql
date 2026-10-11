@@ -4,7 +4,7 @@ SET LOCAL statement_timeout='30s';
 CREATE TEMP TABLE tenant_test AS SELECT gen_random_uuid() a,gen_random_uuid() b,gen_random_uuid() admin_a,
  gen_random_uuid() admin_b,gen_random_uuid() root,gen_random_uuid() user_a,gen_random_uuid() user_b,
  gen_random_uuid() candidate_a,gen_random_uuid() candidate_b,gen_random_uuid() unconfirmed,
- gen_random_uuid() type_a,gen_random_uuid() type_b,gen_random_uuid() car_a,gen_random_uuid() car_b,
+ gen_random_uuid() orphan,gen_random_uuid() orphan_invite,gen_random_uuid() type_a,gen_random_uuid() type_b,gen_random_uuid() car_a,gen_random_uuid() car_b,
  gen_random_uuid() invite_a,gen_random_uuid() invite_b,gen_random_uuid() accepted_a;
 GRANT SELECT ON tenant_test TO authenticated,anon;
 CREATE FUNCTION pg_temp.tenant_must_deny(q text) RETURNS void LANGUAGE plpgsql AS $fn$
@@ -16,7 +16,8 @@ INSERT INTO public.companies(id,name,slug,setup_completed_at)
  SELECT id,'Tenant regression','tenant-test-'||id,now() FROM tenant_test,LATERAL unnest(ARRAY[a,b]) ids(id);
 INSERT INTO auth.users(id,email,email_confirmed_at)
  SELECT id,'tenant-'||id||'@example.invalid',CASE WHEN id=unconfirmed THEN NULL ELSE now() END
- FROM tenant_test,LATERAL unnest(ARRAY[admin_a,admin_b,root,user_a,user_b,candidate_a,candidate_b,unconfirmed]) ids(id);
+ FROM tenant_test,LATERAL unnest(ARRAY[admin_a,admin_b,root,user_a,user_b,candidate_a,candidate_b,unconfirmed,orphan]) ids(id);
+UPDATE public.profiles SET role='DRIVER',company_id=NULL WHERE id=(SELECT orphan FROM tenant_test);
 UPDATE public.profiles SET role='SUPER_ADMIN' WHERE id=(SELECT root FROM tenant_test);
 UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=(SELECT a FROM tenant_test) WHERE id=(SELECT admin_a FROM tenant_test);
 UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=(SELECT b FROM tenant_test) WHERE id=(SELECT admin_b FROM tenant_test);
@@ -38,6 +39,7 @@ SELECT set_config('request.jwt.claims',json_build_object('sub',root,'role','auth
 SET LOCAL ROLE authenticated;
 SELECT public.create_partner_invitation(invite_a,'driver','tenant-'||candidate_a||'@example.invalid',a) FROM tenant_test;
 SELECT public.create_partner_invitation(invite_b,'driver','tenant-'||candidate_b||'@example.invalid',b) FROM tenant_test;
+SELECT public.create_partner_invitation(orphan_invite,'driver','tenant-'||orphan||'@example.invalid',a) FROM tenant_test;
 DO $test$ BEGIN
  IF public.resolve_partner_access('driver',(SELECT invite_a FROM tenant_test))->>'status'<>'denied'
  OR public.resolve_partner_access('any',NULL)->>'destination'<>'/admin/companies' THEN RAISE EXCEPTION 'FAIL explicit foreign link or super role'; END IF;
@@ -71,7 +73,10 @@ DO $test$ BEGIN
 END $test$;
 RESET ROLE;
 -- A recent heartbeat cannot refresh an old device fix.
+-- Seed a naturally expired fix only in this session; restore triggers before every authorization assertion.
+SET LOCAL session_replication_role='replica';
 UPDATE public.driver_locations SET position_at=now()-interval '60 seconds' WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT user_a FROM tenant_test));
+SET LOCAL session_replication_role='origin';
 SET LOCAL ROLE authenticated;
 DO $test$ BEGIN
  IF (public.company_dashboard((SELECT a FROM tenant_test))#>>'{stats,onlineDrivers}')::int<>0
@@ -103,6 +108,18 @@ RESET ROLE;
 SELECT set_config('request.jwt.claims',json_build_object('sub',unconfirmed,'role','authenticated')::text,true) FROM tenant_test;
 SET LOCAL ROLE authenticated;
 DO $test$ BEGIN IF public.resolve_partner_access('driver',(SELECT invite_a FROM tenant_test))->>'reason'<>'missing_email' THEN RAISE EXCEPTION 'FAIL unconfirmed email'; END IF; END $test$;
+RESET ROLE;
+SELECT set_config('request.jwt.claims',json_build_object('sub',orphan,'role','authenticated')::text,true) FROM tenant_test;
+SET LOCAL ROLE authenticated;
+DO $test$ DECLARE r jsonb;BEGIN
+ IF public.resolve_partner_access('driver',(SELECT invite_a FROM tenant_test))->>'status'<>'denied'
+ OR (SELECT role FROM public.profiles WHERE id=(SELECT orphan FROM tenant_test))<>'DRIVER' THEN RAISE EXCEPTION 'FAIL orphan foreign invitation changes role'; END IF;
+ r:=public.resolve_partner_access('driver',(SELECT orphan_invite FROM tenant_test));
+ IF r->>'status'<>'preparation' OR r->>'role'<>'CUSTOMER'
+ OR (SELECT role FROM public.profiles WHERE id=(SELECT orphan FROM tenant_test))<>'CUSTOMER'
+ OR EXISTS(SELECT 1 FROM public.drivers WHERE user_id=(SELECT orphan FROM tenant_test)) THEN RAISE EXCEPTION 'FAIL orphan recovery or premature verification'; END IF;
+ PERFORM public.begin_driver_onboarding((SELECT a FROM tenant_test),'Recovered driver','+359000000000','1–3',false,'');
+END $test$;
 RESET ROLE;
 UPDATE public.profiles SET is_active=false WHERE id=(SELECT admin_a FROM tenant_test);
 SELECT set_config('request.jwt.claims',json_build_object('sub',admin_a,'role','authenticated')::text,true) FROM tenant_test;

@@ -4,7 +4,11 @@ An explicit invitation is checked against the confirmed email in `auth.users`
 before redirecting an existing company administrator, driver or platform administrator.
 A different account, wrong kind, revoked/expired pending invitation or outdated accepted
 membership receives a denial without changing its existing role. `/app` still opens
-that account's authorized panel. Accepted membership survives the invitation's initial
+that account's authorized panel. A legacy DRIVER label without any driver record
+or company is recovered only on acceptance of a confirmed personal driver invitation;
+it becomes a candidate and must complete normal preparation/verification. No existing
+driver membership or approved application is reassigned. Unassigned firm administrators
+can accept a platform administrator's invitation to the intended existing firm. Accepted membership survives the invitation's initial
 14-day pending window; this release does not revoke established memberships by expiry.
 
 Firm driver lists use an authorized, RLS-preserving `company_driver_page` RPC: one
@@ -30,3 +34,5 @@ verification writes and refresh. Browser mocks prevent paid Google calls and ema
 republish the matching previous frontend when using it. It deletes no business records.
 
 See Supabase's [RLS documentation](https://supabase.com/docs/guides/database/postgres/row-level-security).
+
+Expired GPS fixtures use transaction-local replication mode for one synthetic timestamp update, restored before authorization checks. No production GPS guard is removed.

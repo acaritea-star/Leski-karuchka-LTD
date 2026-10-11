@@ -2,7 +2,7 @@ SET LOCAL lock_timeout='2s';
 
 CREATE OR REPLACE FUNCTION private.resolve_partner_access(p_kind text,p_invitation uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
-DECLARE u uuid:=auth.uid(); p public.profiles; i public.partner_invitations; e text; c uuid; a uuid; destination text;
+DECLARE u uuid:=auth.uid(); p public.profiles; i public.partner_invitations; e text; c uuid; a uuid; destination text; recover_orphan boolean:=false;
 BEGIN
  IF p_kind IS NULL OR p_kind NOT IN ('any','company','driver') THEN RAISE EXCEPTION 'Невалиден вход.'; END IF;
  SELECT * INTO p FROM public.profiles WHERE id=u FOR UPDATE;
@@ -23,7 +23,24 @@ BEGIN
  END IF;
  -- Global administrators never become company administrators through an invitation.
  IF p.role='SUPER_ADMIN' THEN RETURN jsonb_build_object('status','ready','destination','/admin/companies','role',p.role,'company_id',p.company_id); END IF;
- IF p.role='DRIVER' THEN RETURN jsonb_build_object('status','ready','destination','/driver/home','role',p.role,'company_id',p.company_id); END IF;
+ IF p.role='DRIVER' THEN
+  IF EXISTS(SELECT 1 FROM public.drivers WHERE user_id=u) THEN
+   RETURN jsonb_build_object('status','ready','destination','/driver/home','role',p.role,'company_id',p.company_id);
+  END IF;
+  -- A legacy role without a firm or driver record grants no driver capabilities.
+  -- Repair only through a new, confirmed personal invitation, never by guessing a firm.
+  IF p_invitation IS NULL THEN
+   SELECT * INTO i FROM public.partner_invitations WHERE email=e AND kind='driver'
+    AND (status='pending' AND expires_at>clock_timestamp() OR status='accepted' AND accepted_by=u)
+    ORDER BY (status='pending') DESC,created_at DESC LIMIT 1 FOR UPDATE;
+  END IF;
+  IF p.company_id IS NOT NULL OR p_kind='company' OR i.id IS NULL OR i.kind<>'driver'
+   OR EXISTS(SELECT 1 FROM public.driver_applications WHERE user_id=u AND status='approved') THEN
+   RETURN jsonb_build_object('status','denied','reason','driver_assignment_required',
+    'message','Шофьорският профил няма завършено фирмено назначение. Поискайте персонална покана от фирмата, за да преминете подготовката и одобрението.');
+  END IF;
+  p.role:='CUSTOMER'; recover_orphan:=true;
+ END IF;
  IF p.role='COMPANY_ADMIN' AND p.company_id IS NOT NULL THEN
   SELECT CASE WHEN setup_completed_at IS NULL THEN '/company/setup' ELSE '/admin/dashboard' END INTO destination FROM public.companies WHERE id=p.company_id;
   IF destination IS NOT NULL THEN RETURN jsonb_build_object('status','ready','destination',destination,'role',p.role,'company_id',p.company_id,'application_id',NULL,'company_name',(SELECT name FROM public.companies WHERE id=p.company_id)); END IF;
@@ -33,7 +50,7 @@ BEGIN
   IF p_kind='any' AND p_invitation IS NULL THEN RETURN jsonb_build_object('status','ready','destination','/customer/home','role',p.role); END IF;
   RETURN jsonb_build_object('status','denied','reason','missing_email','message','Този вход не предостави потвърден имейл. Използвайте Google с поканения имейл или поискайте нова покана от фирмата.');
  END IF;
- IF p_invitation IS NULL THEN
+ IF p_invitation IS NULL AND i.id IS NULL THEN
   SELECT * INTO i FROM public.partner_invitations WHERE email=e AND (p_kind='any' OR kind=p_kind)
    AND (status='pending' AND expires_at>clock_timestamp() OR status='accepted' AND accepted_by=u)
    ORDER BY (status='pending') DESC,created_at DESC LIMIT 1 FOR UPDATE;
@@ -62,6 +79,11 @@ BEGIN
    RAISE EXCEPTION 'Фирмата или профилът не е готов за тази покана.' USING ERRCODE='42501'; END IF;
   IF EXISTS(SELECT 1 FROM public.driver_applications WHERE user_id=u AND company_id<>c AND status='pending') THEN
    RAISE EXCEPTION 'Има незавършена кандидатура към друга фирма.'; END IF;
+  IF recover_orphan THEN
+   UPDATE public.profiles SET role='CUSTOMER',company_id=NULL,updated_at=clock_timestamp() WHERE id=u;
+   INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action)
+    VALUES(c,u,'profile',u,'orphan_driver_access_recovered');
+  END IF;
   SELECT id INTO a FROM public.driver_applications WHERE user_id=u AND company_id=c;
   destination:='/driver/access';
  END IF;
@@ -71,6 +93,46 @@ BEGIN
  END IF;
  RETURN jsonb_build_object('status',CASE WHEN i.kind='driver' THEN 'preparation' ELSE 'ready' END,'destination',destination,
   'role',CASE WHEN i.kind='company' THEN 'COMPANY_ADMIN' ELSE p.role::text END,'company_id',c,'application_id',a,'company_name',(SELECT name FROM public.companies WHERE id=c));
+END $fn$;
+CREATE OR REPLACE FUNCTION private.create_partner_invitation(p_id uuid,p_kind text,p_email text,p_company uuid) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE u uuid:=auth.uid(); e text:=lower(btrim(p_email)); existing public.partner_invitations; actor public.profiles;
+BEGIN
+ SELECT * INTO actor FROM public.profiles WHERE id=u;
+ IF NOT FOUND OR NOT actor.is_active OR p_id IS NULL OR p_kind NOT IN ('company','driver') OR p_kind IS NULL THEN
+  RAISE EXCEPTION 'Нямате права за тази покана.' USING ERRCODE='42501'; END IF;
+ IF (p_kind='company' AND NOT public.is_super_admin()) OR
+ (p_kind='driver' AND (p_company IS NULL OR NOT (public.is_super_admin() OR public.is_company_admin(p_company)))) THEN
+  RAISE EXCEPTION 'Нямате права за тази покана.' USING ERRCODE='42501'; END IF;
+ IF e IS NULL OR length(e)>254 OR e !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN RAISE EXCEPTION 'Въведете валиден имейл.'; END IF;
+ IF p_company IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=p_company AND setup_completed_at IS NOT NULL AND (p_kind='company' OR is_active)) THEN
+  RAISE EXCEPTION 'Първо завършете настройката на активната фирма.'; END IF;
+ -- A stable request ID makes retrying after a lost response safe.
+ PERFORM pg_advisory_xact_lock(hashtextextended('partner-invite:'||e,0));
+ SELECT * INTO existing FROM public.partner_invitations WHERE id=p_id;
+ IF FOUND THEN
+  IF (existing.created_by,existing.kind,existing.email,existing.company_id) IS DISTINCT FROM (u,p_kind,e,p_company) THEN
+   RAISE EXCEPTION 'Поканата не отговаря на тази заявка.' USING ERRCODE='42501'; END IF;
+  RETURN existing.id;
+ END IF;
+ UPDATE public.partner_invitations SET status='revoked' WHERE email=e AND status='pending' AND expires_at<=clock_timestamp();
+ SELECT * INTO existing FROM public.partner_invitations WHERE email=e AND status='pending';
+ IF FOUND THEN
+  IF (existing.kind,existing.company_id) IS DISTINCT FROM (p_kind,p_company) THEN
+   RAISE EXCEPTION 'За този имейл вече има друга активна покана.'; END IF;
+  RETURN existing.id;
+ END IF;
+ IF EXISTS(SELECT 1 FROM auth.users a JOIN public.profiles p ON p.id=a.id
+ WHERE lower(a.email)=e AND (p.role='SUPER_ADMIN' OR (p.role='DRIVER' AND NOT (p_kind='driver' AND p.company_id IS NULL
+  AND NOT EXISTS(SELECT 1 FROM public.drivers d WHERE d.user_id=p.id)
+  AND NOT EXISTS(SELECT 1 FROM public.driver_applications a WHERE a.user_id=p.id AND a.status='approved')))
+  OR (p.role='COMPANY_ADMIN' AND p.company_id IS NOT NULL))) THEN
+  RAISE EXCEPTION 'Този имейл вече има партньорски достъп. Не е създадена нова покана.'; END IF;
+ IF (SELECT count(*) FROM public.partner_invitations WHERE created_by=u AND created_at>clock_timestamp()-interval '1 hour')>=30 THEN
+  RAISE EXCEPTION 'Достигнат е лимитът за покани. Опитайте по-късно.'; END IF;
+ INSERT INTO public.partner_invitations(id,kind,email,company_id,created_by) VALUES(p_id,p_kind,e,p_company,u);
+ INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action) VALUES(p_company,u,'partner_invitation',p_id,'invitation_created');
+ RETURN p_id;
 END $fn$;
 -- Read-only tenant data; keep RLS and use a single freshness rule for all firm screens.
 CREATE FUNCTION private.fleet_online(p_online boolean,p_active boolean,p_received timestamptz,p_position timestamptz,p_now timestamptz)
@@ -176,4 +238,3 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.company_dashboard(uuid,date) FROM PUBLIC,anon,service_role;
 GRANT EXECUTE ON FUNCTION public.company_dashboard(uuid,date) TO authenticated;
-

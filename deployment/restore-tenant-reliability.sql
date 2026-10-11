@@ -130,4 +130,41 @@ GRANT EXECUTE ON FUNCTION public.company_dashboard(uuid,date) TO authenticated;
 DROP FUNCTION IF EXISTS public.company_driver_page(uuid,text,integer);
 DROP FUNCTION IF EXISTS private.fleet_online(boolean,boolean,timestamptz,timestamptz,timestamptz);
 DROP INDEX IF EXISTS public.drivers_company_created_id_idx;
+CREATE OR REPLACE FUNCTION private.create_partner_invitation(p_id uuid,p_kind text,p_email text,p_company uuid) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE u uuid:=auth.uid(); e text:=lower(btrim(p_email)); existing public.partner_invitations; actor public.profiles;
+BEGIN
+ SELECT * INTO actor FROM public.profiles WHERE id=u;
+ IF NOT FOUND OR NOT actor.is_active OR p_id IS NULL OR p_kind NOT IN ('company','driver') OR p_kind IS NULL THEN
+  RAISE EXCEPTION 'Нямате права за тази покана.' USING ERRCODE='42501'; END IF;
+ IF (p_kind='company' AND NOT public.is_super_admin()) OR
+ (p_kind='driver' AND (p_company IS NULL OR NOT (public.is_super_admin() OR public.is_company_admin(p_company)))) THEN
+  RAISE EXCEPTION 'Нямате права за тази покана.' USING ERRCODE='42501'; END IF;
+ IF e IS NULL OR length(e)>254 OR e !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN RAISE EXCEPTION 'Въведете валиден имейл.'; END IF;
+ IF p_company IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=p_company AND setup_completed_at IS NOT NULL AND (p_kind='company' OR is_active)) THEN
+  RAISE EXCEPTION 'Първо завършете настройката на активната фирма.'; END IF;
+ -- A stable request ID makes retrying after a lost response safe.
+ PERFORM pg_advisory_xact_lock(hashtextextended('partner-invite:'||e,0));
+ SELECT * INTO existing FROM public.partner_invitations WHERE id=p_id;
+ IF FOUND THEN
+  IF (existing.created_by,existing.kind,existing.email,existing.company_id) IS DISTINCT FROM (u,p_kind,e,p_company) THEN
+   RAISE EXCEPTION 'Поканата не отговаря на тази заявка.' USING ERRCODE='42501'; END IF;
+  RETURN existing.id;
+ END IF;
+ UPDATE public.partner_invitations SET status='revoked' WHERE email=e AND status='pending' AND expires_at<=clock_timestamp();
+ SELECT * INTO existing FROM public.partner_invitations WHERE email=e AND status='pending';
+ IF FOUND THEN
+  IF (existing.kind,existing.company_id) IS DISTINCT FROM (p_kind,p_company) THEN
+   RAISE EXCEPTION 'За този имейл вече има друга активна покана.'; END IF;
+  RETURN existing.id;
+ END IF;
+ IF EXISTS(SELECT 1 FROM auth.users a JOIN public.profiles p ON p.id=a.id
+ WHERE lower(a.email)=e AND (p.role IN ('SUPER_ADMIN','DRIVER') OR (p.role='COMPANY_ADMIN' AND p.company_id IS NOT NULL))) THEN
+  RAISE EXCEPTION 'Този имейл вече има партньорски достъп. Не е създадена нова покана.'; END IF;
+ IF (SELECT count(*) FROM public.partner_invitations WHERE created_by=u AND created_at>clock_timestamp()-interval '1 hour')>=30 THEN
+  RAISE EXCEPTION 'Достигнат е лимитът за покани. Опитайте по-късно.'; END IF;
+ INSERT INTO public.partner_invitations(id,kind,email,company_id,created_by) VALUES(p_id,p_kind,e,p_company,u);
+ INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action) VALUES(p_company,u,'partner_invitation',p_id,'invitation_created');
+ RETURN p_id;
+END $fn$;
 COMMIT;
