@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.11-invited-partner-access.1",
+  "release": "2026.10.11-invited-partner-access.2",
   "baseCommit": "c9907e85585264bffdf5fec2dd70b9edaa8b3970",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261009074806",
   "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "f559d704d149ef104772df1f73c4a9a9984a299d",
+  "verifiedSourceCommit": "67582911b34378fae2e02d87b6baa75ce521edad",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -32,5 +32,5 @@
   "partnerServiceFeeInfoVersion": 1,
   "partnerServiceFeeBillingEnabled": false,
   "partnerAccessMigrationVersion": "20261011172849",
-  "partnerAccessVerifiedSourceCommit": "f559d704d149ef104772df1f73c4a9a9984a299d"
+  "partnerAccessVerifiedSourceCommit": "67582911b34378fae2e02d87b6baa75ce521edad"
 }
