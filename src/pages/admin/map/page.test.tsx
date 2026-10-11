@@ -14,7 +14,7 @@ beforeEach(() => {
   api.load.mockResolvedValue({ rows: [driver], total: 1 });
   vi.stubGlobal('google', { maps: {
     Map: class { constructor() { const map = { setCenter: vi.fn(), setZoom: vi.fn(), fitBounds: vi.fn() }; api.maps.push(map); return map; } },
-    Marker: class { constructor() { const marker = { setPosition: vi.fn(), setMap: vi.fn(), setTitle: vi.fn(), setIcon: vi.fn() }; api.markers.push(marker); return marker; } },
+    Marker: class { constructor() { const marker = { setPosition: vi.fn(), setMap: vi.fn(), setTitle: vi.fn(), setIcon: vi.fn(), setZIndex: vi.fn() }; api.markers.push(marker); return marker; } },
     Size: class {}, Point: class {}, LatLngBounds: class { extend() {} },
   } });
 });

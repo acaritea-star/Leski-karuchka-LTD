@@ -2,7 +2,9 @@ import DriverVerificationStatus from '@/components/feature/DriverVerificationSta
 import { verificationKey } from '@/lib/driverVerification';
 import DriverApplications from './DriverApplications';
 import { signedDocumentUrl, workflowError } from '@/lib/driverDocuments';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useFleetClock } from '@/hooks/useFleetClock';
+import { loadAdminDrivers, adminDriverOnline, ADMIN_PAGE_SIZE, type AdminDriver } from '@/lib/adminData';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { documentExpired } from '@/lib/legalWorkflow';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 
-type DriverWithName = Tables<'drivers'> & { first_name: string; last_name: string };
+type DriverWithName = AdminDriver;
 type DocumentRow = Tables<'driver_documents'>;
 
 const DOC_LABELS: Record<string, string> = {
@@ -26,12 +28,26 @@ const DOC_LABELS: Record<string, string> = {
 
 
 export default function AdminDrivers() {
+  const { companyId } = useAdminCompany();
+  const { user } = useAuth();
+  return <CompanyDrivers key={JSON.stringify([user?.id, companyId])} />;
+}
+
+function CompanyDrivers() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { companyId, companies, companyName, loading: ctxLoading } = useAdminCompany();
 
+  const now = useFleetClock();
   const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (search.trim() === searchTerm) return;
+    const timer = setTimeout(() => { setSearchTerm(search.trim()); setPage(0); }, 300);
+    return () => clearTimeout(timer);
+  }, [search, searchTerm]);
   const [selected, setSelected] = useState<DriverWithName | null>(null);
   const [documentDates,setDocumentDates] = useState<Record<string,string>>({});
 
@@ -43,49 +59,26 @@ export default function AdminDrivers() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const driversQuery = useQuery({
-    queryKey: companyId ? queryKeys.adminDrivers(companyId) : ['drivers', 'company', 'none'],
-    queryFn: async (): Promise<DriverWithName[]> => {
-      const { data: driversRaw, error } = await withRequestTimeout(signal => supabase
-        .from('drivers')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('created_at', { ascending: false }).abortSignal(signal));
-      if (error) throw error;
-
-      const list = driversRaw ?? [];
-      const userIds = list.map((d) => d.user_id);
-
-      const profileMap: Record<string, Tables<'profiles'>> = {};
-      if (userIds.length > 0) {
-        const { data: profiles, error: profileError } = await withRequestTimeout(signal => supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds).abortSignal(signal));
-        if (profileError) throw profileError;
-        for (const p of profiles ?? []) profileMap[p.id] = p;
-      }
-
-      return list.map((d) => ({
-        ...d,
-        first_name: profileMap[d.user_id]?.first_name ?? '—',
-        last_name: profileMap[d.user_id]?.last_name ?? '',
-      }));
-    },
-    enabled: !!companyId,
+    queryKey: [...queryKeys.adminDrivers(companyId ?? 'none'), searchTerm, page],
+    queryFn: ({ signal }) => loadAdminDrivers(companyId!, searchTerm, page, signal),
+    enabled: !!companyId, staleTime: 5_000, refetchInterval: 15_000, refetchOnWindowFocus: true, retry: 1,
   });
-
-  const drivers = driversQuery.data ?? [];
+  const drivers = (driversQuery.data?.rows ?? []).map(driver => ({ ...driver, is_online: adminDriverOnline(driver, now) }));
+  const total = driversQuery.data?.total ?? 0;
+  useEffect(() => {
+    if (driversQuery.isSuccess && page > 0 && page * ADMIN_PAGE_SIZE >= total) setPage(Math.max(0, Math.ceil(total / ADMIN_PAGE_SIZE) - 1));
+  }, [driversQuery.isSuccess, page, total]);
   const error = driversQuery.error ? workflowError(driversQuery.error, 'Не успяхме да заредим шофьорите.') : '';
   const loading = driversQuery.isLoading;
 
   const documentsQuery = useQuery({
     queryKey: selected?.id ? queryKeys.driverDocuments(selected.id) : ['driver_documents', 'none'],
-    queryFn: async (): Promise<DocumentRow[]> => {
+    queryFn: async ({ signal: querySignal }): Promise<DocumentRow[]> => {
       const { data, error } = await withRequestTimeout(signal => supabase
         .from('driver_documents')
         .select('*')
         .eq('driver_id', selected!.id)
-        .order('created_at', { ascending: false }).abortSignal(signal));
+        .order('created_at', { ascending: false }).abortSignal(signal), 10_000, querySignal);
       if (error) throw error;
       return data ?? [];
     },
@@ -146,14 +139,12 @@ export default function AdminDrivers() {
     finally { setOpeningDocument(false); }
   }
 
-  const filtered = drivers.filter((d) =>
-    `${d.first_name} ${d.last_name}`.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = drivers;
 
   return (
     <AdminLayout title={t('nav_drivers')}>
       {toggleVerifyMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">{workflowError(toggleVerifyMutation.error, 'Верификацията не е потвърдена.')}</p>}
-      <p className="mb-4 text-sm text-foreground-500">Нов шофьор: от „Добави шофьор“ споделете фирмения линк. Той подготвя условията и документите; вие преглеждате и верифицирате целия пакет наведнъж. За по-ранни профили проверките остават в „Детайли“ и „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
+      <p className="mb-4 text-sm text-foreground-500">Нов шофьор: от „Добави шофьор“ поканете шофьора с личния му имейл. Той подготвя условията и документите; вие преглеждате и верифицирате целия пакет наведнъж. За по-ранни профили проверките остават в „Детайли“ и „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -173,6 +164,8 @@ export default function AdminDrivers() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Търси по име..."
+            maxLength={80}
+            aria-label="Търси шофьори"
             className="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl border border-background-200 text-sm text-foreground-950 placeholder:text-foreground-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
           />
         </div>
@@ -184,7 +177,7 @@ export default function AdminDrivers() {
           Добави шофьор
         </button>
         <div className="text-sm text-foreground-500 whitespace-nowrap">
-          {drivers.length} шофьори
+          {driversQuery.data ? total : '—'} шофьори
         </div>
       </div>
 
@@ -271,6 +264,12 @@ export default function AdminDrivers() {
         </div>
       )}
 
+      {total > ADMIN_PAGE_SIZE && <div className="flex items-center justify-between gap-3 mt-4 text-sm">
+        <button disabled={page === 0 || driversQuery.isFetching || search.trim() !== searchTerm} onClick={() => setPage(p => p - 1)} className="px-4 py-2 rounded-lg border border-background-200 disabled:opacity-50">Предишни шофьори</button>
+        <span>Страница {page + 1} от {Math.ceil(total / ADMIN_PAGE_SIZE)}</span>
+        <button disabled={(page + 1) * ADMIN_PAGE_SIZE >= total || driversQuery.isFetching || search.trim() !== searchTerm} onClick={() => setPage(p => p + 1)} className="px-4 py-2 rounded-lg border border-background-200 disabled:opacity-50">Следващи шофьори</button>
+      </div>}
+
       {/* Add Driver Modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -279,6 +278,7 @@ export default function AdminDrivers() {
             <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
               <h3 className="font-semibold text-foreground-950 font-heading">Добави нов шофьор</h3>
               <button
+                aria-label="Затвори поканите"
                 onClick={() => setShowAdd(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
               >
@@ -307,6 +307,7 @@ export default function AdminDrivers() {
                 <p className="text-xs text-foreground-500">Документи на шофьора</p>
               </div>
               <button
+                aria-label="Затвори документите"
                 onClick={() => setSelected(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
               >

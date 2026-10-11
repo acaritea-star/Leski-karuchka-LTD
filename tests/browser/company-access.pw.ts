@@ -93,7 +93,7 @@ test('company login does not turn an unassigned customer into a company administ
   await page.goto('/company/login');
   await expect(page).toHaveURL(/\/company$/);
   await expect(page.getByText(/Няма валидна покана за този акаунт/)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Към клиентския профил' })).toHaveAttribute('href', '/customer/home');
+  await expect(page.getByRole('link', { name: 'Към твоя профил' })).toHaveAttribute('href', '/app');
   expect(state.companyFilters).toHaveLength(0);
   expect(state.profileWrites).toBe(0); expect(state.companyWrites).toBe(0);
   expect(state.errors).toEqual([]); expect(state.google).toBe(0);

@@ -6,16 +6,21 @@ import { queryKeys } from '@/lib/queryKeys';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import OperationalHealth from '@/components/feature/OperationalHealth';
+import { useFleetClock } from '@/hooks/useFleetClock';
+import { GPS_STALE_MS } from '@/lib/driverLocation';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
-  const { companyId } = useAdminCompany();
+  const { companyId, loading: companyLoading } = useAdminCompany();
   const day = useSofiaDay();
+  const now = useFleetClock();
 
   const dashboardQuery = useQuery({
     queryKey: companyId ? queryKeys.adminDashboard(companyId, day) : ['dashboard', 'none'],
     queryFn: ({ signal }) => loadCompanyDashboard(companyId!, signal),
     enabled: !!companyId,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const stats = dashboardQuery.data?.stats ?? {
@@ -28,17 +33,18 @@ export default function AdminDashboard() {
   };
   const chartData = dashboardQuery.data?.chartData ?? [];
   const error = dashboardQuery.error instanceof Error ? dashboardQuery.error.message : '';
-  const loading = dashboardQuery.isLoading;
+  const loading = companyLoading || dashboardQuery.isLoading;
+  const onlineConfirmed = dashboardQuery.data && !dashboardQuery.isError && now - dashboardQuery.dataUpdatedAt < GPS_STALE_MS;
 
   const maxOrders = Math.max(1, ...chartData.map((d) => d.orders));
   const maxRevenue = Math.max(1, ...chartData.map((d) => d.revenue));
 
   const statCards = [
-    { icon: 'ri-steering-line', label: t('online_drivers'), value: String(stats.onlineDrivers), color: 'bg-primary-500' },
-    { icon: 'ri-user-star-line', label: 'Общо шофьори', value: String(stats.totalDrivers), color: 'bg-primary-500' },
-    { icon: 'ri-timer-line', label: t('active_orders'), value: String(stats.activeOrders), color: 'bg-secondary-500' },
-    { icon: 'ri-check-double-line', label: t('completed_orders'), value: String(stats.completedOrders), color: 'bg-primary-500' },
-    { icon: 'ri-close-circle-line', label: t('cancelled_orders'), value: String(stats.cancelledOrders), color: 'bg-primary-500' },
+    { icon: 'ri-steering-line', label: t('online_drivers'), value: onlineConfirmed ? String(stats.onlineDrivers) : '—', color: 'bg-primary-500' },
+    { icon: 'ri-user-star-line', label: 'Общо шофьори', value: dashboardQuery.data ? String(stats.totalDrivers) : '—', color: 'bg-primary-500' },
+    { icon: 'ri-timer-line', label: t('active_orders'), value: dashboardQuery.data ? String(stats.activeOrders) : '—', color: 'bg-secondary-500' },
+    { icon: 'ri-check-double-line', label: t('completed_orders'), value: dashboardQuery.data ? String(stats.completedOrders) : '—', color: 'bg-primary-500' },
+    { icon: 'ri-close-circle-line', label: t('cancelled_orders'), value: dashboardQuery.data ? String(stats.cancelledOrders) : '—', color: 'bg-primary-500' },
     {
       icon: 'ri-money-dollar-circle-line',
       label: t('total_revenue'),

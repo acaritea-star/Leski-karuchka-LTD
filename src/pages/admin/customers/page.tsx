@@ -19,9 +19,10 @@ function CustomerList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   useEffect(() => {
+    if (search.trim() === searchTerm) return;
     const timer = setTimeout(() => { setSearchTerm(search.trim()); setPage(0); }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, searchTerm]);
 
   const customersQuery = useQuery({
     queryKey: [...queryKeys.adminCustomers(companyId ?? 'none'), searchTerm, page],
@@ -31,6 +32,9 @@ function CustomerList() {
 
   const customers = customersQuery.data?.rows ?? [];
   const total = customersQuery.data?.total ?? 0;
+  useEffect(() => {
+    if (customersQuery.isSuccess && page > 0 && page * ADMIN_PAGE_SIZE >= total) setPage(Math.max(0, Math.ceil(total / ADMIN_PAGE_SIZE) - 1));
+  }, [customersQuery.isSuccess, page, total]);
   const error = customersQuery.error instanceof Error ? customersQuery.error.message : '';
   const loading = customersQuery.isLoading;
 
@@ -126,9 +130,9 @@ function CustomerList() {
         </div>
       )}
       {total > ADMIN_PAGE_SIZE && <div className="mt-4 flex items-center justify-between text-sm">
-        <button className="text-primary-600 disabled:opacity-40" disabled={page === 0 || customersQuery.isFetching} onClick={() => setPage(p => p - 1)}>Назад</button>
+        <button className="text-primary-600 disabled:opacity-40" disabled={page === 0 || customersQuery.isFetching || search.trim() !== searchTerm} onClick={() => setPage(p => p - 1)}>Назад</button>
         <span>Страница {page + 1} от {Math.ceil(total / ADMIN_PAGE_SIZE)}</span>
-        <button className="text-primary-600 disabled:opacity-40" disabled={(page + 1) * ADMIN_PAGE_SIZE >= total || customersQuery.isFetching} onClick={() => setPage(p => p + 1)}>Напред</button>
+        <button className="text-primary-600 disabled:opacity-40" disabled={(page + 1) * ADMIN_PAGE_SIZE >= total || customersQuery.isFetching || search.trim() !== searchTerm} onClick={() => setPage(p => p + 1)}>Напред</button>
       </div>}
     </AdminLayout>
   );

@@ -30,22 +30,30 @@ async function train(page: Page) {
   await page.getByRole('button', { name: 'Приеми условията и завърши подготовката' }).click();
 }
 
-test('invited candidate prepares a complete own-car package before any driver role, recovering a lost training reply', async ({ page, context }) => {
+for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole === 'DRIVER' ? 'orphan driver recovers through its personal invitation and' : 'invited candidate'} prepares a complete own-car package before verification, recovering a lost training reply`, async ({ page, context }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   const user = await session(page, account); let a: ReturnType<typeof app> | null = null, r: ReturnType<typeof receipt> | null = null;
   const docs: Record<string, unknown>[] = []; let accepts = 0, submits = 0, google = 0;
+  let profileRole: string = startingRole, profileWrites = 0;
   await context.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.origin === 'http://127.0.0.1:4100') return route.continue();
     if (url.origin !== 'http://127.0.0.1:54329') { if (/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(url.hostname)) google++; return route.abort(); }
     let data: unknown = [];
     if (url.pathname.endsWith('/auth/v1/user')) data = user;
-    else if (url.pathname.endsWith('/profiles')) data = { id: account, role: 'CUSTOMER', is_active: true, company_id: null, first_name: 'Тест', last_name: 'Водач', phone: '+359000000000', email: user.email };
+    else if (url.pathname.endsWith('/profiles')) {
+      if (route.request().method() !== 'GET') profileWrites++;
+      data = { id: account, role: profileRole, is_active: true, company_id: null, first_name: 'Тест', last_name: 'Водач', phone: '+359000000000', email: user.email };
+    }
     else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Поканилата фирма', is_active: true }, { id: category, name: 'Друга фирма', is_active: true }];
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
     else if (url.pathname.endsWith('/driver_applications')) data = a;
     else if (url.pathname.endsWith('/partner_invitations')) data = [];
-    else if (url.pathname.endsWith('/resolve_partner_access')) data = { status: 'preparation', destination: '/driver/access', role: 'CUSTOMER', company_id: company, company_name: 'Поканилата фирма', application_id: a?.id };
+    else if (url.pathname.endsWith('/resolve_partner_access')) {
+      expect(route.request().postDataJSON().p_invitation).toBe(application);
+      profileRole = 'CUSTOMER';
+      data = { status: 'preparation', destination: '/driver/access', role: profileRole, company_id: company, company_name: 'Поканилата фирма', application_id: a?.id };
+    }
     else if (url.pathname.endsWith('/begin_driver_onboarding')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); return route.abort(); }
     else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Поканилата фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: r } };
     else if (url.pathname.endsWith('/accept_application_preparation')) { accepts++; r = receipt(); a!.onboarding_revision++; return route.abort(); }
@@ -83,6 +91,7 @@ test('invited candidate prepares a complete own-car package before any driver ro
   await page.getByRole('button', { name: 'Изпрати целия пакет за проверка' }).click();
   await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
   await page.reload(); await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
+  expect(profileRole).toBe('CUSTOMER'); expect(profileWrites).toBe(0);
   expect(accepts).toBe(1); expect(submits).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });
 
@@ -104,7 +113,7 @@ test('company admin reviews files and verifies a complete package with one actio
       else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Тестова фирма', is_active: true }];
       else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
       else if (url.pathname.endsWith('/driver_applications')) data = verified ? [] : [a];
-      else if (url.pathname.endsWith('/drivers')) data = verified ? [{ id: driver, user_id: account, company_id: company, is_verified: true, is_online: false, total_trips: 0, rating: 5, document_verification_required: true }] : [];
+      else if (url.pathname.endsWith('/company_driver_page')) data = { total: verified ? 1 : 0, rows: verified ? [{ id: driver, user_id: account, company_id: company, is_verified: true, is_online: false, online_now: false, gps_received_at: null, gps_position_at: null, total_trips: 0, rating: 5, document_verification_required: true, first_name: 'Тест', last_name: 'Водач' }] : [] };
       else if (url.pathname.endsWith('/vehicle_types')) data = [{ id: category, name: 'Стандарт' }];
       else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Тестова фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: receipt() } };
       else if (url.pathname.includes('/storage/v1/object/sign/')) data = { signedURL: '/object/sign/driver-documents/fixture.pdf?token=synthetic' };

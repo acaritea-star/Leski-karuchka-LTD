@@ -13,7 +13,7 @@ BEGIN
  PERFORM set_config('request.jwt.claims',json_build_object('sub',root_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
  IF public.create_partner_invitation(invitation,'company',upper(owner_email),NULL)<>invitation OR public.create_partner_invitation(invitation,'company',owner_email,NULL)<>invitation THEN RAISE EXCEPTION 'FAIL creation idempotency'; END IF;
  r:=public.resolve_partner_access('company',invitation);
- IF r->>'destination'<>'/admin/companies' OR (SELECT role FROM public.profiles WHERE id=root_id)<>'SUPER_ADMIN' THEN RAISE EXCEPTION 'FAIL super administrator downgrade'; END IF;
+ IF r->>'status'<>'denied' OR public.resolve_partner_access('any',NULL)->>'destination'<>'/admin/companies' OR (SELECT role FROM public.profiles WHERE id=root_id)<>'SUPER_ADMIN' THEN RAISE EXCEPTION 'FAIL super administrator downgrade'; END IF;
  denied:=false; BEGIN PERFORM public.claim_partner_invitation_email(invitation,root_id,false); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
  IF NOT denied THEN RAISE EXCEPTION 'FAIL client email service privileges'; END IF;
  RESET ROLE;

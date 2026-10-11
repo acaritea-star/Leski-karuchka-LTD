@@ -72,6 +72,7 @@ declare namespace google {
       setMap(map: Map | null): void;
       setPosition(position: LatLngLiteral): void;
       setTitle(title: string): void;
+      setZIndex(index: number): void;
       setIcon(icon: Icon | Symbol | null): void;
     }
 
