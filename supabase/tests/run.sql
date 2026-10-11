@@ -59,3 +59,4 @@ ROLLBACK;
 
 \ir partner_invitations.sql
 \ir tenant_reliability.sql
+\ir reverse_workflows.sql

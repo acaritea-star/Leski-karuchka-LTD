@@ -4,7 +4,7 @@ const account = '11111111-1111-4111-8111-111111111111';
 const ownCompany = '22222222-2222-4222-8222-222222222222';
 const company = (id: string, name: string) => ({ id, name, is_active: true, currency: 'EUR',
   base_fare: 2, price_per_km: 1, price_per_minute: 0.2, dispatch_radius_km: 5,
-  created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
+  updated_at: '2026-10-11T09:00:00Z', created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
 
 async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOMER') {
   const user = { id: account, email: 'synthetic-admin@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
@@ -138,7 +138,10 @@ test('invited company binds after login, finishes setup and keeps its own prices
       data = { status: 'ready', role, company_id: ownCompany, destination: setupAt ? '/admin/dashboard' : '/company/setup' };
     } else if (url.pathname.endsWith('/companies')) {
       expect(url.searchParams.get('id')).toBe('eq.' + ownCompany);
-      if (request.method() === 'PATCH') Object.assign(values, request.postDataJSON());
+      if (request.method() === 'PATCH') {
+        if (url.searchParams.get('updated_at') !== 'eq.' + values.updated_at) return route.fulfill({ status: 406, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST116', message: 'No matching tariff version' }), headers: { 'access-control-allow-origin': '*' } });
+        Object.assign(values, request.postDataJSON(), { updated_at: new Date().toISOString() });
+      }
       data = request.headers().accept?.includes('vnd.pgrst.object') ? values : [values];
     } else if (url.pathname.endsWith('/complete_company_setup')) {
       const body = request.postDataJSON(); expect(body.p_company).toBe(ownCompany); setups++;
@@ -165,6 +168,19 @@ test('invited company binds after login, finishes setup and keeps its own prices
   await page.getByRole('button', { name: 'Запази', exact: true }).click();
   await expect(page.getByText('Настройките са запазени успешно.')).toBeVisible();
   await page.reload(); await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.41');
+  const otherPanel = await context.newPage();
+  await otherPanel.goto('/admin/pricing'); await expect(otherPanel.getByRole('spinbutton').nth(1)).toHaveValue('1.41');
+  await otherPanel.getByRole('spinbutton').nth(1).fill('1.70');
+  await otherPanel.getByRole('button', { name: 'Запази', exact: true }).click();
+  await expect(otherPanel.getByText('Настройките са запазени успешно.')).toBeVisible();
+  await page.getByRole('spinbutton').nth(1).fill('1.90');
+  await page.getByRole('button', { name: 'Запази', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Обнови тарифите' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Запази', exact: true })).toBeDisabled();
+  expect(values.price_per_km).toBe(1.7);
+  await page.getByRole('button', { name: 'Обнови тарифите' }).click();
+  await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.7');
+  await otherPanel.close();
   await page.goto('/company/login'); await expect(page).toHaveURL(/\/admin\/dashboard$/);
   expect(binds).toBe(1); expect(setups).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });
