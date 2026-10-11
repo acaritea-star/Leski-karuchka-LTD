@@ -18,8 +18,14 @@ BEGIN
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=c WHERE id=admin_id;
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=other_c WHERE id=foreign_admin;
  INSERT INTO public.vehicle_types(id,company_id,name) VALUES(vt,c,'Verification fixture');
+ UPDATE public.companies SET setup_completed_at=created_at WHERE id IN (c,other_c);
+ UPDATE auth.users SET email_confirmed_at=now() WHERE id=candidate;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.create_partner_invitation(gen_random_uuid(),'driver','verify-'||candidate||'@example.invalid',c);
+ RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
+ PERFORM public.resolve_partner_access('driver',NULL);
  application:=public.submit_driver_application(c,'Test Driver','+359000000000','1–3',false,'Synthetic');
  IF public.submit_driver_application(c,'Test Driver','+359000000000','1–3',false,'Synthetic')<>application THEN RAISE EXCEPTION 'FAIL application idempotency'; END IF;
  IF jsonb_array_length(public.export_my_basic_data()->'driver_applications')<>1 THEN RAISE EXCEPTION 'FAIL application privacy export'; END IF;

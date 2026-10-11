@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.11-partner-service-fee.1",
-  "baseCommit": "1e35654c0f21ee16be3e8c335a01c55e0428d65f",
+  "release": "2026.10.11-invited-partner-access.2",
+  "baseCommit": "c9907e85585264bffdf5fec2dd70b9edaa8b3970",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261009074806",
   "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "3563ac0883b3a2fd0177dab221ee509b4f544d49",
+  "verifiedSourceCommit": "67582911b34378fae2e02d87b6baa75ce521edad",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -14,7 +14,8 @@
     "20261010045324_financial_posting_integrity",
     "20261010162446_company_vehicle_category_bootstrap",
     "20261010204407_unified_driver_onboarding",
-    "20261011081118_partner_service_fee_training"
+    "20261011081118_partner_service_fee_training",
+    "20261011172849_invited_partner_access"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -29,5 +30,7 @@
   "driverOnboardingVerifiedSourceCommit": "4ad53fa2a4293d049eea6ccece0da901be241cf1",
   "companyAccessVerifiedSourceCommit": "3f42c83042a93689a5791f7b071c3935336c43d8",
   "partnerServiceFeeInfoVersion": 1,
-  "partnerServiceFeeBillingEnabled": false
+  "partnerServiceFeeBillingEnabled": false,
+  "partnerAccessMigrationVersion": "20261011172849",
+  "partnerAccessVerifiedSourceCommit": "67582911b34378fae2e02d87b6baa75ce521edad"
 }

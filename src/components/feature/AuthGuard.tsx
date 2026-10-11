@@ -16,7 +16,8 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children, allowedRoles, redirectTo = '/', showLegalNotice = true, companyScoped = true }: AuthGuardProps) {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
-  const { companyId } = useAdminCompany();
+  const { companyId, companies } = useAdminCompany();
+  const needsCompanySetup = companyScoped && user?.role === 'COMPANY_ADMIN' && (!user.company_id || companies.some(c => c.id === user.company_id && c.setup_completed_at === null));
   const [retrying, setRetrying] = useState(false);
   const navigate = useNavigate();
 
@@ -30,11 +31,12 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
       navigate(redirectTo, { replace: true });
       return;
     }
+    if (needsCompanySetup) { navigate(user.company_id ? '/company/setup' : '/company', { replace: true }); return; }
     if (rolesKey && !allowedRoles?.includes(user.role)) {
       navigate(roleHomePath(user.role), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, session, profileError, navigate, redirectTo, rolesKey]);
+  }, [loading, user, session, profileError, navigate, redirectTo, rolesKey, needsCompanySetup]);
 
   if (loading) {
     return (
@@ -76,7 +78,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
     );
   }
 
-  if (!user || (rolesKey && !allowedRoles?.includes(user.role))) {
+  if (!user || needsCompanySetup || (rolesKey && !allowedRoles?.includes(user.role))) {
     return null;
   }
 

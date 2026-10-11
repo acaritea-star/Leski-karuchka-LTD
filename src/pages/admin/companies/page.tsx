@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useQueryClient } from '@tanstack/react-query';
 import { withRequestTimeout } from '@/lib/requestTimeout';
-import { companyPayload, createCompany } from '@/lib/companyAdmin';
-import { isAmbiguousWrite } from '@/lib/rideOperations';
 import { useNavigate } from 'react-router-dom';
+import PartnerInvitations from '@/components/feature/PartnerInvitations';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 
 interface Company {
@@ -22,35 +20,20 @@ interface Company {
   dispatch_radius_km: number;
   is_active: boolean;
   created_at: string;
+  setup_completed_at: string | null;
   drivers_count: number;
 }
 
-const emptyForm = {
-  name: '',
-  phone: '',
-  email: '',
-  address: '',
-  base_fare: '2.00',
-  price_per_km: '1.10',
-  price_per_minute: '0.28',
-  dispatch_radius_km: '5',
-};
-
 export default function AdminCompanies() {
-  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { companies: availableCompanies, setCompanyId } = useAdminCompany();
-  const savingRef = useRef(false);
-  const intent = useRef<{ id: string; form: string } | null>(null);
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [representative, setRepresentative] = useState<Company | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -58,7 +41,7 @@ export default function AdminCompanies() {
     try {
       const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('id, name, phone, email, address, currency, base_fare, price_per_km, price_per_minute, dispatch_radius_km, is_active, created_at, drivers(count)')
+        .select('id, name, phone, email, address, currency, base_fare, price_per_km, price_per_minute, dispatch_radius_km, is_active, created_at, setup_completed_at, drivers(count)')
         .order('created_at', { ascending: false }).order('id').abortSignal(signal));
 
       if (err) throw err;
@@ -86,39 +69,6 @@ export default function AdminCompanies() {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  const setField = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
-
-  const handleSave = async () => {
-    if (!form.name.trim() || savingRef.current) return;
-    savingRef.current = true;
-    setSaving(true);
-    setError('');
-    setSaved(false);
-    try {
-      const snapshot = JSON.stringify(form);
-      if (intent.current && intent.current.form !== snapshot) throw new Error('Има непотвърден запис. Върнете същите данни и повторете, за да не създадете дублирана фирма.');
-      const id = intent.current?.id ?? crypto.randomUUID();
-      const payload = companyPayload(form, id);
-      intent.current = { id, form: snapshot };
-      await createCompany({ ...payload, id });
-      intent.current = null;
-
-      setForm(emptyForm);
-      setShowForm(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-      void fetchCompanies();
-      void queryClient.invalidateQueries({ queryKey: ['admin-companies'] });
-    } catch (err: unknown) {
-      if (!isAmbiguousWrite(err)) intent.current = null;
-      const msg = err instanceof Error ? err.message : 'Грешка при запис';
-      setError(msg);
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  };
-
   return (
     <AdminLayout title="Фирми">
       {error && (
@@ -128,13 +78,6 @@ export default function AdminCompanies() {
           <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
             <i className="ri-close-line text-red-400 text-xs" />
           </button>
-        </div>
-      )}
-
-      {saved && (
-        <div className="mb-4 bg-primary-50 text-primary-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
-          <i className="ri-check-double-line" />
-          Фирмата е добавена успешно. Запазваш правата си на супер администратор.
         </div>
       )}
 
@@ -149,7 +92,7 @@ export default function AdminCompanies() {
         </button>
       </div>
 
-      <p className="mb-4 text-sm text-foreground-500">Тук управляваш всички фирми като супер администратор. Избери „Управлявай“, за да отвориш конкретна фирма. Имейлът за контакт не предоставя фирмени права на профил.</p>
+      <p className="mb-4 text-sm text-foreground-500">Тук управляваш всички фирми като супер администратор. Избери „Управлявай“, за да отвориш конкретна фирма. Новите фирми започват с лична покана по имейл. За съществуваща фирма използвай „Покани представител“.</p>
 
       {loading ? (
         <div className="flex justify-center py-24">
@@ -231,146 +174,24 @@ export default function AdminCompanies() {
                 Добавена: {new Date(c.created_at).toLocaleDateString('bg-BG')}
               </p>
               <button type="button" disabled={!availableCompanies.some(company => company.id === c.id)}
-                onClick={() => { setCompanyId(c.id); navigate('/admin/dashboard'); }}
+                onClick={() => { setCompanyId(c.id); navigate(c.setup_completed_at === null ? '/company/setup?company=' + c.id : '/admin/dashboard'); }}
                 aria-label={`Управлявай ${c.name}`}
                 className="mt-3 w-full py-2.5 rounded-lg bg-primary-50 text-primary-700 text-sm font-semibold hover:bg-primary-100 disabled:opacity-50 cursor-pointer">
-                Управлявай
+                {c.setup_completed_at === null ? 'Довърши настройката' : 'Управлявай'}
               </button>
+              {c.setup_completed_at !== null && <button onClick={() => setRepresentative(c)} className="mt-2 w-full text-sm text-primary-700 underline">Покани представител</button>}
             </div>
           ))}
         </div>
       )}
 
-      {/* Add Company Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-in zoom-in-95 fade-in duration-200">
-            <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
-              <h3 className="font-semibold text-foreground-950 font-heading">Добави нова фирма</h3>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
-              >
-                <i className="ri-close-line text-foreground-600 text-lg" />
-              </button>
-            </div>
-
-            <p className="px-5 pt-4 text-xs text-foreground-500">Новата фирма получава категория „Стандарт“ за 4 места, която използва въведената фирмена тарифа без увеличение.</p>
-
-            <div className="p-5 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-foreground-500 block mb-1">Име на фирмата *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setField('name', e.target.value)}
-                  placeholder="Напр. Лески Каручка"
-                  className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Телефон</label>
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={(e) => setField('phone', e.target.value)}
-                    placeholder="+359..."
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Имейл</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setField('email', e.target.value)}
-                    placeholder="info@..."
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-foreground-500 block mb-1">Адрес</label>
-                <input
-                  type="text"
-                  value={form.address}
-                  onChange={(e) => setField('address', e.target.value)}
-                  placeholder="Адрес на офиса"
-                  className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Начална такса (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.base_fare}
-                    onChange={(e) => setField('base_fare', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Цена на км (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.price_per_km}
-                    onChange={(e) => setField('price_per_km', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Цена на минута (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.price_per_minute}
-                    onChange={(e) => setField('price_per_minute', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Радиус (км)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={form.dispatch_radius_km}
-                    onChange={(e) => setField('dispatch_radius_km', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-background-50 rounded-xl text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-primary-50 text-primary-800 text-xs rounded-xl px-3 py-2.5 flex items-center gap-2">
-                <i className="ri-information-line" />
-                Всички цени на новата фирма са в евро (€).
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 bg-background-100 text-foreground-600 font-medium rounded-xl hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer text-sm"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !form.name.trim()}
-                  className="flex-1 py-2.5 bg-primary-500 text-white font-medium rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer text-sm disabled:opacity-50"
-                >
-                  {saving ? t('loading') : 'Добави фирма'}
-                </button>
-              </div>
-            </div>
-          </div>
+      {(showForm || representative) && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/40" onClick={() => { setShowForm(false); setRepresentative(null); }} />
+        <div role="dialog" aria-modal="true" aria-label="Покана за фирма" className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-5 space-y-4">
+          <div className="flex justify-between items-center"><h3 className="font-semibold font-heading">{representative ? 'Представител на ' + representative.name : 'Покани нова фирма'}</h3><button aria-label="Затвори" onClick={() => { setShowForm(false); setRepresentative(null); void fetchCompanies(); void queryClient.invalidateQueries({ queryKey: ['admin-companies'] }); }} className="p-2">×</button></div>
+          <PartnerInvitations key={representative?.id ?? 'new'} kind="company" companyId={representative?.id} />
         </div>
-      )}
+      </div>}
     </AdminLayout>
   );
 }

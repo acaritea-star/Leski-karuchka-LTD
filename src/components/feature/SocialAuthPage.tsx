@@ -1,6 +1,6 @@
-import { beginCompanyLogin, consumeAuthReturn } from '@/lib/authReturn';
+import { beginPartnerLogin, consumeAuthReturn, invitationId, partnerEntryPath } from '@/lib/authReturn';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { LOGO_URL } from '@/lib/logo';
@@ -8,9 +8,11 @@ import { socialAuthErrorKey, type SocialProvider } from '@/lib/socialAuth';
 import { legalOperator } from '@/config/legal';
 import { beginLegalIntent } from '@/lib/legalAcceptance';
 
-export default function SocialAuthPage({ mode, audience = 'general' }: { mode: 'login' | 'register'; audience?: 'general' | 'company' }) {
+export default function SocialAuthPage({ mode, audience = 'general' }: { mode: 'login' | 'register'; audience?: 'general' | 'company' | 'driver' }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const invite = invitationId(location.search);
   const { session, loading, signInWithOAuth } = useAuth();
   const [pending, setPending] = useState<SocialProvider | null>(null);
   const [error, setError] = useState('');
@@ -18,14 +20,15 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
   const redirected = useRef(false);
   const registering = mode === 'register';
   const companyLogin = audience === 'company';
+  const partnerLogin = audience !== 'general';
 
   useEffect(() => {
     if (!loading && session && !redirected.current) {
       redirected.current = true;
       const destination = consumeAuthReturn();
-      navigate(companyLogin ? '/company' : destination, { replace: true });
+      navigate(partnerLogin ? partnerEntryPath(audience as 'company' | 'driver', invite) : destination, { replace: true });
     }
-  }, [loading, session, navigate, companyLogin]);
+  }, [loading, session, navigate, partnerLogin, audience, invite]);
 
   const handleSignIn = async (provider: SocialProvider) => {
     if (requestInFlight.current || loading || session) return;
@@ -33,7 +36,7 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
     setPending(provider);
     setError('');
     try {
-      if (companyLogin) beginCompanyLogin();
+      if (partnerLogin) beginPartnerLogin(audience as 'company' | 'driver', invite);
       beginLegalIntent(provider);
       const result = await signInWithOAuth(provider);
       if (result.error) throw result.error;
@@ -63,9 +66,9 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
         <div className="text-center mb-8">
           <img src={LOGO_URL} alt="" className="h-14 w-auto mx-auto mb-3 rounded-lg" />
           <h1 className="text-xl font-semibold text-foreground-950 font-heading tracking-tight">
-            {companyLogin ? 'Вход за фирми' : t('app_name')}
+            {partnerLogin ? companyLogin ? 'Вход за фирми' : 'Вход за шофьори' : t('app_name')}
           </h1>
-          <p className="text-foreground-500 text-sm mt-1">{companyLogin ? 'Влез с профила, на който е предоставен достъп до твоята фирма.' : t(registering ? 'register_cta' : 'login_cta')}</p>
+          <p className="text-foreground-500 text-sm mt-1">{partnerLogin ? 'Влез с точния имейл, на който получи поканата. Данните и подготовката са след входа.' : t(registering ? 'register_cta' : 'login_cta')}</p>
         </div>
 
         <div className="bg-background-50 border border-background-200 rounded-xl p-6 space-y-4" aria-busy={!!pending}>
@@ -100,15 +103,17 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
             {' '}{t('auth_data_notice_prefix')}{' '}<Link className="underline text-primary-700" to="/privacy">{t('auth_privacy_label')}</Link>.
           </p>
 
-          {companyLogin ? <p className="text-center text-xs text-foreground-500">Фирменият достъп се предоставя от администратор на платформата. Входът сам по себе си не създава фирма.</p> : <p className="text-center mt-5 text-sm text-foreground-500">
+          {partnerLogin ? <p className="text-center text-xs text-foreground-500">{companyLogin ? 'Фирменият достъп се предоставя от Лески Каручка.' : 'Шофьорският достъп се предоставя от твоята фирма.'} При Facebook без същия потвърден имейл използвай Google или поискай нова покана.</p> : <p className="text-center mt-5 text-sm text-foreground-500">
             {t(registering ? 'have_account' : 'no_account')}{' '}
             <Link to={registering ? '/auth/login' : '/auth/register'} className="text-primary-600 hover:text-primary-700 font-semibold transition-colors">
               {t(registering ? 'login_here' : 'register_here')}
             </Link>
           </p>}
-          <Link to={companyLogin ? '/auth/login' : '/company/login'} className="block text-center text-sm text-primary-600 underline">
-            {companyLogin ? 'Вход за клиенти и шофьори' : 'Вход за фирми'}
-          </Link>
+          {partnerLogin ? <Link to="/auth/login" className="block text-center text-xs text-foreground-500 underline">Към клиентския вход</Link> :
+            <details className="text-center text-xs text-foreground-500">
+              <summary className="cursor-pointer">За фирми и шофьори</summary>
+              <div className="flex justify-center gap-5 pt-3"><Link to="/company/login" className="underline">Вход за фирми</Link><Link to="/driver/login" className="underline">Вход за шофьори</Link></div>
+            </details>}
         </div>
         <p className="text-center text-foreground-500 text-xs mt-6">{t('service_testing_period')}</p>
       </div>

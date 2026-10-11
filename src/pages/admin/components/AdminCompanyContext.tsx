@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 
-export interface CompanyOption { id: string; name: string; is_active?: boolean }
+export interface CompanyOption { id: string; name: string; is_active?: boolean; setup_completed_at?: string | null }
 interface AdminCompanyCtx {
   companyId: string | null;
   companies: CompanyOption[];
@@ -37,7 +37,7 @@ export function AdminCompanyProvider({ children }: { children: ReactNode }) {
     enabled, staleTime: 60_000, retry: 1,
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(requestSignal => {
-        let request = supabase.from('companies').select('id, name, is_active');
+        let request = supabase.from('companies').select('id, name, is_active, setup_completed_at');
         if (!isSuperAdmin) request = request.eq('id', user!.company_id!);
         return request.order('created_at', { ascending: false }).order('id').abortSignal(requestSignal);
       }, 10_000, signal);

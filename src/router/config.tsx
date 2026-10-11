@@ -25,6 +25,9 @@ const Register = lazy(() => import('@/pages/auth/register/page'));
 const AuthCallback = lazy(() => import('@/pages/auth/callback/page'));
 const CompanyLogin = lazy(() => import('@/pages/company/login/page'));
 const CompanyEntry = lazy(() => import('@/pages/company/page'));
+const CompanySetup = lazy(() => import('@/pages/company/setup/page'));
+const DriverLogin = lazy(() => import('@/pages/driver/login/page'));
+const DriverAccess = lazy(() => import('@/pages/driver/access/page'));
 
 // Customer pages
 const CustomerHome = lazy(() => import('@/pages/customer/home/page'));
@@ -79,7 +82,10 @@ const routes: RouteObject[] = [
   { path: '/auth/register', element: <Register /> },
   { path: '/auth/callback', element: <AuthCallback /> },
   { path: '/company/login', element: <CompanyLogin /> },
-  { path: '/company', element: <AuthGuard redirectTo="/company/login" companyScoped={false}><CompanyEntry /></AuthGuard> },
+  { path: '/driver/login', element: <DriverLogin /> },
+  { path: '/driver/access', element: <DriverAccess /> },
+  { path: '/company/setup', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['COMPANY_ADMIN', 'SUPER_ADMIN']}><CompanySetup /></AuthGuard> },
+  { path: '/company', element: <CompanyEntry /> },
   { path: '/admin', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']} redirectTo="/company/login" companyScoped={false}><AppRedirect /></AuthGuard> },
 
   // ─── Legal pages (public) ────────────────────────────────────────────────
