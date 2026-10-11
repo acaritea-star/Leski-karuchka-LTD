@@ -36,3 +36,13 @@ republish the matching previous frontend when using it. It deletes no business r
 See Supabase's [RLS documentation](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
 Expired GPS fixtures use transaction-local replication mode for one synthetic timestamp update, restored before authorization checks. No production GPS guard is removed.
+
+Release verification: 456 unit/component tests, lint, typecheck, legal digest checks,
+Edge Function typechecks and 30 Chromium/WebKit browser tests passed on source
+`64a7e2b328c8761a2cf403ffc70a91e2e4ecca4c`. The complete disposable PostgreSQL suite
+and money concurrency tests passed. Migration `20261011184333` was applied to the live
+project; tenant isolation/freshness, invitation and unified onboarding regression
+tests also passed there in rollback transactions. No real recipient email, paid map
+request or external OAuth login was used in these tests. Compiled assets are included;
+the independent Readdy hosting publication must load this release before its frontend
+changes appear on the public website.
