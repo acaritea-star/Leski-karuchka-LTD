@@ -15,7 +15,7 @@ export type Database = {
   public: {
     Tables: {
       partner_invitations: {
-        Row: { id: string; kind: string; email: string; company_id: string | null; created_by: string; created_at: string; expires_at: string; status: string; accepted_by: string | null; accepted_at: string | null; email_status: string; email_error: string | null; email_attempt: number; email_sent_at: string | null; email_lease: string | null; email_lease_until: string | null; email_attempt_at: string | null; email_message_id: string | null }
+        Row: { id: string; kind: string; email: string; company_id: string | null; created_by: string | null; created_at: string; expires_at: string; status: string; accepted_by: string | null; accepted_at: string | null; email_status: string; email_error: string | null; email_attempt: number; email_sent_at: string | null; email_lease: string | null; email_lease_until: string | null; email_attempt_at: string | null; email_message_id: string | null }
         Insert: { id?: string; kind: string; email: string; company_id?: string | null; created_by: string }
         Update: { status?: string }
         Relationships: []

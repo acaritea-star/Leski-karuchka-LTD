@@ -83,9 +83,9 @@ const routes: RouteObject[] = [
   { path: '/auth/callback', element: <AuthCallback /> },
   { path: '/company/login', element: <CompanyLogin /> },
   { path: '/driver/login', element: <DriverLogin /> },
-  { path: '/driver/access', element: <AuthGuard redirectTo="/driver/login" companyScoped={false}><DriverAccess /></AuthGuard> },
+  { path: '/driver/access', element: <DriverAccess /> },
   { path: '/company/setup', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['COMPANY_ADMIN', 'SUPER_ADMIN']}><CompanySetup /></AuthGuard> },
-  { path: '/company', element: <AuthGuard redirectTo="/company/login" companyScoped={false}><CompanyEntry /></AuthGuard> },
+  { path: '/company', element: <CompanyEntry /> },
   { path: '/admin', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']} redirectTo="/company/login" companyScoped={false}><AppRedirect /></AuthGuard> },
 
   // ─── Legal pages (public) ────────────────────────────────────────────────

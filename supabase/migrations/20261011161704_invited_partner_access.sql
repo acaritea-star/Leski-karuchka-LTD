@@ -28,7 +28,9 @@ CREATE TABLE public.partner_invitations (
 );
 CREATE UNIQUE INDEX partner_invitations_open_email ON public.partner_invitations(email) WHERE status='pending';
 CREATE INDEX partner_invitations_company_created ON public.partner_invitations(company_id,created_at DESC);
-CREATE INDEX partner_invitations_accepted_user ON public.partner_invitations(accepted_by) WHERE status='accepted';
+CREATE INDEX partner_invitations_accepted_user ON public.partner_invitations(accepted_by);
+CREATE INDEX partner_invitations_creator_created ON public.partner_invitations(created_by,created_at DESC);
+CREATE INDEX partner_invitations_email_created ON public.partner_invitations(email,created_at DESC);
 ALTER TABLE public.partner_invitations ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.partner_invitations FROM PUBLIC,anon,authenticated;
 GRANT SELECT ON public.partner_invitations TO authenticated;
@@ -211,7 +213,7 @@ LANGUAGE sql SECURITY INVOKER SET search_path='' AS $fn$ SELECT private.complete
 CREATE FUNCTION private.guard_company_setup() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $fn$
 BEGIN
  IF current_user NOT IN ('postgres','service_role','supabase_admin') THEN
-  IF NEW.setup_completed_at IS DISTINCT FROM OLD.setup_completed_at OR (OLD.setup_completed_at IS NULL AND NEW.is_active) THEN
+  IF NEW.setup_completed_at IS DISTINCT FROM OLD.setup_completed_at OR (OLD.setup_completed_at IS NULL AND NEW.is_active AND NOT OLD.is_active) THEN
    RAISE EXCEPTION 'Завършете фирмената настройка през приложението.' USING ERRCODE='42501'; END IF;
  END IF;
  RETURN NEW;

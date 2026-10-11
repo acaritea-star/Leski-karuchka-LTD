@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,7 +6,7 @@ import { useSignOut } from '@/hooks/useSignOut';
 import { invitationId } from '@/lib/authReturn';
 import { resolvePartnerAccess, type PartnerKind } from '@/lib/partnerAccess';
 import { workflowError } from '@/lib/driverDocuments';
-import InvitedDriverPreparation from './InvitedDriverPreparation';
+const InvitedDriverPreparation = lazy(() => import('./InvitedDriverPreparation'));
 
 export default function PartnerEntry({ kind }: { kind: PartnerKind | 'any' }) {
   const { user, loading, refreshProfile } = useAuth();
