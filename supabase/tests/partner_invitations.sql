@@ -53,6 +53,8 @@ BEGIN
  RESET ROLE;
  -- Sending is leased; concurrent callers cannot send twice, and lost replies reuse the key.
  SET LOCAL ROLE service_role;
+ denied:=false;BEGIN PERFORM public.claim_partner_invitation_email(driver_invitation,gen_random_uuid(),false);EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL missing actor grants email lease'; END IF;
  lease:=public.claim_partner_invitation_email(driver_invitation,owner_id,false);
  IF NOT (lease->>'claimed')::boolean OR (public.claim_partner_invitation_email(driver_invitation,owner_id,false)->>'claimed')::boolean THEN RAISE EXCEPTION 'FAIL email lease exclusivity'; END IF;
  IF NOT public.finish_partner_invitation_email(driver_invitation,(lease->>'lease')::uuid,'synthetic-message',NULL) THEN RAISE EXCEPTION 'FAIL email result persistence'; END IF;

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { deliverInvitation, invitationEmail } from '../../supabase/functions/_shared/partnerInvitationEmail';
+import { deliverInvitation, invitationEmail } from './partnerInvitationEmail';
 const mail = { id: '22222222-2222-4222-8222-222222222222', kind: 'driver' as const, email: 'synthetic@example.invalid', company_name: '<img src=x onerror=alert(1)>', attempt: 1 };
 afterEach(() => vi.useRealTimers());
 it('escapes company data and includes the same exact-account instructions in HTML and text', () => {

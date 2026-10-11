@@ -228,7 +228,7 @@ DECLARE i public.partner_invitations; actor public.profiles; lease uuid:=gen_ran
 BEGIN
  SELECT * INTO actor FROM public.profiles WHERE id=p_actor;
  SELECT * INTO i FROM public.partner_invitations WHERE id=p_id FOR UPDATE;
- IF i.id IS NULL OR NOT actor.is_active OR NOT (actor.role='SUPER_ADMIN' OR (i.kind='driver' AND actor.role='COMPANY_ADMIN' AND actor.company_id=i.company_id)) THEN
+ IF i.id IS NULL OR actor.id IS NULL OR NOT actor.is_active OR NOT (actor.role='SUPER_ADMIN' OR (i.kind='driver' AND actor.role='COMPANY_ADMIN' AND actor.company_id=i.company_id)) THEN
   RAISE EXCEPTION 'Нямате права за тази покана.' USING ERRCODE='42501'; END IF;
  IF i.status<>'pending' OR i.expires_at<=clock_timestamp() THEN RETURN jsonb_build_object('claimed',false,'status',i.status); END IF;
  IF i.email_lease_until>clock_timestamp() THEN RETURN jsonb_build_object('claimed',false,'status',i.email_status); END IF;
