@@ -22,6 +22,8 @@ const NewsArticlePage = lazy(() => import('@/pages/landing/news/article/page'));
 const Login = lazy(() => import('@/pages/auth/login/page'));
 const Register = lazy(() => import('@/pages/auth/register/page'));
 const AuthCallback = lazy(() => import('@/pages/auth/callback/page'));
+const CompanyLogin = lazy(() => import('@/pages/company/login/page'));
+const CompanyEntry = lazy(() => import('@/pages/company/page'));
 
 // Customer pages
 const CustomerHome = lazy(() => import('@/pages/customer/home/page'));
@@ -74,6 +76,9 @@ const routes: RouteObject[] = [
   { path: '/auth/login', element: <Login /> },
   { path: '/auth/register', element: <Register /> },
   { path: '/auth/callback', element: <AuthCallback /> },
+  { path: '/company/login', element: <CompanyLogin /> },
+  { path: '/company', element: <AuthGuard redirectTo="/company/login" companyScoped={false}><CompanyEntry /></AuthGuard> },
+  { path: '/admin', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']} redirectTo="/company/login" companyScoped={false}><AppRedirect /></AuthGuard> },
 
   // ─── Legal pages (public) ────────────────────────────────────────────────
   { path: '/terms', element: <TermsPage /> },
@@ -98,19 +103,19 @@ const routes: RouteObject[] = [
   { path: '/driver/preparation', element: <AuthGuard allowedRoles={['DRIVER']} showLegalNotice={false}><DriverPreparation /></AuthGuard> },
 
   // ─── Admin ────────────────────────────────────────────────────────────────
-  { path: '/admin/companies', element: <AuthGuard allowedRoles={['SUPER_ADMIN']}><AdminCompanies /></AuthGuard> },
-  { path: '/admin/dashboard', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDashboard /></AuthGuard> },
-  { path: '/admin/map', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminMap /></AuthGuard> },
-  { path: '/admin/drivers', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDrivers /></AuthGuard> },
-  { path: '/admin/vehicles', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminVehicles /></AuthGuard> },
-  { path: '/admin/customers', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminCustomers /></AuthGuard> },
-  { path: '/admin/orders', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminOrders /></AuthGuard> },
-  { path: '/admin/pricing', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminPricing /></AuthGuard> },
-  { path: '/admin/analytics', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminAnalytics /></AuthGuard> },
-  { path: '/admin/settings', element: <AuthGuard allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminSettings /></AuthGuard> },
-  { path: '/admin/news', element: <AuthGuard allowedRoles={['SUPER_ADMIN']}><AdminNews /></AuthGuard> },
-  { path: '/admin/news/new', element: <AuthGuard allowedRoles={['SUPER_ADMIN']}><AdminNewsEdit /></AuthGuard> },
-  { path: '/admin/news/:id', element: <AuthGuard allowedRoles={['SUPER_ADMIN']}><AdminNewsEdit /></AuthGuard> },
+  { path: '/admin/companies', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN']}><AdminCompanies /></AuthGuard> },
+  { path: '/admin/dashboard', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDashboard /></AuthGuard> },
+  { path: '/admin/map', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminMap /></AuthGuard> },
+  { path: '/admin/drivers', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDrivers /></AuthGuard> },
+  { path: '/admin/vehicles', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminVehicles /></AuthGuard> },
+  { path: '/admin/customers', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminCustomers /></AuthGuard> },
+  { path: '/admin/orders', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminOrders /></AuthGuard> },
+  { path: '/admin/pricing', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminPricing /></AuthGuard> },
+  { path: '/admin/analytics', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminAnalytics /></AuthGuard> },
+  { path: '/admin/settings', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminSettings /></AuthGuard> },
+  { path: '/admin/news', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN']}><AdminNews /></AuthGuard> },
+  { path: '/admin/news/new', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN']}><AdminNewsEdit /></AuthGuard> },
+  { path: '/admin/news/:id', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN']}><AdminNewsEdit /></AuthGuard> },
 
   { path: '*', element: <NotFound /> },
 ];

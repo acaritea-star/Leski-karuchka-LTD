@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react';
-import { beginDriverApplicationLogin } from '@/lib/authReturn';
+import { beginDriverApplicationLogin, consumeAuthReturn } from '@/lib/authReturn';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import bg from '@/i18n/local/bg/common';
 import LoginPage from '@/pages/auth/login/page';
 import RegisterPage from '@/pages/auth/register/page';
+import CompanyLogin from '@/pages/company/login/page';
 
 const auth = vi.hoisted(() => ({ signInWithOAuth: vi.fn(), session: null as unknown, loading: false }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => auth }));
@@ -32,7 +33,7 @@ describe('two social sign-in options', () => {
     expect(await screen.findByText('Application form')).toBeTruthy();
     expect(screen.queryByText('Wrong destination')).toBeNull();
   });
-  it.each([LoginPage, RegisterPage])('shows only Google and Facebook on %p', Page => {
+  it.each([LoginPage, RegisterPage, CompanyLogin])('shows only Google and Facebook on %p', Page => {
     const { container } = render(<MemoryRouter><Page /></MemoryRouter>);
     expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Продължи с Google' })).toBeTruthy();
@@ -85,6 +86,21 @@ describe('two social sign-in options', () => {
       <Route path="/app" element={<p>Existing session</p>} />
     </Routes></MemoryRouter>);
     expect(await screen.findByText('Existing session')).toBeTruthy();
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+  it('keeps the company destination through OAuth', async () => {
+    render(<MemoryRouter><CompanyLogin /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Продължи с Google' }));
+    await waitFor(() => expect(auth.signInWithOAuth).toHaveBeenCalledOnce());
+    expect(consumeAuthReturn()).toBe('/company');
+  });
+  it('checks existing sessions at the company entry without another login or a role change', async () => {
+    auth.session = { user: { id: 'existing-user' } };
+    render(<StrictMode><MemoryRouter initialEntries={['/company/login']}><Routes>
+      <Route path="/company/login" element={<CompanyLogin />} />
+      <Route path="/company" element={<p>Company access check</p>} />
+    </Routes></MemoryRouter></StrictMode>);
+    expect(await screen.findByText('Company access check')).toBeTruthy();
     expect(auth.signInWithOAuth).not.toHaveBeenCalled();
   });
 });

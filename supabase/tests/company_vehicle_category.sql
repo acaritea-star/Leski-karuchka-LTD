@@ -29,6 +29,8 @@ BEGIN
  -- Retry of the same company insert cannot leave a second category behind.
  INSERT INTO public.companies(id,name,slug) VALUES(c,'Retry','category-'||c) ON CONFLICT(id) DO NOTHING;
  IF (SELECT count(*) FROM public.vehicle_types WHERE company_id=c)<>1 THEN RAISE EXCEPTION 'FAIL company retry duplicates category'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.profiles WHERE id=super_uid AND role='SUPER_ADMIN' AND company_id IS NULL AND is_active)
+  OR NOT public.is_super_admin() THEN RAISE EXCEPTION 'FAIL company creation changes super-admin identity or scope'; END IF;
  denied:=false; BEGIN PERFORM private.seed_company_vehicle_type(); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
  IF NOT denied THEN RAISE EXCEPTION 'FAIL trigger helper is directly callable'; END IF;
  RESET ROLE;
@@ -43,6 +45,10 @@ BEGIN
  SELECT id INTO STRICT d FROM public.drivers WHERE user_id=driver_uid;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_uid,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
+ denied:=false; BEGIN UPDATE public.profiles SET role='SUPER_ADMIN' WHERE id=admin_uid; EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL company admin can promote self'; END IF;
+ denied:=false; BEGIN UPDATE public.profiles SET company_id=other_c WHERE id=admin_uid; EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'FAIL company admin can change own tenant'; END IF;
  PERFORM public.save_driver_vehicle(car,c,d,NULL,jsonb_build_object('make','Mercedes','model','CLK','registration_number','CAT-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
  PERFORM public.save_driver_vehicle(car,c,d,NULL,jsonb_build_object('make','Mercedes','model','CLK','registration_number','CAT-'||left(car::text,8),'vehicle_type_id',vt,'capacity',4));
  IF NOT EXISTS(SELECT 1 FROM public.vehicles WHERE id=car AND company_id=c AND vehicle_type_id=vt)

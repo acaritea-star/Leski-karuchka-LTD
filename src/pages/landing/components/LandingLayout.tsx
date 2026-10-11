@@ -4,12 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import LandingFooter from './LandingFooter';
 import { LOGO_URL } from '@/lib/logo';
-
-function roleHomePath(role?: string): string {
-  if (role === 'DRIVER') return '/driver/home';
-  if (role === 'SUPER_ADMIN') return '/admin/dashboard';
-  return '/customer/home';
-}
+import { roleHomePath } from '@/lib/roleHome';
 
 export default function LandingLayout() {
   const { t } = useTranslation();

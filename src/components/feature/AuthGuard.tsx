@@ -4,22 +4,17 @@ import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import LegalAcceptanceNotice from './LegalAcceptanceNotice';
+import { roleHomePath } from '@/lib/roleHome';
 
 interface AuthGuardProps {
   children: React.ReactNode;
   allowedRoles?: AppUser['role'][];
   redirectTo?: string;
   showLegalNotice?: boolean;
+  companyScoped?: boolean;
 }
 
-function roleHome(user: AppUser | null): string {
-  if (!user) return '/';
-  if (user.role === 'DRIVER') return '/driver/home';
-  if (user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN') return '/admin/dashboard';
-  return '/customer/home';
-}
-
-export default function AuthGuard({ children, allowedRoles, redirectTo = '/', showLegalNotice = true }: AuthGuardProps) {
+export default function AuthGuard({ children, allowedRoles, redirectTo = '/', showLegalNotice = true, companyScoped = true }: AuthGuardProps) {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
   const { companyId } = useAdminCompany();
   const [retrying, setRetrying] = useState(false);
@@ -36,7 +31,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
       return;
     }
     if (rolesKey && !allowedRoles?.includes(user.role)) {
-      navigate(roleHome(user), { replace: true });
+      navigate(roleHomePath(user.role), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, session, profileError, navigate, redirectTo, rolesKey]);
@@ -85,7 +80,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
     return null;
   }
 
-  const scope = user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN' ? companyId : '';
+  const scope = companyScoped && (user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN') ? companyId : '';
   // Discard forms, dialogs and late component reads when account/company changes.
   return <Fragment key={`${user.id}:${user.role}:${scope}`}>{showLegalNotice && <LegalAcceptanceNotice />}{children}</Fragment>;
 }

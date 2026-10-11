@@ -24,3 +24,11 @@ it('preserves a draft across same-account background refresh', () => {
   state.user = { ...state.user }; view.rerender(tree());
   expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('keep');
 });
+
+it('does not discard a platform-wide form when the available company context changes', () => {
+  const globalTree = () => <MemoryRouter><AuthGuard companyScoped={false}><Draft /></AuthGuard></MemoryRouter>;
+  const view = render(globalTree());
+  fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'new-company' } });
+  state.companyId = 'two'; view.rerender(globalTree());
+  expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('new-company');
+});

@@ -6,6 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { companyPayload, createCompany } from '@/lib/companyAdmin';
 import { isAmbiguousWrite } from '@/lib/rideOperations';
+import { useNavigate } from 'react-router-dom';
+import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 
 interface Company {
   id: string;
@@ -37,6 +39,8 @@ const emptyForm = {
 export default function AdminCompanies() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { companies: availableCompanies, setCompanyId } = useAdminCompany();
   const savingRef = useRef(false);
   const intent = useRef<{ id: string; form: string } | null>(null);
 
@@ -130,7 +134,7 @@ export default function AdminCompanies() {
       {saved && (
         <div className="mb-4 bg-primary-50 text-primary-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-check-double-line" />
-          Фирмата е добавена успешно.
+          Фирмата е добавена успешно. Запазваш правата си на супер администратор.
         </div>
       )}
 
@@ -144,6 +148,8 @@ export default function AdminCompanies() {
           Добави фирма
         </button>
       </div>
+
+      <p className="mb-4 text-sm text-foreground-500">Тук управляваш всички фирми като супер администратор. Избери „Управлявай“, за да отвориш конкретна фирма. Имейлът за контакт не предоставя фирмени права на профил.</p>
 
       {loading ? (
         <div className="flex justify-center py-24">
@@ -224,6 +230,12 @@ export default function AdminCompanies() {
               <p className="text-[11px] text-foreground-400">
                 Добавена: {new Date(c.created_at).toLocaleDateString('bg-BG')}
               </p>
+              <button type="button" disabled={!availableCompanies.some(company => company.id === c.id)}
+                onClick={() => { setCompanyId(c.id); navigate('/admin/dashboard'); }}
+                aria-label={`Управлявай ${c.name}`}
+                className="mt-3 w-full py-2.5 rounded-lg bg-primary-50 text-primary-700 text-sm font-semibold hover:bg-primary-100 disabled:opacity-50 cursor-pointer">
+                Управлявай
+              </button>
             </div>
           ))}
         </div>

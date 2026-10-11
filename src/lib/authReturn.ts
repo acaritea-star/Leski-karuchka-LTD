@@ -8,12 +8,18 @@ export function invitationCompany(search: string): string | undefined {
 export function beginDriverApplicationLogin(companyId?: string): void {
   try { sessionStorage.setItem(key, JSON.stringify({ path: '/driver-join', company: companyId && companyPattern.test(companyId) ? companyId : undefined, expires: Date.now() + 30 * 60_000 })); } catch { /* The form remains reachable from the public menu. */ }
 }
+export function beginCompanyLogin(): void {
+  try { sessionStorage.setItem(key, JSON.stringify({ path: '/company', expires: Date.now() + 30 * 60_000 })); } catch { /* The normal role redirect still handles assigned company administrators. */ }
+}
 export function consumeAuthReturn(): string {
   try {
     const raw = sessionStorage.getItem(key);
     sessionStorage.removeItem(key);
     const value = raw ? JSON.parse(raw) : null;
-    if (value?.path === '/driver-join' && Number.isFinite(value.expires) && value.expires > Date.now() && value.expires <= Date.now() + 30 * 60_000) return typeof value.company === 'string' && companyPattern.test(value.company) ? '/driver-join?company=' + value.company : '/driver-join';
+    if (Number.isFinite(value?.expires) && value.expires > Date.now() && value.expires <= Date.now() + 30 * 60_000) {
+      if (value.path === '/company') return '/company';
+      if (value.path === '/driver-join') return typeof value.company === 'string' && companyPattern.test(value.company) ? '/driver-join?company=' + value.company : '/driver-join';
+    }
   } catch { /* Unavailable or invalid storage is not an authentication failure. */ }
   return '/app';
 }

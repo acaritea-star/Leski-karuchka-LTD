@@ -14,7 +14,7 @@ interface AdminLayoutProps {
 
 const sidebarLinks = [
   { icon: 'ri-dashboard-line', label: 'nav_dashboard', path: '/admin/dashboard' },
-  { icon: 'ri-building-2-line', label: 'Фирми', path: '/admin/companies' },
+  { icon: 'ri-building-2-line', label: 'Фирми', path: '/admin/companies', superOnly: true },
   { icon: 'ri-map-pin-line', label: 'Карта на живо', path: '/admin/map' },
   { icon: 'ri-steering-line', label: 'nav_drivers', path: '/admin/drivers' },
   { icon: 'ri-car-line', label: 'nav_vehicles', path: '/admin/vehicles' },
@@ -22,7 +22,7 @@ const sidebarLinks = [
   { icon: 'ri-file-list-3-line', label: 'nav_orders', path: '/admin/orders' },
   { icon: 'ri-money-dollar-circle-line', label: 'Цени', path: '/admin/pricing' },
   { icon: 'ri-bar-chart-line', label: 'nav_analytics', path: '/admin/analytics' },
-  { icon: 'ri-newspaper-line', label: 'Новини', path: '/admin/news' },
+  { icon: 'ri-newspaper-line', label: 'Новини', path: '/admin/news', superOnly: true },
   { icon: 'ri-settings-line', label: 'nav_settings', path: '/admin/settings' },
 ];
 
@@ -33,6 +33,8 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
   const { user } = useAuth();
   const { logout, pending: loggingOut, error: logoutError } = useSignOut();
   const { companyId, companies, setCompanyId, companyName, error: companyError, reload } = useAdminCompany();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const platformPage = location.pathname === '/admin/companies' || location.pathname.startsWith('/admin/news');
 
   return (
     <div className="min-h-screen bg-background-50 flex">
@@ -49,16 +51,19 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
               alt="Лески Каручка"
               className="h-8 w-auto rounded"
             />
-            <h1 className="text-lg font-bold text-foreground-950 font-heading truncate">
-              {companyName || 'Админ панел'}
+            <h1 className="text-lg font-bold text-foreground-950 font-heading leading-tight">
+              {isSuperAdmin ? 'Супер администратор' : 'Фирмен панел'}
             </h1>
           </div>
           <p className="text-xs text-foreground-500 mt-0.5">
             {user?.first_name} {user?.last_name}
           </p>
+          <p className="text-xs text-foreground-600 mt-2 break-words">
+            {platformPage ? 'Управление на платформата' : companyName ? `Управляваш: ${companyName}` : 'Няма избрана фирма'}
+          </p>
         </div>
         <nav className="p-3 flex flex-col gap-1">
-          {sidebarLinks.map((link) => {
+          {sidebarLinks.filter(link => !link.superOnly || isSuperAdmin).map((link) => {
             const label = link.label.startsWith('nav_') ? t(link.label) : link.label;
             return (
               <button
@@ -104,6 +109,8 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? 'Затвори менюто' : 'Отвори менюто'}
+              aria-expanded={sidebarOpen}
               className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
             >
               <i className="ri-menu-line text-foreground-600 text-lg" />
@@ -111,9 +118,11 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
             <h2 className="text-base font-semibold text-foreground-950 font-heading">{title}</h2>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {user?.role === 'SUPER_ADMIN' && companies.length > 1 && (
+            {isSuperAdmin && !platformPage && companies.length > 0 && (
               <div className="relative">
+                <label htmlFor="admin-company" className="sr-only">Управлявана фирма</label>
                 <select
+                  id="admin-company"
                   value={companyId || ''}
                   onChange={(e) => setCompanyId(e.target.value)}
                   className="pl-8 pr-8 py-2 rounded-lg bg-background-50 border border-background-200 text-sm font-medium text-foreground-800 focus:outline-none focus:ring-2 focus:ring-primary-200 cursor-pointer appearance-none"
@@ -123,7 +132,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
                   </option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.name}{c.is_active === false ? ' (неактивна)' : ''}
                     </option>
                   ))}
                 </select>

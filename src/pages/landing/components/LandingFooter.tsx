@@ -12,6 +12,7 @@ export default function LandingFooter() {
     { to: '/about', label: t('landing.nav_about') },
     { to: '/pricing', label: t('landing.nav_pricing') },
     { to: '/driver-join', label: t('landing.nav_driver') },
+    { to: '/company/login', label: 'Вход за фирми' },
     { to: '/novini', label: t('landing.nav_news') },
     { to: '/contact', label: t('landing.nav_contact') },
   ];

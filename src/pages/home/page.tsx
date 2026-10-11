@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { roleHomePath } from '@/lib/roleHome';
 
 export default function AppRedirect() {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
@@ -8,9 +9,7 @@ export default function AppRedirect() {
   const [retrying, setRetrying] = useState(false);
   useEffect(() => {
     if (loading || !user) return;
-    const home = user.role === 'DRIVER' ? '/driver/home'
-      : user.role === 'CUSTOMER' ? '/customer/home' : '/admin/dashboard';
-    navigate(home, {replace: true});
+    navigate(roleHomePath(user.role), {replace: true});
   }, [loading, user, navigate]);
 
   const onRetry = async () => {

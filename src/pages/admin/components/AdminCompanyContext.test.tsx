@@ -17,6 +17,7 @@ function Consumer() {
 let client: QueryClient;
 const tree = () => <QueryClientProvider client={client}><AdminCompanyProvider><Consumer /></AdminCompanyProvider></QueryClientProvider>;
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   api.user = { id: 'admin-a', role: 'SUPER_ADMIN', company_id: null };
   api.read.mockResolvedValue({ data: [{ id: 'a', name: 'А' }, { id: 'b', name: 'Б' }], error: null });
@@ -48,4 +49,36 @@ it('does not query companies for customers', () => {
   api.user = { id: 'customer', role: 'CUSTOMER', company_id: 'a' };
   render(tree());
   expect(api.read).not.toHaveBeenCalled();
+});
+
+it('keeps the initial company after creation reorders the list and through a reload', async () => {
+  const view = render(tree());
+  await screen.findByText('a:А');
+  api.read.mockResolvedValue({ data: [{ id: 'new', name: 'Нова' }, { id: 'a', name: 'А' }, { id: 'b', name: 'Б' }], error: null });
+  await act(async () => { await client.invalidateQueries({ queryKey: ['admin-companies'] }); });
+  expect(screen.getByText('a:А')).toBeTruthy();
+  fireEvent.click(screen.getByText('B'));
+  view.unmount(); client.clear();
+  render(tree());
+  await screen.findByText('b:Б');
+});
+
+it('ignores a tampered selection and foreign rows for a company administrator', async () => {
+  api.user = { id: 'admin-b', role: 'COMPANY_ADMIN', company_id: 'b' };
+  sessionStorage.setItem('leski:admin-company:' + JSON.stringify(['admin-b', 'COMPANY_ADMIN', 'b']), 'a');
+  render(tree());
+  await screen.findByText('b:Б');
+  fireEvent.click(screen.getByText('invalid'));
+  expect(screen.getByText('b:Б')).toBeTruthy();
+  expect(screen.queryByText('a:А')).toBeNull();
+});
+
+it('continues with memory when browser storage is blocked', async () => {
+  const read = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+  try {
+    render(tree()); await screen.findByText('a:А');
+    fireEvent.click(screen.getByText('B'));
+    expect(screen.getByText('b:Б')).toBeTruthy();
+  } finally { read.mockRestore(); write.mockRestore(); }
 });

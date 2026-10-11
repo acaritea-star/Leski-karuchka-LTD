@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { beginDriverApplicationLogin, consumeAuthReturn } from './authReturn';
+import { beginCompanyLogin, beginDriverApplicationLogin, consumeAuthReturn } from './authReturn';
 afterEach(() => { sessionStorage.clear(); vi.useRealTimers(); });
 describe('application OAuth return', () => {
+  it('keeps the company entry through OAuth exactly once without accepting a tenant or role', () => {
+    beginCompanyLogin();
+    expect(consumeAuthReturn()).toBe('/company');
+    expect(consumeAuthReturn()).toBe('/app');
+  });
+  it('expires the company entry', () => {
+    vi.useFakeTimers(); beginCompanyLogin(); vi.advanceTimersByTime(31 * 60_000);
+    expect(consumeAuthReturn()).toBe('/app');
+  });
   it('returns to the application exactly once', () => { beginDriverApplicationLogin(); expect(consumeAuthReturn()).toBe('/driver-join'); expect(consumeAuthReturn()).toBe('/app'); });
   it('keeps the invited company through OAuth without accepting arbitrary destinations', () => {
     const company = '22222222-2222-4222-8222-222222222222';
