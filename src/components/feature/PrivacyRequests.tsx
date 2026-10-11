@@ -21,7 +21,9 @@ export default function PrivacyRequests({admin=false}:{admin?:boolean}) {
  };
  const download=async()=>{
   if(busy)return;setBusy(true);setMessage('');
-  try{const {data,error}=await withRequestTimeout(signal=>supabase.rpc('export_my_basic_data').abortSignal(signal));if(error)throw error;
+  try{const [basic,invitations]=await withRequestTimeout(signal=>Promise.all([supabase.rpc('export_my_basic_data').abortSignal(signal),supabase.rpc('my_partner_invitation_data').abortSignal(signal)]));if(basic.error)throw basic.error;if(invitations.error)throw invitations.error;
+   if(!basic.data||typeof basic.data!=='object'||Array.isArray(basic.data)||!Array.isArray(invitations.data))throw new Error('Export not confirmed');
+   const data={...basic.data,partner_invitations:invitations.data};
    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='leski-my-data.json';a.click();URL.revokeObjectURL(url);
   }catch{setMessage('Данните не се изтеглиха. Опитайте отново.');}finally{setBusy(false);}
  };

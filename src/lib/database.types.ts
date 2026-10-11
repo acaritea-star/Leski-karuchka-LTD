@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      partner_invitations: {
+        Row: { id: string; kind: string; email: string; company_id: string | null; created_by: string; created_at: string; expires_at: string; status: string; accepted_by: string | null; accepted_at: string | null; email_status: string; email_error: string | null; email_attempt: number; email_sent_at: string | null; email_lease: string | null; email_lease_until: string | null; email_attempt_at: string | null; email_message_id: string | null }
+        Insert: { id?: string; kind: string; email: string; company_id?: string | null; created_by: string }
+        Update: { status?: string }
+        Relationships: []
+      }
       ride_evidence: {
         Row: { request_id:string; company_id:string; customer_id:string; driver_id:string; first_observed_at:string|null; last_observed_at:string|null; samples:number; good_samples:number; approach_meters:number; trip_meters:number; observed_seconds:number; stationary_seconds:number; flags:string[]; customer_confirmed_at:string|null; updated_at:string }
         Insert: never
@@ -106,6 +112,8 @@ export type Database = {
           price_per_km: number
           price_per_minute: number
           registration_id: string | null
+          setup_completed_at: string | null
+          service_city: string | null
           slug: string
           updated_at: string
         }
@@ -133,6 +141,8 @@ export type Database = {
           price_per_km?: number
           price_per_minute?: number
           registration_id?: string | null
+          setup_completed_at?: string | null
+          service_city?: string | null
           slug: string
           updated_at?: string
         }
@@ -160,6 +170,8 @@ export type Database = {
           price_per_km?: number
           price_per_minute?: number
           registration_id?: string | null
+          setup_completed_at?: string | null
+          service_city?: string | null
           slug?: string
           updated_at?: string
         }
@@ -1660,6 +1672,11 @@ export type Database = {
       }
     }
     Functions: {
+      my_partner_invitation_data: { Args: Record<PropertyKey, never>; Returns: Json }
+      create_partner_invitation: { Args: { p_id: string; p_kind: string; p_email: string; p_company?: string }; Returns: string }
+      revoke_partner_invitation: { Args: { p_id: string }; Returns: undefined }
+      resolve_partner_access: { Args: { p_kind?: string; p_invitation?: string }; Returns: Json }
+      complete_company_setup: { Args: { p_company: string; p_data: Json }; Returns: Json }
       driver_onboarding: { Args: { p_application: string }; Returns: Json }
       begin_driver_onboarding: { Args: { p_company: string; p_full_name: string; p_phone: string; p_experience: string; p_has_vehicle: boolean; p_message?: string }; Returns: string }
       reopen_driver_onboarding: { Args: { p_application: string }; Returns: string }
@@ -2981,22 +2998,3 @@ export const Constants = {
       document_type: [
         "license",
         "id_card",
-        "insurance",
-        "vehicle_registration",
-      ],
-      driver_status: ["available", "busy", "offline"],
-      payment_method: ["cash", "card", "online"],
-      payment_status: ["pending", "paid", "refunded"],
-      request_status: [
-        "pending",
-        "accepted",
-        "arrived",
-        "in_progress",
-        "completed",
-        "cancelled",
-      ],
-      transaction_status: ["pending", "completed", "failed", "refunded"],
-      user_role: ["CUSTOMER", "DRIVER", "COMPANY_ADMIN", "SUPER_ADMIN"],
-    },
-  },
-} as const

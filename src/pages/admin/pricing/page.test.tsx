@@ -20,18 +20,26 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.companyId = 'company';
   api.read.mockResolvedValue({ data: { name: 'Company', base_fare: 2, price_per_km: 1, price_per_minute: .2, dispatch_radius_km: 5, currency: 'EUR', document_checks_required: false }, error: null });
-  api.write.mockResolvedValue({ data: { id: 'company' }, error: null });
+  api.write.mockResolvedValue({ data: { id: 'company', base_fare: 2, min_fare: 0, price_per_km: 1, price_per_minute: .2, dispatch_radius_km: 5, currency: 'EUR' }, error: null });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it.each([Pricing, Settings])('blocks saves after a failed load and allows recovery', async Page => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   api.read.mockResolvedValueOnce({ data: null, error: new Error('Offline') });
   render(<Page />);
-  const save = await screen.findByRole('button', { name: 'Запази' });
-  expect((save as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(save); expect(api.update).not.toHaveBeenCalled();
+  await screen.findByRole('button', { name: 'Опитай отново' });
+  const save = screen.queryByRole('button', { name: 'Запази' });
+  if (Page === Pricing) { expect(save).toBeNull(); expect(screen.queryAllByRole('spinbutton')).toHaveLength(0); }
+  else { expect((save as HTMLButtonElement).disabled).toBe(true); fireEvent.click(save!); }
+  expect(api.update).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Опитай отново' }));
   expect((await screen.findByRole('button', { name: 'Запази' }) as HTMLButtonElement).disabled).toBe(false);
+});
+it('shows the tariffs returned by the server after saving', async () => {
+  api.write.mockResolvedValue({ data: { id: 'company', base_fare: 4.15, min_fare: 3, price_per_km: 1.23, price_per_minute: .17, dispatch_radius_km: 6, currency: 'EUR' }, error: null });
+  render(<Pricing />); fireEvent.click(await screen.findByRole('button', { name: 'Запази' }));
+  await screen.findByText('Настройките са запазени успешно.');
+  expect((screen.getAllByRole('spinbutton')[0] as HTMLInputElement).value).toBe('4.15');
 });
 it('does not report a zero-row pricing update as saved', async () => {
   api.write.mockResolvedValue({ data: null, error: new Error('No authorized company') });

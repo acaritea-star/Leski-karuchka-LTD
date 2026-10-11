@@ -56,3 +56,5 @@ ROLLBACK;
 
 \ir financial_integrity.sql
 \ir company_vehicle_category.sql
+
+\ir partner_invitations.sql

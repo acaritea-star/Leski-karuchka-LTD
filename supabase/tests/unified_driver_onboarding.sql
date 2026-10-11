@@ -17,7 +17,13 @@ BEGIN
  INSERT INTO auth.users(id,email) SELECT x,'unified-'||x||'@example.invalid' FROM unnest(ARRAY[u,u2,admin_id,foreign_id])s(x);
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=c WHERE id=admin_id;
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=other_c WHERE id=foreign_id;
+ UPDATE public.companies SET setup_completed_at=created_at WHERE id IN (c,other_c);
+ UPDATE auth.users SET email_confirmed_at=now() WHERE id=u;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.create_partner_invitation(gen_random_uuid(),'driver','unified-'||u||'@example.invalid',c);
+ RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',u,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.resolve_partner_access('driver',NULL);
  a:=public.begin_driver_onboarding(c,'Unified Driver','+359000000000','1–3',true,'');
  IF EXISTS(SELECT 1 FROM public.drivers WHERE user_id=u) OR (SELECT role FROM public.profiles WHERE id=u)<>'CUSTOMER' THEN RAISE EXCEPTION 'FAIL invitation grants driver privileges'; END IF;
  bundle:=public.driver_onboarding(a); m:=bundle->'preparation';
@@ -95,7 +101,11 @@ BEGIN
  -- A candidate without a car uploads only the licence. Company insurance and car are resolved in this same review.
  INSERT INTO public.vehicles(id,company_id,make,model,registration_number,vehicle_type_id,insurance_expiry_date,inspection_expiry_date)
  VALUES(car,c,'Test','Company','C-'||left(car::text,8),category,today+30,today+60);
+ UPDATE auth.users SET email_confirmed_at=now() WHERE id=u2;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.create_partner_invitation(gen_random_uuid(),'driver','unified-'||u2||'@example.invalid',c); RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',u2,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ PERFORM public.resolve_partner_access('driver',NULL);
  a2:=public.begin_driver_onboarding(c,'No Car Driver','+359000000001','1–3',false,''); m:=public.driver_onboarding(a2)->'preparation';
  PERFORM public.accept_application_preparation(a2,m#>>'{document,termsVersion}',m#>>'{document,trainingVersion}',m->>'content_hash',answers,terms,privacy);
  path:=u2||'/'||a2||'/'||licence2||'.pdf';

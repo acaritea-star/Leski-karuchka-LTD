@@ -1,16 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { roleHomePath } from '@/lib/roleHome';
+import PartnerEntry from '@/components/feature/PartnerEntry';
 
 export default function AppRedirect() {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
-  const navigate = useNavigate();
   const [retrying, setRetrying] = useState(false);
-  useEffect(() => {
-    if (loading || !user) return;
-    navigate(roleHomePath(user.role), {replace: true});
-  }, [loading, user, navigate]);
 
   const onRetry = async () => {
     setRetrying(true);
@@ -21,6 +16,7 @@ export default function AppRedirect() {
     }
   };
 
+  if (user && !loading) return <PartnerEntry kind="any" />;
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-sm text-center space-y-4">

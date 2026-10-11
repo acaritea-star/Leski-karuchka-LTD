@@ -17,9 +17,20 @@ export function consumeAuthReturn(): string {
     sessionStorage.removeItem(key);
     const value = raw ? JSON.parse(raw) : null;
     if (Number.isFinite(value?.expires) && value.expires > Date.now() && value.expires <= Date.now() + 30 * 60_000) {
-      if (value.path === '/company') return '/company';
+      if (value.path === '/company' || value.path === '/driver/access') return partnerEntryPath(value.path === '/company' ? 'company' : 'driver', value.invite);
       if (value.path === '/driver-join') return typeof value.company === 'string' && companyPattern.test(value.company) ? '/driver-join?company=' + value.company : '/driver-join';
     }
   } catch { /* Unavailable or invalid storage is not an authentication failure. */ }
   return '/app';
+}
+export function invitationId(search: string): string | undefined {
+  const value = new URLSearchParams(search).get('invite');
+  return value && companyPattern.test(value) ? value : undefined;
+}
+export function partnerEntryPath(kind: 'company' | 'driver', invite?: string): string {
+  const path = kind === 'company' ? '/company' : '/driver/access';
+  return invite && companyPattern.test(invite) ? path + '?invite=' + invite : path;
+}
+export function beginPartnerLogin(kind: 'company' | 'driver', invite?: string): void {
+  try { sessionStorage.setItem(key, JSON.stringify({ path: kind === 'company' ? '/company' : '/driver/access', invite: invite && companyPattern.test(invite) ? invite : undefined, expires: Date.now() + 30 * 60_000 })); } catch { /* Server resolves invitations again on /app. */ }
 }

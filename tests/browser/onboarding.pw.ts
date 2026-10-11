@@ -44,6 +44,8 @@ test('invited candidate prepares a complete own-car package before any driver ro
     else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Поканилата фирма', is_active: true }, { id: category, name: 'Друга фирма', is_active: true }];
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
     else if (url.pathname.endsWith('/driver_applications')) data = a;
+    else if (url.pathname.endsWith('/partner_invitations')) data = [];
+    else if (url.pathname.endsWith('/resolve_partner_access')) data = { status: 'preparation', destination: '/driver/access', role: 'CUSTOMER', company_id: company, company_name: 'Поканилата фирма', application_id: a?.id };
     else if (url.pathname.endsWith('/begin_driver_onboarding')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); data = application; }
     else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Поканилата фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: r } };
     else if (url.pathname.endsWith('/accept_application_preparation')) { accepts++; r = receipt(); a!.onboarding_revision++; return route.abort(); }
@@ -58,11 +60,12 @@ test('invited candidate prepares a complete own-car package before any driver ro
     else if (url.pathname.includes('/storage/v1/object/')) data = { Key: 'fixture', Id: driver };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: { 'access-control-allow-origin': '*' } });
   });
-  await page.goto('/driver-join?company=' + company);
-  await expect(page.getByLabel('Фирма, към която кандидатстваш')).toHaveValue(company);
-  await expect(page.getByRole('option', { name: 'Друга фирма' })).toHaveCount(0);
-  await page.locator('select[name=experience]').selectOption('1–3'); await page.locator('select[name=vehicle]').selectOption('yes');
-  await page.getByRole('button', { name: 'Продължи към правата и подготовката' }).click();
+  await page.goto('/driver/login?invite=' + application);
+  await expect(page).toHaveURL(/\/driver\/access/);
+  await expect(page.getByRole('heading', { name: 'Подготовка за Поканилата фирма' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Фирма, към която кандидатстваш' })).toHaveCount(0);
+  await page.locator('select[name=experience]').selectOption('1–3'); await page.locator('select[name=vehicle]').selectOption('own');
+  await page.getByRole('button', { name: 'Запази и продължи към обучението' }).click();
   await expect(page.getByRole('form', { name: 'Качване: Шофьорска книжка' })).toHaveCount(0);
   await train(page);
   await expect(page.getByRole('heading', { name: '2. Документи и автомобил' })).toBeVisible();
@@ -111,7 +114,8 @@ test('company admin reviews files and verifies a complete package with one actio
   }
   await page.goto('/admin/drivers');
   await page.getByRole('button', { name: 'Добави шофьор', exact: true }).click();
-  await expect(page.getByLabel('Фирмен линк за присъединяване')).toHaveValue('http://127.0.0.1:4100/driver-join?company=' + company);
+  await expect(page.getByLabel('Имейл на шофьора')).toBeVisible();
+  await expect(page.getByLabel('Фирмен линк за присъединяване')).toHaveCount(0);
   await page.getByRole('button', { name: 'Прегледай целия пакет' }).click();
   const approve = page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' });
   await expect(approve).toBeDisabled();

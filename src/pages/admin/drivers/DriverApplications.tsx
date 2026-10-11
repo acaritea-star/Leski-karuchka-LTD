@@ -7,6 +7,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { workflowError } from '@/lib/driverDocuments';
 import type { Tables } from '@/lib/database.types';
 import ApplicationReview from './ApplicationReview';
+import PartnerInvitations from '@/components/feature/PartnerInvitations';
 
 export default function DriverApplications({ companyId }: { companyId: string }) {
   const { user } = useAuth();
@@ -16,7 +17,6 @@ export default function DriverApplications({ companyId }: { companyId: string })
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
-  const invitation = `${window.location.origin}/driver-join?company=${companyId}`;
   const latch = useRef(false);
   const key = ['admin-driver-applications', user?.id, companyId];
   const query = useQuery({
@@ -47,10 +47,8 @@ export default function DriverApplications({ companyId }: { companyId: string })
     }
   }
   return <div className="space-y-4 text-sm">
-    <p>Споделете фирмения линк. Шофьорът влиза с Google или Facebook, приема лично условията, преминава подготовката и качва документите. Получавате един пакет за общ преглед.</p>
-    <label className="block text-xs">Фирмен линк за присъединяване<input readOnly value={invitation} onFocus={e => e.target.select()} className="w-full rounded-lg border border-background-200 p-2 mt-1 text-sm" /></label>
-    <a className="underline text-primary-700" href={invitation} target="_blank" rel="noopener noreferrer">Отвори фирмения линк</a>
-    <p className="text-foreground-500">Линкът избира вашата фирма. Сам по себе си не дава права за курсове. При готов пакет използвайте „Прегледай целия пакет“ и едно общо одобрение.</p>
+    <PartnerInvitations key={companyId} kind="driver" companyId={companyId} />
+    <p className="text-foreground-500">При готов пакет използвайте „Прегледай целия пакет“ и едно общо одобрение.</p>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {notice && <p role="status" className="text-accent-700">{notice}</p>}
     <button disabled={busy || query.isFetching} onClick={() => void query.refetch()} className="underline text-primary-700">Обнови кандидатурите</button>
