@@ -3,6 +3,7 @@ const actor='11111111-1111-4111-8111-111111111111',a='22222222-2222-4222-8222-22
 async function setup(page:Page) {
  const state={google:0,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
  page.on('pageerror',e=>state.errors.push(e.message));
+ page.on('requestfinished',r=>{if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(new URL(r.url()).hostname))state.google++;});
  const user={id:actor,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
  await page.addInitScript(user=>{
   const token=[btoa(JSON.stringify({alg:'HS256'})),btoa(JSON.stringify({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})),'synthetic'].join('.');
@@ -13,7 +14,7 @@ async function setup(page:Page) {
  await page.route('**/*',async route=>{
   const request=route.request(),u=new URL(request.url());
   if(u.origin==='http://127.0.0.1:4100')return route.continue();
-  if(u.origin!=='http://127.0.0.1:54329'){if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(u.hostname))state.google++;return route.abort();}
+  if(u.origin!=='http://127.0.0.1:54329')return route.abort();
   const headers={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,PATCH,OPTIONS','access-control-allow-headers':'authorization,apikey,content-type,x-client-info,x-supabase-api-version,prefer,accept-profile,content-profile,range,range-unit'};
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   let data:unknown=[];

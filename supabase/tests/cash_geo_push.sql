@@ -2,6 +2,10 @@
 RESET ROLE;
 UPDATE test_ids SET quote=gen_random_uuid(),request=gen_random_uuid();
 UPDATE public.companies SET dispatch_radius_km=5 WHERE id=(SELECT company FROM test_ids);
+-- A real booking now needs an eligible driver at creation; later assertions
+-- move/disable the driver to independently test feed and acceptance guards.
+UPDATE public.driver_locations SET latitude=42.6977,longitude=23.3219,position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.drivers SET is_online=true WHERE id=(SELECT driver FROM test_ids);
 INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
 SELECT quote,customer,company,vehicle_type,
  '{"pickup_latitude":42.6977,"pickup_longitude":23.3219,"destination_latitude":42.70,"destination_longitude":23.33,"pickup_address":"Test Sofia","destination_address":"Test destination","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}'::jsonb FROM test_ids;

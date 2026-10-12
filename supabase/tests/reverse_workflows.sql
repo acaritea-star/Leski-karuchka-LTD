@@ -65,11 +65,21 @@ SELECT pg_temp.workflow_deny('INSERT INTO public.request_declines(request_id,dri
 RESET ROLE;
 
 CREATE TEMP TABLE workflow_foreign AS SELECT gen_random_uuid() company,gen_random_uuid() customer,
- gen_random_uuid() vehicle_type,gen_random_uuid() quote,gen_random_uuid() request;
+ gen_random_uuid() vehicle_type,gen_random_uuid() quote,gen_random_uuid() request,gen_random_uuid() driver_user,gen_random_uuid() vehicle;
 GRANT SELECT ON workflow_foreign TO authenticated;
 INSERT INTO public.companies(id,name,slug) SELECT company,'Foreign workflow test','workflow-'||company FROM workflow_foreign;
 INSERT INTO auth.users(id,email) SELECT customer,'workflow-'||customer||'@example.invalid' FROM workflow_foreign;
 INSERT INTO public.vehicle_types(id,company_id,name) SELECT vehicle_type,company,'Foreign test car' FROM workflow_foreign;
+-- Give the foreign operator a real eligible synthetic driver so this tests
+-- company isolation without relying on creation of an unserviceable booking.
+INSERT INTO auth.users(id,email) SELECT driver_user,'workflow-driver-'||driver_user||'@example.invalid' FROM workflow_foreign;
+UPDATE public.profiles SET role='DRIVER',company_id=(SELECT company FROM workflow_foreign) WHERE id=(SELECT driver_user FROM workflow_foreign);
+INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number)
+ SELECT vehicle,company,vehicle_type,'Workflow','Foreign','WF-'||left(vehicle::text,8) FROM workflow_foreign;
+UPDATE public.drivers SET document_verification_required=false,is_verified=true,vehicle_id=(SELECT vehicle FROM workflow_foreign) WHERE user_id=(SELECT driver_user FROM workflow_foreign);
+INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
+ SELECT d.id,f.company,43.2,25.6,10,clock_timestamp() FROM workflow_foreign f JOIN public.drivers d ON d.user_id=f.driver_user;
+UPDATE public.drivers SET is_online=true WHERE user_id=(SELECT driver_user FROM workflow_foreign);
 INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
  SELECT quote,customer,company,vehicle_type,
  '{"pickup_latitude":43.2,"pickup_longitude":25.6,"destination_latitude":43.21,"destination_longitude":25.61,"pickup_address":"Foreign workflow","destination_address":"Workflow destination","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}'::jsonb FROM workflow_foreign;
