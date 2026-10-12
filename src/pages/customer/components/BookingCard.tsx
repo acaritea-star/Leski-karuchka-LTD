@@ -8,6 +8,10 @@ export interface VehicleOption { id: string; name: string; capacity: number; ava
 
 interface BookingCardProps {
   companyId?: string;
+  companies?: Array<{ id: string; name: string }>;
+  onCompanyChange?: (id: string) => void;
+  availabilityMessage?: string;
+  onRefreshAvailability?: () => void;
   pickup: BookingLocation;
   destination: BookingLocation;
   onFieldClick: (field: 'pickup' | 'dest') => void;
@@ -38,6 +42,8 @@ export default function BookingCard(props: BookingCardProps) {
   const { t } = useTranslation();
   return <div className="booking-confirm booking-enter">
     <div className="booking-scroll">
+      {props.companies && <label className="block text-sm font-semibold px-1 py-2">Фирма за тази поръчка<select aria-label="Фирма за тази поръчка" value={props.companyId || ''} disabled={props.creating || props.companies.length < 2} onChange={e => props.onCompanyChange?.(e.target.value)} className="block mt-2 w-full rounded-xl border border-background-200 p-3 text-base font-normal">{props.companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+
       <div className="booking-route">
         <div className="min-w-0 flex-1">
           {(['pickup', 'dest'] as const).map(field => <button key={field} type="button"
@@ -57,9 +63,10 @@ export default function BookingCard(props: BookingCardProps) {
           <input type="radio" name="booking-vehicle" value={vehicle.id} checked={props.vehicleType === vehicle.id}
             disabled={!vehicle.available} onChange={() => props.onVehicleTypeChange(vehicle.id)} />
           <span><i className={vehicle.capacity > 4 ? 'ri-bus-line' : 'ri-taxi-line'} aria-hidden="true" />
-            {vehicleLabel(vehicle.name, t)}<small>{t('booking_seats', { count: vehicle.capacity })}</small></span>
+            {vehicleLabel(vehicle.name, t)}<small>{vehicle.available ? t('booking_seats', { count: vehicle.capacity }) : 'Няма свободна кола'}</small></span>
         </label>)}
       </fieldset>
+      {props.availabilityMessage && <div className="booking-hint" role="status"><p>{props.availabilityMessage}</p><button type="button" disabled={props.creating} onClick={props.onRefreshAvailability} className="underline shrink-0">Обнови наличността</button></div>}
       {props.calculating ? <p className="booking-hint" role="status"><span className="booking-spinner" />{t('booking_calculating')}</p>
         : <div className="booking-meta">
           <span>{props.distance != null && <>{props.distance.toFixed(1)} {t('km')} · {props.duration} {t('min')}</>}</span>

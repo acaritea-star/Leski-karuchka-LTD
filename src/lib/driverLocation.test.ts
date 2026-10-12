@@ -209,3 +209,14 @@ it('does not upload a persisted fix when sharing has been explicitly disabled',a
  Object.assign(navigator,{permissions:{query:vi.fn().mockResolvedValue(Object.assign(new EventTarget(),{state:'granted'}))}});
  expect(startDriverGps('driver','company',{},'owner')).toBe(false);await flush();expect(upsert).not.toHaveBeenCalled();
 });
+
+it('cannot transfer late GPS callbacks or write acknowledgements into the next driver account', async () => {
+  let finish!:(value:unknown)=>void;
+  single.mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+  const oldUpdate=vi.fn(),newUpdate=vi.fn();
+  startDriverGps('old-driver','old-company',{onUpdate:oldUpdate});const oldWatch=watch;oldWatch(fix());
+  stopDriverGps();startDriverGps('new-driver','new-company',{onUpdate:newUpdate});watch(fix());await flush();
+  finish({data:{updated_at:new Date().toISOString()},error:null});await flush();oldWatch(fix());await flush();
+  expect(oldUpdate).not.toHaveBeenCalled();expect(newUpdate).toHaveBeenCalledOnce();
+  expect(upsert.mock.calls.map(call=>call[0].driver_id)).toEqual(['old-driver','new-driver']);
+});

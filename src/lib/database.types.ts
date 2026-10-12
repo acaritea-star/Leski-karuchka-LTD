@@ -1672,6 +1672,7 @@ export type Database = {
       }
     }
     Functions: {
+      booking_availability: { Args: { p_company: string; p_lat: number; p_lng: number }; Returns: Json }
       my_partner_invitation_data: { Args: Record<PropertyKey, never>; Returns: Json }
       create_partner_invitation: { Args: { p_id: string; p_kind: string; p_email: string; p_company?: string }; Returns: string }
       revoke_partner_invitation: { Args: { p_id: string }; Returns: undefined }

@@ -8,6 +8,9 @@ import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { availabilityFresh, loadBookingAvailability } from '@/lib/bookingAvailability';
+import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -118,6 +121,9 @@ export default function CustomerHome() {
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
 
   // Booking options
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [companyChoice, setCompanyChoice] = useState('');
+  const selectedCompany = user?.company_id || companyChoice;
   const [vehicleType, setVehicleType] = useState('');
   const [vehicleTypes, setVehicleTypes] = useState<Tables<'vehicle_types'>[]>([]);
   const [quoteRefresh, setQuoteRefresh] = useState(0);
@@ -132,7 +138,7 @@ export default function CustomerHome() {
   const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
-  const quoteCompany = vehicleTypes.find(type => type.id === vehicleType)?.company_id ?? user?.company_id;
+  const quoteCompany = selectedCompany;
   const quoteInput = JSON.stringify([pickup, destination, quoteCompany]);
   const quoteReady = !!vehicleType;
   const requestedType = useRef(vehicleType);
@@ -179,10 +185,32 @@ export default function CustomerHome() {
     };
   }, []);
 
+  const availability = useQuery({
+    queryKey: ['booking-availability', user?.id, selectedCompany, pickup?.lat, pickup?.lng],
+    queryFn: ({ signal }) => loadBookingAvailability(selectedCompany, pickup!.lat, pickup!.lng, signal),
+    enabled: !!user?.id && !!selectedCompany && !!pickup && !activeRequest && !recovering && requestStatus !== 'creating',
+    refetchInterval: 15_000, staleTime: 10_000, retry: 1,
+  });
+  const now = useFleetClock();
+  const availabilityConfirmed = !availability.isError && availabilityFresh(availability.data, now);
+  const readyCategory = availabilityConfirmed ? availability.data?.categories.find(c => c.id === vehicleType) : undefined;
+  const availabilityMessage = availability.isPending ? 'Проверяваме свободните автомобили около началния адрес…'
+    : !availabilityConfirmed ? 'Наличността не е потвърдена. Провери връзката и обнови.'
+    : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази фирма и категория. Избери друга категория или фирма, или опитай по-късно.'
+    : `Свободни шофьори около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
+  useEffect(() => {
+    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating') return;
+    const current = availability.data.categories.find(c => c.id === vehicleType);
+    if (current?.drivers) return;
+    const next = availability.data.categories.find(c => c.drivers > 0);
+    if (next) setVehicleType(next.id);
+  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus]);
+
   const fare = currentRoute?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
   const canRequest = !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
+    && availabilityConfirmed && !!readyCategory?.drivers
     && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
@@ -296,8 +324,9 @@ export default function CustomerHome() {
     try {
       const data = await createTaxiRequest(quoteId, bookingId.current, user.id);
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
-    } catch {
-      setRequestError(t('request_failed_hint'));
+    } catch (error) {
+      setRequestError(error instanceof Error && error.message.startsWith('NO_AVAILABLE_DRIVER:') ? error.message.slice('NO_AVAILABLE_DRIVER:'.length).trim() : t('request_failed_hint'));
+      void availability.refetch();
       setRequestStatus('error');
     } finally { bookingInFlight.current = false; }
   };
@@ -428,29 +457,36 @@ export default function CustomerHome() {
     }
   };
 
-  // Fetch company pricing config
+  // Public operator choice never changes profile/admin membership.
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
     const load = async () => {
-      let companies = supabase.from('companies').select('id').eq('is_active',true).order('created_at').order('id').limit(1);
-      if (user?.company_id) companies = companies.eq('id',user.company_id);
-      const {data:company,error:companyError} = await withRequestTimeout(signal => companies.abortSignal(signal).maybeSingle());
-      if (companyError || !company) { if(active) setRequestError('Няма активна компания.'); return; }
-      const {data,error} = await withRequestTimeout(signal => supabase.from('vehicle_types').select('*').eq('company_id',company.id).order('multiplier').order('id').abortSignal(signal));
+      let query = supabase.from('companies').select('id,name').eq('is_active',true).order('created_at').order('id').limit(100);
+      if (user.company_id) query = query.eq('id', user.company_id);
+      const { data, error } = await withRequestTimeout(signal => query.abortSignal(signal));
       if (!active) return;
-      if(error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
-      setVehicleTypes(data);
-      const firstAvailable = data.find(v => v.is_active);
-      setVehicleType(current => {
-        const cur = data.find(v => v.id === current);
-        if (cur && cur.is_active) return current;
-        return firstAvailable ? firstAvailable.id : '';
-      });
+      if (error || !data?.length) { setRequestError('Няма активна фирма за поръчки.'); return; }
+      setCompanies(data);
+      setCompanyChoice(current => data.some(c => c.id === current) ? current : data[0].id);
+    };
+    void load().catch(() => { if (active) setRequestError('Не успяхме да заредим фирмите. Провери връзката и опитай отново.'); });
+    return () => { active = false; };
+  }, [user?.id, user?.company_id, configAttempt]);
+  useEffect(() => {
+    if (!selectedCompany) return;
+    let active = true;
+    setVehicleTypes([]); setVehicleType('');
+    const load = async () => {
+      const { data, error } = await withRequestTimeout(signal => supabase.from('vehicle_types').select('*')
+        .eq('company_id', selectedCompany).eq('is_active',true).order('multiplier').order('id').limit(32).abortSignal(signal));
+      if (!active) return;
+      if (error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
+      setVehicleTypes(data); setVehicleType(data[0].id); setRequestError('');
     };
     void load().catch(() => { if (active) setRequestError('Не успяхме да заредим автомобилите. Провери връзката и опитай отново.'); });
-    return () => {active=false;};
-  }, [user?.id, user?.company_id, configAttempt, t]);
+    return () => { active = false; };
+  }, [selectedCompany, configAttempt, t]);
 
   // Redirect to orders after trip completed or cancelled
   useEffect(() => {
@@ -506,13 +542,14 @@ export default function CustomerHome() {
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
         {step === 'confirm' && pickup && destination
           ? <BookingCard pickup={pickup} destination={destination}
-            companyId={vehicleTypes.find(v => v.id === vehicleType)?.company_id}
+            companyId={selectedCompany} companies={companies} onCompanyChange={id => { if (!user?.company_id) setCompanyChoice(id); }}
             onFieldClick={handleFieldClick} onSwap={swapLocations}
             vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
-            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active }))}
+            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active && availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
             fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
             calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
             onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
+            availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()}
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}

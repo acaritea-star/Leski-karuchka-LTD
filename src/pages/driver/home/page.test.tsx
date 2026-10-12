@@ -86,3 +86,10 @@ it('initialises the optional map once when opened and reuses it after collapsing
   expect(maps).not.toHaveBeenCalled();await toggle(true);expect(maps).toHaveBeenCalledOnce();
   await toggle(false);await toggle(true);expect(maps).toHaveBeenCalledOnce();expect(fake.register).toHaveBeenCalledOnce();client.clear();
 });
+
+it('does not present a stale GPS session as ready to receive new requests', async () => {
+  vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};const client=mount();
+  await act(async()=>vi.advanceTimersByTimeAsync(0));
+  expect(screen.getByText('Изчаква GPS')).toBeTruthy();
+  expect(screen.getByText(/не си достъпен за нови заявки/)).toBeTruthy();client.clear();
+});

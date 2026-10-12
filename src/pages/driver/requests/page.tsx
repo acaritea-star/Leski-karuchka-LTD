@@ -1,3 +1,4 @@
+import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
@@ -71,6 +72,7 @@ export default function DriverRequests() {
   // ── Driver record ──
   const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
+  const identity = useDriverDispatchIdentity(user?.id, driver?.vehicle_id);
   const isOnline = driver?.is_online ?? false;
 
   // ── Active request ──
@@ -378,12 +380,15 @@ export default function DriverRequests() {
         {isOnline && (
           <span className="ml-auto flex items-center gap-1.5 text-xs text-accent-600 bg-accent-50 px-3 py-1.5 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
-            {t('you_are_online')}
+            {gps.status === 'tracking' ? t('you_are_online') : 'Изчаква GPS'}
           </span>
         )}
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
+        {identity.data?.company && <p className="text-sm text-foreground-700 mb-3"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}</p>}
+        {isOnline && gps.status !== 'tracking' && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.</p>}
+
         {/* ── Error ── */}
         {(error || refusalMessage) && (
           <div className="mb-3 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">

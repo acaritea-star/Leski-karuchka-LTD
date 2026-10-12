@@ -1,3 +1,4 @@
+import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { loadDriverDay } from '@/lib/serverSummaries';
 import { useSofiaDay } from '@/hooks/useSofiaDay';
 import { acceptTaxiRequest } from '@/lib/rideOperations';
@@ -60,6 +61,8 @@ export default function DriverHome() {
   // ── Driver record ──
   const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
+  const identity = useDriverDispatchIdentity(user?.id, driver?.vehicle_id);
+  const readyForRequests = !!driver?.is_online && gpsStatus === 'tracking';
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
@@ -336,10 +339,11 @@ export default function DriverHome() {
           <div className="mx-auto w-full max-w-3xl space-y-4">
             <section aria-label="Твоят работен статус" className="space-y-2">
               <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-foreground-500">ШОФЬОРСКИ ПАНЕЛ</p>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : driver?.is_online ? 'bg-primary-100 text-primary-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? 'Онлайн' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground-950 break-words">Здравей{user?.first_name ? ', ' + user.first_name : ''}!</h1>
-              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? 'Онлайн режимът е включен. Следи връзката и местоположението си.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? readyForRequests ? 'Готов си за заявки от твоята фирма и категория.' : 'Онлайн режимът е включен, но изчакваме актуален GPS. Докато няма потвърдена позиция, не си достъпен за нови заявки.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+              {identity.data?.company && <p className="text-sm text-foreground-700"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}<span className="block text-xs text-foreground-500 mt-1">Заявките са само за тази фирма и категория, в радиуса около теб.</span></p>}
             </section>
             {driver && !driver.is_verified && !activeRequest && <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 space-y-3" aria-label="Подготовка за работа">
               <h2 className="font-semibold text-foreground-950">Следваща стъпка: профил и документи</h2>

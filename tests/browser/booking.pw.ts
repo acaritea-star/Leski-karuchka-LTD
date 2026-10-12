@@ -23,6 +23,7 @@ test('mobile booking keeps the price action visible and reuses the category rout
   else if(u.pathname.endsWith('/vehicle_types')) data=[{id:'eco',company_id:company,name:'Economy',capacity:4,is_active:true},{id:'comfort',company_id:company,name:'Comfort',capacity:4,is_active:true}];
   else if(u.pathname.endsWith('/legal_acceptances')) data={id:'accepted'};
   else if(u.pathname.endsWith('/taxi_requests')) data=null;
+  else if(u.pathname.endsWith('/booking_availability')) data={company_id:company,sampled_at:new Date().toISOString(),categories:['eco','comfort'].map(id=>({id,drivers:1,configured:true}))};
   else if(u.pathname.endsWith('/carrier_identity')) data={id:company,name:'Тестова фирма',verified:false};
   else if(u.pathname.endsWith('/google-routes')) {
    routes++;
