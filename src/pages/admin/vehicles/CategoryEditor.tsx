@@ -41,8 +41,9 @@ export default function CategoryEditor({ companyId, categories, disabled, create
         p_details: { ...form, name, capacity: cap, multiplier: mult },
       }).abortSignal(signal));
       if (failure) throw failure;
-      if (!data || data.id !== saveId.current || data.company_id !== companyId) throw new Error('Записът не е потвърден. Обнови списъка.');
-      onSavedRef.current(data); setOpen(false);
+      const category = Array.isArray(data) ? (data.length === 1 ? data[0] as Category : null) : data;
+      if (!category || category.id !== saveId.current || category.company_id !== companyId) throw new Error('Записът не е потвърден. Обнови списъка.');
+      onSavedRef.current(category); setOpen(false);
     } catch (cause) { setError(workflowError(cause, 'Записът не е потвърден. Обнови списъка преди повторен опит.')); }
     finally { latch.current = false; setSaving(false); }
   };

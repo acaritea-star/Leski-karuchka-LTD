@@ -23,3 +23,7 @@ Older geographic test fixtures now make the original booking serviceable before 
 Apply `20261012105718_booking_dispatch_availability.sql` only after regression passes, then publish the merged frontend through Readdy. Verify `/release.json`. The migration is transactional and preserves profiles, historical requests, trips, prices and reports. Existing modified function ACLs are retained. The new public wrapper is invoker security; its private definer checks the active customer and operator scope and exposes no driver identity or raw GPS.
 
 The rollback file restores the two previous live function definitions and removes the new availability endpoint. If rolling back SQL, also publish the previous frontend: the new frontend intentionally blocks bookings when availability cannot be verified. No request/profile/history rows are deleted.
+# Subsequent marketplace release
+
+The availability fixes below remain the legacy single-company compatibility path. The shared marketplace supersedes the customer company selector; see [marketplace-dispatch.md](marketplace-dispatch.md) for the current dispatch, pricing and release procedure.
+

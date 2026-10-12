@@ -42,3 +42,11 @@ All SQL fixtures run only against the disposable localhost Supabase. Tests cover
 Apply the additive marketplace migration only after database regression passes, deploy the backward-compatible google-routes function, then publish the matching frontend. Legacy single-company quotes retain their old eligibility and financial semantics. GitHub merge alone does not publish the external Readdy site; verify release.json after its publish step.
 
 The rollback package restores the exact pre-release functions and policies. The service_class column and index can remain as harmless metadata after rollback; no profiles, journeys, receipts or ledger rows are deleted.
+
+### Applied backend and checked release
+
+- Live migration: `20261012151552_marketplace_dispatch`; Google Routes: version 12. All five retrieved deployed function files match the tested source. Existing custom authentication and legacy single-company requests are preserved.
+- GitHub Actions passed database lifecycle tests, real overlapping acceptance sessions, private Broadcast delivery/read isolation and the rollback package. The checked source also passed 500 unit tests, lint, build, Deno checks and 38 Chromium/WebKit browser cases. A final category-response compatibility check brings local unit coverage to 501 passing cases.
+- Read-only checks with both actual driver identities successfully call the incoming-request RPC. Both were offline during the check, so zero offers is expected. A customer can read aggregated availability; anonymous callers cannot, and only the server can obtain candidate tariff snapshots.
+- Advisor comparison introduced no new security findings. Existing extension placement, extension-table RLS, helper-function grants and disabled leaked-password protection findings remain separate follow-up work; this change is not a full security certification.
+- Readdy must pull the matching GitHub revision and publish. Check `/release.json` for `2026.10.12-marketplace-dispatch.1`, then test Standard with two verified, online, available drivers on independently active devices and fresh GPS. Both should receive the shared offer; one accepts, the other's offer disappears, and each company's history contains only its own completed trips.

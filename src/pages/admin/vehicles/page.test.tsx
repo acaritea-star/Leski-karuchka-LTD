@@ -94,11 +94,11 @@ it('blocks a category that was disabled while the vehicle form was open', async 
   expect(screen.getByRole('option', { name: /Категорията е неактивна/ })).toBeTruthy();
   expect(api.rpc).not.toHaveBeenCalled();
 });
-it('adds a category from the vehicle form without losing entered car details or duplicating the write', async () => {
+it.each(['object', 'array'])('adds a category from a confirmed %s response without losing car details or duplicating the write', async shape => {
   api.rpc.mockImplementation(async (method: string, input: Record<string, unknown>) => {
     if(method !== 'save_vehicle_category') return {data:'car',error:null};
     const category={...standard,...input.p_details as Record<string, unknown>,id:input.p_id as string};
-    categories=[...categories,category];return {data:category,error:null};
+    categories=[...categories,category];return {data:shape === 'array' ? [category] : category,error:null};
   });
   mount();await openForm();fillCar();fireEvent.click(screen.getByRole('button',{name:'Добави нова категория'}));
   fireEvent.change(screen.getByLabelText('Име на категорията'),{target:{value:'Комфорт'}});
