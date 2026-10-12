@@ -106,7 +106,7 @@ export default function DriverHome() {
       return data ?? [];
     },
     enabled: !!user?.company_id && !!driver?.is_online && !activeRequest,
-    refetchInterval: requestsRealtime ? 15_000 : 8000,
+    refetchInterval: offersConnected ? 30_000 : 8000,
   });
   // The badge renders 9+ beyond nine; the existing ten-row snapshot is enough.
   const freshPending = useFreshRequests(pendingListQuery.data ?? []);

@@ -444,6 +444,11 @@ export default function CustomerHome() {
 
   // Reset
   const resetRequest = () => {
+    // A quote already linked to a closed request remains idempotent on the
+    // server. A deliberate new order must not reopen that old request.
+    setRoute(current => current ? { ...current, quote_id: undefined,
+      quotes: current.quotes?.map(quote => ({ ...quote, quote_id: undefined })) } : null);
+    setQuoteRefresh(value => value + 1);
     setActiveRequest(null);
     setRequestStatus('idle');
     setRequestError('');

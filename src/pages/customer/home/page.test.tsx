@@ -71,6 +71,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); stopSharedGps(); localStorage.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('customer booking integration', () => {
+  it('gets a fresh quote and booking ID when ordering the same route after cancellation', async () => {
+    await mount();await chooseRoute();
+    fireEvent.click(screen.getByRole('button',{name:/Поръчай каручка/}));await act(async()=>{});
+    const first=fake.rpc.mock.calls.find(call=>call[0]==='create_taxi_request')![1];
+    fake.active={...fake.active,status:'cancelled'};
+    act(()=>fake.notify?.({new:fake.active!}));
+    fake.route.mockResolvedValue({...quote(),quote_id:'next-quote'});
+    fireEvent.click(screen.getByRole('button',{name:/Поръчай нова/}));
+    expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+    await act(async()=>vi.advanceTimersByTimeAsync(351));
+    expect(fake.route).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('button',{name:/Поръчай каручка/}));await act(async()=>{});
+    const writes=fake.rpc.mock.calls.filter(call=>call[0]==='create_taxi_request');
+    expect(writes).toHaveLength(2);expect(writes[1][1].p_quote_id).toBe('next-quote');
+    expect(writes[1][1].p_request_id).not.toBe(first.p_request_id);
+  });
   it('switches category with no new routing call and books that category quote', async () => {
     fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
     const result = quote();

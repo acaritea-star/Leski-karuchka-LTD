@@ -10,9 +10,11 @@ const fake = vi.hoisted(() => ({
   driver: { id:'driver',user_id:'user',company_id:'company',is_online:false,is_verified:true,status:'offline' },
   change: vi.fn(), declined: new Set<string>(), accept: vi.fn(), incoming: [] as Array<Record<string, unknown>>,
   sound:vi.fn(),unlock:vi.fn(),register:vi.fn(),reads:vi.fn(),
+  offersConnected: false, incomingReads: vi.fn(),
   activeRow:null as Record<string, unknown>|null,statuses:new Map<string,(status:string)=>void>(),filters:[] as Array<{table?:string;filter?:string}>,
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER' } }) }));
+vi.mock('@/hooks/useDriverOfferConnection', () => ({ useDriverOfferConnection: () => fake.offersConnected }));
 vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
 vi.mock('@/components/feature/DriverGpsProvider', () => ({ useDriverGps: () => ({ status:'idle',error:'' }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ unlockAudio:fake.unlock,playDriverSound:fake.sound }) }));
@@ -20,7 +22,7 @@ vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ 
 vi.mock('@/hooks/useDriverDeclines', () => ({ useDriverDeclines: () => ({ declinedIds:fake.declined,decline:vi.fn(),declineError:null,isDeclining:false }) }));
 vi.mock('@/pages/driver/components/DriverRouteMap', () => ({ default: () => null }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?Promise.resolve({data:fake.incoming,error:null}):fake.accept(...args)}),
+  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?(fake.incomingReads(),Promise.resolve({data:fake.incoming,error:null})):fake.accept(...args)}),
   removeChannel:vi.fn(), channel: (name:string) => { const channel={
     on:(_event:string,filter:{table?:string;filter?:string})=>{fake.filters.push(filter);return channel;},
     subscribe:(status?:(status:string)=>void)=>{if(status)fake.statuses.set(name,status);return channel;},
@@ -32,7 +34,21 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
     return query;
   },
 } }));
-afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.filters=[];fake.statuses.clear();vi.useRealTimers(); });
+afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.filters=[];fake.statuses.clear();fake.offersConnected=false;fake.incomingReads.mockClear();vi.useRealTimers(); });
+
+it('recovers pending offers from a failed private socket independently of the assigned ride socket', async () => {
+  vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+  const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+  client.setQueryData(queryKeys.driverRecord('user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('driver'),null);
+  const content=()=> <QueryClientProvider client={client}><MemoryRouter><DriverRequests /></MemoryRouter></QueryClientProvider>;
+  const view=render(content());await act(async()=>vi.advanceTimersByTimeAsync(0));
+  act(()=>fake.statuses.get('driver-requests-panel-driver')?.('SUBSCRIBED'));
+  await act(async()=>vi.advanceTimersByTimeAsync(0));fake.incomingReads.mockClear();
+  await act(async()=>vi.advanceTimersByTimeAsync(8000));expect(fake.incomingReads).toHaveBeenCalledOnce();
+  fake.offersConnected=true;view.rerender(content());fake.incomingReads.mockClear();
+  await act(async()=>vi.advanceTimersByTimeAsync(29999));expect(fake.incomingReads).not.toHaveBeenCalled();
+  await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.incomingReads).toHaveBeenCalledOnce();client.clear();
+});
 it('blocks duplicate online clicks and does not replay an uncertain write after the driver cache changes', async () => {
   vi.useFakeTimers(); fake.driver={...fake.driver,is_online:false,status:'offline'};fake.change.mockReset();
   fake.change.mockRejectedValueOnce(new Error('Acknowledgement lost')).mockImplementation(async()=>fake.driver);

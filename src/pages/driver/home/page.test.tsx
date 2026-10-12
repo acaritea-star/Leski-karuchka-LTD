@@ -10,9 +10,11 @@ const fake = vi.hoisted(() => ({
   driver: { id:'driver',user_id:'user',company_id:'company',is_online:false,is_verified:true,status:'offline' },
   change: vi.fn(), declined: new Set<string>(), accept: vi.fn(), incoming: [] as Array<Record<string, unknown>>,
   sound:vi.fn(),unlock:vi.fn(),register:vi.fn(),reads:vi.fn(),
+  offersConnected: false, incomingReads: vi.fn(),
   activeRow:null as Record<string, unknown>|null,statuses:new Map<string,(status:string)=>void>(),filters:[] as Array<{table?:string;filter?:string}>,
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER',first_name:'Иван' },loading:false }) }));
+vi.mock('@/hooks/useDriverOfferConnection', () => ({ useDriverOfferConnection: () => fake.offersConnected }));
 vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
 vi.mock('@/components/feature/DriverGpsProvider', () => ({ useDriverGps: () => ({ status:'idle',error:'' }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ unlockAudio:fake.unlock,playDriverSound:fake.sound }) }));
@@ -23,7 +25,7 @@ vi.mock('@/lib/serverSummaries', () => ({ loadDriverDay: async () => ({ trips: 3
 vi.mock('@/lib/googleMapsLoader', () => ({ loadGoogleMaps: fake.register }));
 vi.mock('@/lib/sharedGps', () => ({ getGpsPosition: () => null, subscribeGpsState: () => () => {} }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?Promise.resolve({data:fake.incoming,error:null}):fake.accept(...args)}),
+  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?(fake.incomingReads(),Promise.resolve({data:fake.incoming,error:null})):fake.accept(...args)}),
   removeChannel:vi.fn(), channel: (name:string) => { const channel={
     on:(_event:string,filter:{table?:string;filter?:string})=>{fake.filters.push(filter);return channel;},
     subscribe:(status?:(status:string)=>void)=>{if(status)fake.statuses.set(name,status);return channel;},
@@ -35,7 +37,21 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
     return query;
   },
 } }));
-afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();vi.useRealTimers();vi.unstubAllGlobals(); });
+afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();fake.offersConnected=false;fake.incomingReads.mockClear();vi.useRealTimers();vi.unstubAllGlobals(); });
+
+it('uses private offer health for home reconciliation even when assigned updates remain connected', async () => {
+  vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+  const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+  client.setQueryData(queryKeys.driverRecord('user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('driver'),null);
+  const content=()=> <QueryClientProvider client={client}><MemoryRouter><DriverHome /></MemoryRouter></QueryClientProvider>;
+  const view=render(content());await act(async()=>vi.advanceTimersByTimeAsync(0));
+  act(()=>fake.statuses.get('driver-requests-driver')?.('SUBSCRIBED'));
+  await act(async()=>vi.advanceTimersByTimeAsync(0));fake.incomingReads.mockClear();
+  await act(async()=>vi.advanceTimersByTimeAsync(8000));expect(fake.incomingReads).toHaveBeenCalledOnce();
+  fake.offersConnected=true;view.rerender(content());fake.incomingReads.mockClear();
+  await act(async()=>vi.advanceTimersByTimeAsync(29999));expect(fake.incomingReads).not.toHaveBeenCalled();
+  await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.incomingReads).toHaveBeenCalledOnce();client.clear();
+});
 
 function mount() {
   const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});

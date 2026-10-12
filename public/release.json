@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.12-marketplace-dispatch.1",
+  "release": "2026.10.12-marketplace-dispatch.2",
   "baseCommit": "5a9f2f1c7a880ae220291b0410c29f5296302656",
-  "databaseMigration": "marketplace_dispatch",
+  "databaseMigration": "marketplace_offer_recovery",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261012151552",
+  "databaseMigrationVersion": "20261012184648",
   "googleRoutesVersion": 12,
-  "verifiedSourceCommit": "8c2a36dad7556b4dccff9dd59746ae3f1ac5db5a",
+  "verifiedSourceCommit": "44b75d63f10765f47225b0f3b9cd0ec8f9603898",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -19,7 +19,8 @@
     "20261011184333_tenant_reliability_and_live_status",
     "20261011205954_reverse_workflow_reliability",
     "20261012105718_booking_dispatch_availability",
-    "20261012151552_marketplace_dispatch"
+    "20261012151552_marketplace_dispatch",
+    "20261012184648_marketplace_offer_recovery"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -49,5 +50,7 @@
   "dispatchAvailabilityVerifiedSourceCommit": "efbe9ee7eddd8df9a00e970539d9e1fbfe8cb8ac",
   "marketplaceDispatchMigrationVersion": "20261012151552",
   "marketplaceDispatchVerifiedSourceCommit": "8c2a36dad7556b4dccff9dd59746ae3f1ac5db5a",
-  "marketplaceDispatchVersion": 1
+  "marketplaceDispatchVersion": 1,
+  "marketplaceOfferRecoveryMigrationVersion": "20261012184648",
+  "marketplaceOfferRecoveryVerifiedSourceCommit": "44b75d63f10765f47225b0f3b9cd0ec8f9603898"
 }
