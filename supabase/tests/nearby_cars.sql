@@ -49,7 +49,7 @@ SAVEPOINT company_preview;
 INSERT INTO public.companies(name,slug) SELECT 'Preview isolation','preview-'||company FROM test_ids;
 UPDATE public.profiles SET company_id=(SELECT id FROM public.companies WHERE slug='preview-'||(SELECT company::text FROM test_ids)) WHERE id=(SELECT customer FROM test_ids);
 SET LOCAL ROLE authenticated;
-DO $$ BEGIN IF jsonb_array_length(public.nearby_cars(43.2,25.6)->'cars')<>0 THEN RAISE EXCEPTION 'FAIL other company car'; END IF; END $$;
+DO $$ BEGIN IF jsonb_array_length(public.nearby_cars(43.2,25.6)->'cars')<>1 THEN RAISE EXCEPTION 'FAIL marketplace hides other company car'; END IF; END $$;
 RESET ROLE;
 ROLLBACK TO SAVEPOINT company_preview;
 RELEASE SAVEPOINT company_preview;

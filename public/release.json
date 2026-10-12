@@ -18,7 +18,7 @@
     "20261011172849_invited_partner_access",
     "20261011184333_tenant_reliability_and_live_status",
     "20261011205954_reverse_workflow_reliability",
-    "20261012100335_booking_dispatch_availability"
+    "20261012105718_booking_dispatch_availability"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -44,6 +44,6 @@
   "partnerUxVerifiedSourceCommit": "f42ba542723a173456af4639d8871b738793fb91",
   "driverInvitationUxVersion": 1,
   "driverInvitationUxVerifiedSourceCommit": "604c3439749d036f355a20b17ea8c1d39da12caa",
-  "dispatchAvailabilityMigrationVersion": "20261012100335",
+  "dispatchAvailabilityMigrationVersion": "20261012105718",
   "dispatchAvailabilityVerifiedSourceCommit": "efbe9ee7eddd8df9a00e970539d9e1fbfe8cb8ac"
 }

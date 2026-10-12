@@ -9,7 +9,8 @@ import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { availabilityFresh, loadBookingAvailability } from '@/lib/bookingAvailability';
+import { availabilityFresh, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
+import { SERVICE_CLASSES, marketplaceRange } from '@/lib/marketplace';
 import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +51,7 @@ interface ActiveRequest {
   destination_longitude: number;
   destination_address: string;
   estimated_price: number | null;
+  fare_breakdown?: import('@/lib/database.types').Json | null;
   cancelled_by?: string | null;
   updated_at?: string;
 }
@@ -121,13 +123,9 @@ export default function CustomerHome() {
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
 
   // Booking options
-  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
-  const [companyChoice, setCompanyChoice] = useState('');
-  const selectedCompany = user?.company_id || companyChoice;
-  const [vehicleType, setVehicleType] = useState('');
-  const [vehicleTypes, setVehicleTypes] = useState<Tables<'vehicle_types'>[]>([]);
+  const [vehicleType, setVehicleType] = useState('standard');
+  const vehicleTypes = SERVICE_CLASSES;
   const [quoteRefresh, setQuoteRefresh] = useState(0);
-  const [configAttempt, setConfigAttempt] = useState(0);
   const bookingId = useRef(crypto.randomUUID());
   const bookingInFlight = useRef(false);
 
@@ -138,9 +136,8 @@ export default function CustomerHome() {
   const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
-  const quoteCompany = selectedCompany;
+  const quoteCompany = 'marketplace';
   const quoteInput = JSON.stringify([pickup, destination, quoteCompany]);
-  const quoteReady = !!vehicleType;
   const requestedType = useRef(vehicleType);
   requestedType.current = vehicleType;
   const selectedQuote = route?.quotes?.find(quote => quote.vehicle_type_id === vehicleType);
@@ -186,18 +183,19 @@ export default function CustomerHome() {
   }, []);
 
   const availability = useQuery({
-    queryKey: ['booking-availability', user?.id, selectedCompany, pickup?.lat, pickup?.lng],
-    queryFn: ({ signal }) => loadBookingAvailability(selectedCompany, pickup!.lat, pickup!.lng, signal),
-    enabled: !!user?.id && !!selectedCompany && !!pickup && !activeRequest && !recovering && requestStatus !== 'creating',
+    queryKey: ['marketplace-availability', user?.id, pickup?.lat, pickup?.lng],
+    queryFn: ({ signal }) => loadMarketplaceAvailability(pickup!.lat, pickup!.lng, signal),
+    enabled: !!user?.id && !!pickup && !activeRequest && !recovering && requestStatus !== 'creating',
     refetchInterval: 15_000, staleTime: 10_000, retry: 1,
   });
   const now = useFleetClock();
   const availabilityConfirmed = !availability.isError && availabilityFresh(availability.data, now);
   const readyCategory = availabilityConfirmed ? availability.data?.categories.find(c => c.id === vehicleType) : undefined;
+  const quoteReady = !!readyCategory?.drivers;
   const availabilityMessage = availability.isPending ? 'Проверяваме свободните автомобили около началния адрес…'
     : !availabilityConfirmed ? 'Наличността не е потвърдена. Провери връзката и обнови.'
-    : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази фирма и категория. Избери друга категория или фирма, или опитай по-късно.'
-    : `Свободни шофьори около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
+    : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
+    : `Свободни шофьори от партньорските фирми около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
   useEffect(() => {
     if (!availabilityConfirmed || !availability.data || requestStatus === 'creating') return;
     const current = availability.data.categories.find(c => c.id === vehicleType);
@@ -397,7 +395,7 @@ export default function CustomerHome() {
     setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
-      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,pickup_address:pickup.address,destination_address:destination.address}})
+      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
           setCalculating(false);
@@ -457,37 +455,6 @@ export default function CustomerHome() {
     }
   };
 
-  // Public operator choice never changes profile/admin membership.
-  useEffect(() => {
-    if (!user?.id) return;
-    let active = true;
-    const load = async () => {
-      let query = supabase.from('companies').select('id,name').eq('is_active',true).order('created_at').order('id').limit(100);
-      if (user.company_id) query = query.eq('id', user.company_id);
-      const { data, error } = await withRequestTimeout(signal => query.abortSignal(signal));
-      if (!active) return;
-      if (error || !data?.length) { setRequestError('Няма активна фирма за поръчки.'); return; }
-      setCompanies(data);
-      setCompanyChoice(current => data.some(c => c.id === current) ? current : data[0].id);
-    };
-    void load().catch(() => { if (active) setRequestError('Не успяхме да заредим фирмите. Провери връзката и опитай отново.'); });
-    return () => { active = false; };
-  }, [user?.id, user?.company_id, configAttempt]);
-  useEffect(() => {
-    if (!selectedCompany) return;
-    let active = true;
-    setVehicleTypes([]); setVehicleType('');
-    const load = async () => {
-      const { data, error } = await withRequestTimeout(signal => supabase.from('vehicle_types').select('*')
-        .eq('company_id', selectedCompany).eq('is_active',true).order('multiplier').order('id').limit(32).abortSignal(signal));
-      if (!active) return;
-      if (error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
-      setVehicleTypes(data); setVehicleType(data[0].id); setRequestError('');
-    };
-    void load().catch(() => { if (active) setRequestError('Не успяхме да заредим автомобилите. Провери връзката и опитай отново.'); });
-    return () => { active = false; };
-  }, [selectedCompany, configAttempt, t]);
-
   // Redirect to orders after trip completed or cancelled
   useEffect(() => {
     if (activeRequest?.status === 'completed' || activeRequest?.status === 'cancelled') {
@@ -516,7 +483,7 @@ export default function CustomerHome() {
 
   return <CustomerLayout
     expanded={step === 'confirm' && !activeRequest}
-    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={vehicleType || undefined} />}
+    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">
         <img src={LOGO_URL} alt="" />
@@ -532,7 +499,7 @@ export default function CustomerHome() {
         <p role="alert">{t('booking_recovery_error')}</p>
         <button type="button" className="booking-primary" onClick={() => setRecoveryAttempt(n => n + 1)}>{t('booking_retry')}</button>
       </div>
-      : activeRequest ? <RequestStatusCard request={activeRequest} price={price}
+      : activeRequest ? <RequestStatusCard request={activeRequest} price={price} priceRange={marketplaceRange(activeRequest.fare_breakdown) ?? undefined}
         confirmCancel={confirmCancel} cancelling={cancelling}
         onShowCancel={() => setConfirmCancel(true)} onKeepRequest={() => setConfirmCancel(false)}
         onCancel={cancelRequest} onReset={() => navigate('/customer/orders')}
@@ -542,13 +509,13 @@ export default function CustomerHome() {
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
         {step === 'confirm' && pickup && destination
           ? <BookingCard pickup={pickup} destination={destination}
-            companyId={selectedCompany} companies={companies} onCompanyChange={id => { if (!user?.company_id) setCompanyChoice(id); }}
+            marketplace priceRange={currentRoute?.price_min != null && currentRoute.price_max != null ? {min:currentRoute.price_min,max:currentRoute.price_max} : undefined}
             onFieldClick={handleFieldClick} onSwap={swapLocations}
             vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
-            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active && availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
+            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
             fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
             calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
-            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
+            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }} canRequest={canRequest}
             availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()}
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}

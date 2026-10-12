@@ -1526,6 +1526,7 @@ export type Database = {
           is_active: boolean
           multiplier: number
           name: string
+          service_class: string
           updated_at: string
         }
         Insert: {
@@ -1537,6 +1538,7 @@ export type Database = {
           is_active?: boolean
           multiplier?: number
           name: string
+          service_class?: string
           updated_at?: string
         }
         Update: {
@@ -1548,6 +1550,7 @@ export type Database = {
           is_active?: boolean
           multiplier?: number
           name?: string
+          service_class?: string
           updated_at?: string
         }
         Relationships: [
@@ -1672,6 +1675,9 @@ export type Database = {
       }
     }
     Functions: {
+      marketplace_availability: { Args: { p_lat: number; p_lng: number }; Returns: Json }
+      driver_incoming_requests: { Args: { p_limit?: number }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"][] }
+      save_vehicle_category: { Args: { p_id: string; p_company: string; p_expected_at: string; p_details: Json }; Returns: Database["public"]["Tables"]["vehicle_types"]["Row"] }
       booking_availability: { Args: { p_company: string; p_lat: number; p_lng: number }; Returns: Json }
       my_partner_invitation_data: { Args: Record<PropertyKey, never>; Returns: Json }
       create_partner_invitation: { Args: { p_id: string; p_kind: string; p_email: string; p_company?: string }; Returns: string }

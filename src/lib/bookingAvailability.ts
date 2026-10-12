@@ -22,3 +22,8 @@ export async function loadBookingAvailability(company: string, lat: number, lng:
   if (error) throw error;
   return parseBookingAvailability(data, company);
 }
+export async function loadMarketplaceAvailability(lat: number, lng: number, signal?: AbortSignal) {
+  const { data, error } = await withRequestTimeout(abort => supabase.rpc('marketplace_availability', { p_lat: lat, p_lng: lng }).abortSignal(abort), 10_000, signal);
+  if (error) throw error;
+  return parseBookingAvailability(data, 'marketplace');
+}

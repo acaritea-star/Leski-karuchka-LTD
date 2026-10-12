@@ -105,14 +105,10 @@ export default function DriverRequests() {
 
   // ── Incoming requests ──
   const incomingQuery = useQuery({
-    queryKey: user?.company_id ? queryKeys.driverIncomingRequests(user.company_id) : ['taxi_requests', 'company', 'none', 'incoming'],
+    queryKey: user?.id ? queryKeys.driverIncomingRequests(user.id) : ['taxi_requests', 'company', 'none', 'incoming'],
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(abort => supabase
-        .from('taxi_requests')
-        .select('*')
-        .eq('company_id', user!.company_id!)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false }).limit(50).abortSignal(abort), 10_000, signal);
+        .rpc('driver_incoming_requests', { p_limit: 50 }).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
@@ -120,6 +116,16 @@ export default function DriverRequests() {
     refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
   const freshIncoming = useFreshRequests(incomingQuery.data ?? []);
+  const heardOffers = useRef(new Set<string>());
+  useEffect(() => { heardOffers.current = new Set(); }, [driver?.id]);
+  useEffect(() => {
+    if (!isOnline) return;
+    const newOffers = freshIncoming.filter(row => !heardOffers.current.has(row.id));
+    for (const row of freshIncoming) heardOffers.current.add(row.id);
+    if (newOffers.length) playDriverSound();
+    if (heardOffers.current.size > 200) heardOffers.current = new Set(freshIncoming.map(row => row.id));
+  }, [freshIncoming, isOnline, playDriverSound]);
+
   const { declinedIds, decline, declineError, isDeclining, declinesReady, declinesLoadError, refreshDeclines } = useDriverDeclines(driver?.id, freshIncoming.map(r => r.id));
   const incomingRequests = declinesReady === false ? [] : freshIncoming.filter((r) => !declinedIds.has(r.id));
   const refusalError = declineError || declinesLoadError;
@@ -169,15 +175,15 @@ export default function DriverRequests() {
       if (driver?.id) {
         cacheDriverRequest(queryClient, driver.id, confirmed);
       }
-      if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.company_id) });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
       }
     },
     onError: (err) => {
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('request_missed'));
-      if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.company_id) });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
       }
     },
   });
@@ -238,24 +244,17 @@ export default function DriverRequests() {
 
   // ── Realtime: taxi_requests ──
   useEffect(() => {
-    if (!user?.company_id || !driver?.id) return;
-    const companyId = user.company_id;
+    if (!user?.id || !driver?.id) return;
     setRequestsRealtime(false);
     let subscribed = false;
 
     const channel = supabase
-      .channel(`driver-requests-panel-${driver.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` },
-        (payload) => {
-          const newRow = payload.new as TaxiRequest;
-          if (newRow.company_id === companyId && newRow.status === 'pending' && isOnline) {
-            playDriverSound();
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) }, { cancelRefetch: false });
-          }
-        },
-      )
+      .channel('driver-offers:' + user.id, { config: { private: true } })
+      .on('broadcast', { event: 'offer_changed' }, () => {
+        if (isOnline) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) }, { cancelRefetch: false });
+        }
+      })
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `driver_id=eq.${driver.id}` },
@@ -263,24 +262,18 @@ export default function DriverRequests() {
           const newRow = payload.new as TaxiRequest;
           if (['accepted', 'arrived', 'in_progress'].includes(newRow.status)) {
             cacheDriverRequest(queryClient, driver.id, newRow);
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
             cacheDriverRequest(queryClient, driver.id, newRow);
           }
         },
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` }, (payload) => {
-        const newRow = payload.new as TaxiRequest;
-        if (newRow.company_id === companyId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) }, { cancelRefetch: false });
-        }
-      })
       .subscribe(status => {
         setRequestsRealtime(status === 'SUBSCRIBED');
         if (status === 'SUBSCRIBED') {
           if (subscribed) {
             queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(companyId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
           }
           subscribed = true;
         }
@@ -289,7 +282,7 @@ export default function DriverRequests() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.company_id, driver?.id, isOnline, queryClient, playDriverSound]);
+  }, [user?.id, driver?.id, isOnline, queryClient]);
 
   // ── Realtime: own driver row (sync is_online across tabs) ──
   useEffect(() => {
