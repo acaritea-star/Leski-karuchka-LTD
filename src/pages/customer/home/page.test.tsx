@@ -313,3 +313,13 @@ it('never substitutes a different carrier when a selected carrier disappears fro
  expect(fake.rpc).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('radio'));
  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
 });
+
+it('keeps the selected category when its drivers disappear instead of switching to a different price',async()=>{
+ fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
+ fake.route.mockResolvedValue({...quote(),quotes:[offer(),offer('comfort','comfort',9)]});
+ await mount();await chooseRoute();fake.counts={standard:0,comfort:1};
+ fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>vi.advanceTimersByTimeAsync(1));
+ expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('5.00');
+ expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+ expect(fake.route).toHaveBeenCalledOnce();expect(fake.rpc).not.toHaveBeenCalled();
+});

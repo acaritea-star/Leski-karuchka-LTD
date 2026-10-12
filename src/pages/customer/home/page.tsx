@@ -202,12 +202,12 @@ export default function CustomerHome() {
     : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
     : `Свободни шофьори от партньорските фирми около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
   useEffect(() => {
-    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating') return;
+    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating' || carrierKey) return;
     const current = availability.data.categories.find(c => c.id === vehicleType);
     if (current?.drivers) return;
     const next = availability.data.categories.find(c => c.drivers > 0);
     if (next) setVehicleType(next.id);
-  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus]);
+  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus, carrierKey]);
 
   const fare = currentRoute?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
@@ -473,9 +473,9 @@ export default function CustomerHome() {
     }
   };
 
-  // Redirect to orders after trip completed or cancelled
+  // Keep a cancelled search visible so the customer can choose another offer.
   useEffect(() => {
-    if (activeRequest?.status === 'completed' || activeRequest?.status === 'cancelled') {
+    if (activeRequest?.status === 'completed') {
       const timer = setTimeout(() => {
         if (activeRequest.status === 'completed' && activeRequest.driver_id) {
           navigate(`/customer/orders?rate=${activeRequest.id}`);
