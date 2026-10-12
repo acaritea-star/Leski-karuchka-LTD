@@ -15,7 +15,7 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER',first_name:'Иван' },loading:false }) }));
 vi.mock('@/hooks/useDriverOfferConnection', () => ({ useDriverOfferConnection: () => fake.offersConnected }));
-vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
+vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change, ensureDriverLocation: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/components/feature/DriverGpsProvider', () => ({ useDriverGps: () => ({ status:'idle',error:'' }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ unlockAudio:fake.unlock,playDriverSound:fake.sound }) }));
 vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register:fake.register }) }));
@@ -108,4 +108,14 @@ it('does not present a stale GPS session as ready to receive new requests', asyn
   await act(async()=>vi.advanceTimersByTimeAsync(0));
   expect(screen.getByText('Изчаква GPS')).toBeTruthy();
   expect(screen.getByText(/не си достъпен за нови заявки/)).toBeTruthy();client.clear();
+});
+
+it('checks the request deadline again when clicking an offer after frozen browser timers',async()=>{
+ vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+ fake.incoming=[{id:'request',status:'pending',created_at:new Date().toISOString(),expires_at:new Date(Date.now()+10000).toISOString(),pickup_address:'Начало',destination_address:'Край',estimated_price:5}];
+ const client=mount();await act(async()=>vi.advanceTimersByTimeAsync(0));
+ const button=screen.getByRole('button',{name:/Приеми/});fake.accept.mockClear();
+ vi.setSystemTime(Date.now()+11000);fireEvent.click(button);await act(async()=>vi.advanceTimersByTimeAsync(0));
+ expect(fake.accept).not.toHaveBeenCalled();expect(screen.getByText(/Списъкът се обновява/)).toBeTruthy();
+ expect(screen.getByRole('button',{name:'Излез офлайн'})).toBeTruthy();client.clear();
 });

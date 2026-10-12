@@ -1,6 +1,6 @@
 import { isInBulgaria, SERVICE_AREA_ERROR } from './serviceArea';
 import { supabase } from '@/lib/supabase';
-import { gpsErrorMessage, isGpsPermissionDenied, requestGps, subscribeGps } from './sharedGps';
+import { gpsErrorMessage, isGpsPermissionDenied, isTransientGpsError, positionProblem, requestGps, subscribeGps } from './sharedGps';
 import { getLocationEnabled, setLocationEnabled } from './locationPreference';
 import { withRequestTimeout } from './requestTimeout';
 import { isAmbiguousWrite } from './rideOperations';
@@ -21,6 +21,7 @@ let lastError = '';
 let stopListeners: (() => void) | null = null;
 let bufferOwner: string | undefined;
 let trackedDriverId: string | undefined;
+let confirmTrackedPosition: ((position: GeolocationPosition, savedAt: string) => void) | undefined;
 
 type Callbacks = { onUpdate?: () => void; onError?: (message: string) => void };
 
@@ -28,11 +29,25 @@ export function isFreshTimestamp(value: string | null | undefined, now = Date.no
   const time = Date.parse(value ?? '');
   return Number.isFinite(time) && time <= now + 30_000 && now - time < GPS_STALE_MS;
 }
-export function getCurrentPosition(): Promise<GeolocationPosition> { return requestGps(); }
+export function getCurrentPosition(): Promise<GeolocationPosition> { return requestGps({ maximumAgeMs: 5000 }); }
 function validatePosition(position: GeolocationPosition) {
-  if (!Number.isFinite(position.timestamp) || Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла.');
+  const problem = positionProblem(position);
+  if (problem) throw problem;
   if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy < 0 || position.coords.accuracy > GPS_MAX_ACCURACY_METERS) throw new Error('Неточна GPS позиция. Изчакай по-добър сигнал.');
   if (!isInBulgaria(position.coords.latitude, position.coords.longitude)) throw new Error(SERVICE_AREA_ERROR);
+}
+/** Before an offer claim, refresh only when the confirmed GPS is getting old. */
+export async function ensureDriverLocation(driver: { id: string; company_id: string; user_id?: string; is_online?: boolean }, force = false) {
+  if (getLocationEnabled(driver.user_id) === false) throw new Error('Местоположението е изключено от настройките.');
+  if (driver.is_online === false) throw new Error('Включи онлайн режим, за да приемаш заявки.');
+  if (!force && trackedDriverId === driver.id && Date.now() - lastWriteAt < 15_000 && Date.now() - lastConfirmedFixAt < 15_000) return;
+  const startedGeneration = generation;
+  const wasTracked = trackedDriverId === driver.id;
+  let position: GeolocationPosition;
+  try { position = await getCurrentPosition(); } catch (error) { throw new Error(gpsErrorMessage(error, false, true)); }
+  if (wasTracked && (generation !== startedGeneration || trackedDriverId !== driver.id)) throw new DOMException('Account changed', 'AbortError');
+  const savedAt = await saveDriverPosition(driver.id, driver.company_id, position);
+  if (generation === startedGeneration && trackedDriverId === driver.id) confirmTrackedPosition?.(position, savedAt);
 }
 export async function saveDriverPosition(id: string, company: string, position: GeolocationPosition, signal?: AbortSignal): Promise<string> {
   validatePosition(position);
@@ -106,7 +121,11 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
       if (userId) clearGpsBuffer(userId);
       if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
     }
-    lastError = gpsErrorMessage(error);
+    lastError = gpsErrorMessage(error, false, true);
+    // A redundant native read timeout must not hide a still-current server
+    // position. Permission revocation stops dispatch immediately.
+    if (isGpsPermissionDenied(error)) { lastWriteAt = 0; lastConfirmedFixAt = 0; }
+    else if (isTransientGpsError(error) && Date.now() - lastWriteAt < GPS_STALE_MS && Date.now() - lastConfirmedFixAt < GPS_STALE_MS) return;
     callbacks.onError?.(lastError);
   };
   const schedule = () => {
@@ -125,15 +144,13 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     try {
       const savedAt = await saveDriverPosition(id, company, position, controller.signal);
       if (run !== generation) return;
-      lastWriteAt = Date.parse(savedAt);
-      lastConfirmedFixAt = position.timestamp;
-      confirmedFix = position;
+      confirmTrackedPosition?.(position, savedAt);
       if (userId && (!queued || (queued as GeolocationPosition).timestamp <= position.timestamp)) clearGpsBuffer(userId);
-      failures = 0; lastError = '';
-      callbacks.onUpdate?.();
+      failures = 0;
     } catch (error) {
       if (run !== generation) return;
       if (permissionDenied) return;
+      if (position.timestamp <= lastConfirmedFixAt) return;
       // Keep at most one fix in memory. Never replay an offline journey.
       const newer = queued as GeolocationPosition | null; // Native callbacks can replace it during await.
       if (!permissionDenied && (!newer || newer.timestamp < position.timestamp)) queued = position;
@@ -143,6 +160,11 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
       writing = null; controller = null;
       schedule();
     }
+  };
+  confirmTrackedPosition = (position, savedAt) => {
+    if (run !== generation || position.timestamp < lastConfirmedFixAt) return;
+    lastWriteAt = Date.parse(savedAt); lastConfirmedFixAt = position.timestamp; confirmedFix = position;
+    lastError = ''; callbacks.onUpdate?.();
   };
   const push = (position: GeolocationPosition) => {
     if (run !== generation) return;
@@ -202,6 +224,7 @@ export function stopDriverGps(clearBuffer = true, expectedDriverId?: string) {
   // An old offline write can finish after another account started tracking.
   if (expectedDriverId && trackedDriverId !== expectedDriverId) return;
   trackedDriverId = undefined;
+  confirmTrackedPosition = undefined;
   if (clearBuffer && bufferOwner) { clearGpsBuffer(bufferOwner); bufferOwner = undefined; }
   generation++;
   unsubscribeGps?.();

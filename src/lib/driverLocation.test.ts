@@ -3,7 +3,7 @@ const { single, upsert, update, updateSingle, readDriver } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => ({supabase:{from:()=>({upsert,update,select:()=>({eq:()=>({abortSignal:()=>({maybeSingle:readDriver})})})})}}));
 import { stopSharedGps } from './sharedGps';
 import {bufferGps,readBufferedGps} from './gpsBuffer';
-import { startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS, isFreshTimestamp, setDriverOnline } from './driverLocation';
+import { startDriverGps, stopDriverGps, ensureDriverLocation, getGpsStats, GPS_STALE_MS, isFreshTimestamp, setDriverOnline } from './driverLocation';
 
 type PositionCallback = (position: GeolocationPosition) => void;
 let watch: PositionCallback;
@@ -44,7 +44,7 @@ describe('driver GPS writes',()=>{
   });
   it('does not refresh the timestamp with an old GPS fix',async()=>{
     startDriverGps('driver','company');watch({...fix(),timestamp:Date.now()-60000});await flush();
-    expect(single).not.toHaveBeenCalled();expect(getGpsStats().error).toContain('остаряла');
+    expect(single).not.toHaveBeenCalled();expect(getGpsStats().error).toContain('Обновяваме');
   });
   it('rejects a location too imprecise for dispatch without claiming a successful write',async()=>{
     const onUpdate=vi.fn(),onError=vi.fn();startDriverGps('driver','company',{onUpdate,onError});
@@ -230,4 +230,19 @@ it('cannot transfer late GPS callbacks or write acknowledgements into the next d
   finish({data:{updated_at:new Date().toISOString()},error:null});await flush();oldWatch(fix());await flush();
   expect(oldUpdate).not.toHaveBeenCalled();expect(newUpdate).toHaveBeenCalledOnce();
   expect(upsert.mock.calls.map(call=>call[0].driver_id)).toEqual(['old-driver','new-driver']);
+});
+
+it('refreshes before claiming only when the measured server-confirmed position is ageing',async()=>{
+ startDriverGps('driver','company');watch(fix());await flush();
+ await ensureDriverLocation({id:'driver',company_id:'company',is_online:true});expect(upsert).toHaveBeenCalledOnce();
+ await vi.advanceTimersByTimeAsync(16000);await ensureDriverLocation({id:'driver',company_id:'company',is_online:true},true);
+ expect(Date.now()-Date.parse(upsert.mock.calls.at(-1)![0].position_at)).toBe(1000);
+ expect(getGpsStats().lastConfirmedFixAgeMs).toBe(1000);
+});
+it('keeps a confirmed fresh server position available when a redundant native read times out',async()=>{
+ const onError=vi.fn();startDriverGps('driver','company',{onError});watch(fix());await flush();
+ // Trigger a native watch timeout while the latest server fix is still valid.
+ const handler=vi.mocked(navigator.geolocation.watchPosition).mock.calls[0][1]!;
+ handler({code:3} as GeolocationPositionError);expect(onError).not.toHaveBeenCalled();
+ expect(getGpsStats().lastConfirmedFixAgeMs).toBe(0);
 });

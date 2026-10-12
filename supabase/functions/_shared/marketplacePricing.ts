@@ -1,5 +1,5 @@
 import { calculateFare, applyVehicleMultiplier, pricingFromRow, type PricingRow } from './pricing.ts';
-export type MarketplaceTariff = PricingRow & { id: string; company_id: string; service_class: string; multiplier: number; currency: string };
+export type MarketplaceTariff = PricingRow & { company_name?: string; type_name?: string; capacity?: number; id: string; company_id: string; service_class: string; multiplier: number; currency: string };
 export function marketplaceQuotes(types: MarketplaceTariff[], input: {
   customer: string; distanceMeters: number; durationSeconds: number;
   origin: { lat: number; lng: number }; destination: { lat: number; lng: number };
@@ -31,4 +31,17 @@ export function marketplaceQuotes(types: MarketplaceTariff[], input: {
         distance_km: high.breakdown.distanceKm, duration_min: Math.ceil(input.durationSeconds / 60), total: high.total,
         breakdown: { ...high.breakdown, marketplace } } };
   });
+}
+
+/** Exact carrier quotes share a route but never share a booking or fare. */
+export function carrierQuotes(types: MarketplaceTariff[], input: Parameters<typeof marketplaceQuotes>[1]) {
+  const priced = marketplaceQuotes(types, input);
+  return priced.flatMap(group => group.payload.breakdown.marketplace.offers.map(offer => {
+    const type = types.find(type => type.id === offer.vehicle_type_id)!;
+    if (!type.company_name?.trim() || !type.type_name?.trim() || !Number.isInteger(type.capacity) || type.capacity! < 1 || type.capacity! > 8)
+      throw new Error('Carrier identity unavailable');
+    return { id: crypto.randomUUID(), customer_id: input.customer, company_id: offer.company_id, vehicle_type_id: offer.vehicle_type_id,
+      payload: { ...group.payload, total: offer.total, breakdown: { ...offer.breakdown,
+        carrier_choice: { service_class: type.service_class, company_name: type.company_name, type_name: type.type_name, capacity: type.capacity! } } } };
+  })).sort((a,b) => a.payload.total - b.payload.total || a.company_id.localeCompare(b.company_id) || a.vehicle_type_id.localeCompare(b.vehicle_type_id));
 }

@@ -15,7 +15,7 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER' } }) }));
 vi.mock('@/hooks/useDriverOfferConnection', () => ({ useDriverOfferConnection: () => fake.offersConnected }));
-vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
+vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change, ensureDriverLocation: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/components/feature/DriverGpsProvider', () => ({ useDriverGps: () => ({ status:'idle',error:'' }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ unlockAudio:fake.unlock,playDriverSound:fake.sound }) }));
 vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register:fake.register }) }));

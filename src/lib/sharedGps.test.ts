@@ -91,7 +91,7 @@ it('never retries or falls back after permission denial', async () => {
   readError({ code: 1 } as GeolocationPositionError); await rejected;
   await vi.advanceTimersByTimeAsync(60_000);
   expect(get).toHaveBeenCalledOnce(); expect(getGpsPosition()).toBeNull();
-  expect(gpsErrorMessage({ code: 3 })).toContain('забави');
+  expect(gpsErrorMessage({ code: 3 })).toContain('актуална позиция');
   expect(gpsErrorMessage({ code: 2 })).toContain('недостъпно');
 });
 it('does not publish invalid or out-of-order native callbacks', () => {
@@ -162,4 +162,30 @@ it('fences frozen-page callbacks and starts a fresh watch on restoration',()=>{
  const consumer=vi.fn();releases.push(subscribeGps(consumer));const previous=receive;
  document.dispatchEvent(new Event('freeze'));previous(fix());expect(consumer).not.toHaveBeenCalled();
  window.dispatchEvent(new Event('pageshow'));expect(watch).toHaveBeenCalledTimes(2);receive(fix());expect(consumer).toHaveBeenCalledOnce();
+});
+
+it('uses a valid watch fix when a concurrent one-shot read stalls, and fences its late timeout',async()=>{
+ const sink=vi.fn();releases.push(subscribeGps(sink));const first=requestGps(),oldFailure=readError;
+ await vi.advanceTimersByTimeAsync(1000);const measured=fix();receive(measured);
+ await expect(first).resolves.toBe(measured);oldFailure({code:3} as GeolocationPositionError);
+ expect(get).toHaveBeenCalledOnce();expect(sink).toHaveBeenCalledOnce();
+});
+it('recovers two stale native reads without publishing or retimestamping the old GPS',async()=>{
+ const task=requestGps();const old=fix(Date.now()-60000);read(old);read(old);
+ expect(getGpsPosition()).toBeNull();const measured=fix();receive(measured);
+ await expect(task).resolves.toBe(measured);expect(getGpsPosition()?.timestamp).toBe(measured.timestamp);
+ expect(watch).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+});
+it('bounds repeated stale readings and releases the recovery watch at the original deadline',async()=>{
+ const task=requestGps(),rejected=expect(task).rejects.toMatchObject({code:3});
+ read(fix(Date.now()-60000));read(fix(Date.now()-60000));
+ await vi.advanceTimersByTimeAsync(1000);read(fix(Date.now()-60000));
+ await vi.advanceTimersByTimeAsync(23000);await rejected;
+ expect(get).toHaveBeenCalledTimes(3);expect(getGpsPosition()).toBeNull();expect(clear).toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+});
+it('reuses only a measured fix younger than five seconds when explicitly allowed',async()=>{
+ const pending=requestGps(),measured=fix();read(measured);await pending;
+ await expect(requestGps({maximumAgeMs:5000})).resolves.toBe(measured);expect(get).toHaveBeenCalledOnce();
+ await vi.advanceTimersByTimeAsync(5001);const next=requestGps({maximumAgeMs:5000});read(fix());await next;
+ expect(get).toHaveBeenCalledTimes(2);
 });

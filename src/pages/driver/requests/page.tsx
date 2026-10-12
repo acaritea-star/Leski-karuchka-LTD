@@ -6,7 +6,7 @@ import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
-import { setDriverOnline } from '@/lib/driverLocation';
+import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +38,8 @@ export default function DriverRequests() {
   const toggleInFlight = useRef(false);
   const acceptInFlight = useRef(false);
   const { user } = useAuth();
+  const activeOwner = useRef(user?.id);
+  activeOwner.current = user?.id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { playDriverSound, unlockAudio } = useNotificationSound();
@@ -142,6 +144,7 @@ export default function DriverRequests() {
       return await setDriverOnline(driver, goingOnline);
     },
     onSuccess: async (confirmed) => {
+      if (confirmed.id !== driver?.id) return;
       if (user?.id) {
         await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
         queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
@@ -169,10 +172,19 @@ export default function DriverRequests() {
     retry: false,
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      return acceptTaxiRequest(requestId, driver.id);
+      const request = incomingRequests.find(row => row.id === requestId);
+      if (!request || !isOpenRequest(request)) throw new Error('Заявката вече не е налична. Списъкът се обновява.');
+      const owner = user?.id;
+      await ensureDriverLocation(driver);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      if (!isOpenRequest(request)) throw new Error('Заявката изтече, докато обновявахме GPS. Изчакай следващата.');
+      const confirmed = await acceptTaxiRequest(requestId, driver.id);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      return confirmed;
     },
     onSettled: () => { acceptInFlight.current = false; },
     onSuccess: (confirmed) => {
+      if (confirmed.driver_id !== driver?.id) return;
       setError('');
       if (driver?.id) {
         cacheDriverRequest(queryClient, driver.id, confirmed);
@@ -182,6 +194,7 @@ export default function DriverRequests() {
       }
     },
     onError: (err) => {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.id) {
@@ -419,6 +432,7 @@ export default function DriverRequests() {
               )}
             </button>
             {driver && !driver.is_verified && <p className="text-xs text-foreground-600 my-3">Премини подготовката и качи документите преди верификация от фирмата. <button type="button" className="underline text-primary-700" onClick={() => navigate('/driver/profile')}>Към подготовката и документите</button> · <button type="button" className="underline" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
+              {isOnline && gps.status !== 'tracking' && <button type="button" className="text-sm text-primary-700 underline mb-2" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>}
               {gpsError && (
               <p className="text-xs text-red-500 mt-3 flex items-center justify-center gap-1">
                 <i className="ri-error-warning-line" /> {gpsError}

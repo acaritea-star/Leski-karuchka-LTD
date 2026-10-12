@@ -1,6 +1,6 @@
 import type { LocationPreset } from '@/lib/geo';
 
-export type BookingStep = 'pickup' | 'dest' | 'confirm';
+export type BookingStep = 'pickup' | 'dest' | 'confirm' | 'offers';
 
 /** Editing an address must not repeat already completed steps. */
 export function stepAfterSelection(field: 'pickup' | 'dest', hasOtherAddress: boolean): BookingStep {

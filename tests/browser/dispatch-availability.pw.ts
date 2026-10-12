@@ -26,27 +26,35 @@ async function setup(page:Page) {
   else if(u.pathname.endsWith('/taxi_requests'))data=null;
   else if(u.pathname.endsWith('/carrier_identity')){const c=request.postDataJSON().p_company;data={id:c,name:c===b?'Втора фирма':'Първа фирма',verified:false};}
   else if(u.pathname.endsWith('/marketplace_availability'))data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:[{id:'standard',drivers:state.vanished?0:2,configured:true},{id:'comfort',drivers:0,configured:false},{id:'van',drivers:0,configured:false}]};
-  else if(u.pathname.endsWith('/google-routes')){const id=request.postDataJSON().quote.vehicle_type_id;const price=id==='standard'?9:5;data={success:true,vehicle_type_id:id,quote_id:'quote-'+id,quote_expires_at:new Date(Date.now()+120000).toISOString(),price,price_min:5,price_max:9,breakdown:{total:price},distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};}
+  else if(u.pathname.endsWith('/google-routes')){
+   const quotes=[{company_id:b,company_name:'Втора фирма',price:9,quote_id:'quote-b'},{company_id:a,company_name:'Първа фирма',price:5,quote_id:'quote-a'}]
+    .map(c=>({...c,vehicle_type_id:'type-'+c.company_id,type_name:'Стандарт',capacity:4,service_class:'standard',quote_expires_at:new Date(Date.now()+120000).toISOString(),breakdown:{total:c.price}}));
+   data={success:true,...quotes[1],quotes,distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};
+  }
   else if(u.pathname.endsWith('/create_taxi_request')){
    const payload=request.postDataJSON();state.bookings.push(payload);
    if(state.vanished)return route.fulfill({status:400,headers,contentType:'application/json',body:JSON.stringify({code:'P0001',message:'NO_AVAILABLE_DRIVER: Няма свободен шофьор за тази фирма.'})});
-   data={id:payload.p_request_id,company_id:payload.p_quote_id==='quote-standard'?b:a,customer_id:actor,driver_id:null,status:'pending',pickup_address:'Начало',destination_address:'Край',estimated_price:payload.p_quote_id==='quote-standard'?9:5};
+   data={id:payload.p_request_id,company_id:payload.p_quote_id==='quote-b'?b:a,customer_id:actor,driver_id:null,status:'pending',pickup_address:'Начало',destination_address:'Край',estimated_price:payload.p_quote_id==='quote-b'?9:5};
   }
   await route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify(data)});
  });return state;
 }
 async function chooseRoute(page:Page){await page.goto('/customer/home');await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();await page.getByRole('button',{name:/Край.*Гара/}).click();}
-test('customer sees the combined fleet and fare range without selecting a firm',async({page},testInfo)=>{
+test('customer sees exact sorted carrier offers and books only the chosen firm',async({page},testInfo)=>{
  const state=await setup(page);await chooseRoute(page);const order=page.getByRole('button',{name:/Поръчай каручка/});
- await expect(order).toBeEnabled();await expect(page.getByRole('radio',{name:/Комфорт/})).toBeDisabled();
+ await expect(page.getByRole('radio',{name:/Комфорт/})).toBeDisabled();
  await expect(page.getByLabel('Фирма за тази поръчка')).toHaveCount(0);
- await expect(page.getByRole('radio',{name:/Стандарт/})).toBeChecked();await expect(order).toContainText('5.00–9.00');await expect(order).toBeEnabled();
+ await expect(page.getByRole('radio',{name:/Стандарт/})).toBeChecked();
+ await page.getByRole('button',{name:/Виж офертите/}).click();
+ await expect(order).toContainText('5.00');await expect(order).not.toContainText('–');
+ const cards=page.getByRole('radio');await expect(cards.first()).toBeChecked();await expect(cards.first().locator('..')).toContainText('Първа фирма');
+ await cards.nth(1).check();await expect(order).toContainText('9.00');await expect(order).toBeEnabled();
  await page.screenshot({path:testInfo.outputPath('booking-operator-availability.png'),fullPage:true});
  await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
- expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-standard');expect(state.errors).toEqual([]);expect(state.google).toBe(0);
+ expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');expect(state.errors).toEqual([]);expect(state.google).toBe(0);
 });
 test('a driver disappearing at submission keeps the customer out of a false searching state',async({page})=>{
- const state=await setup(page);await chooseRoute(page);const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
- state.vanished=true;await order.click();await expect(page.getByRole('alert')).toContainText('Няма свободен шофьор');await expect(order).toBeDisabled();
+ const state=await setup(page);await chooseRoute(page);await page.getByRole('button',{name:/Виж офертите/}).click();const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ state.vanished=true;await order.click();await expect(page.getByRole('alert')).toContainText('няма свободен шофьор');await expect(order).toBeDisabled();
  await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toHaveCount(0);expect(state.bookings).toHaveLength(1);expect(state.errors).toEqual([]);expect(state.google).toBe(0);
 });
