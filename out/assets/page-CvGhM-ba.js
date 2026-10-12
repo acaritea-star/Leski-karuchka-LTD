@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-DpJIb57s.js";import{o as t}from"./chunk-BV7QT456-BCIzF0Q6.js";import{O as n,i as r,m as i,w as a}from"./index-BeYsbTzZ.js";var o=e();function s(){let e=t();return(0,o.jsx)(r,{companyScoped:!1,redirectTo:a(`driver`,n(e.search)),children:(0,o.jsx)(i,{kind:`driver`})})}export{s as default};
