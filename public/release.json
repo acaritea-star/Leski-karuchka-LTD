@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.12-reverse-workflow.1",
-  "baseCommit": "c9186350e3050bee48fb44499db333e85ddece7f",
+  "release": "2026.10.12-partner-ux.1",
+  "baseCommit": "d6c7ab0787fbaa172058bbb3d82d222753e9f834",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261009074806",
   "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "30ec776921a82654175785536fdac639e89fcf89",
+  "verifiedSourceCommit": "f42ba542723a173456af4639d8871b738793fb91",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -38,5 +38,7 @@
   "tenantReliabilityMigrationVersion": "20261011184333",
   "tenantReliabilityVerifiedSourceCommit": "64a7e2b328c8761a2cf403ffc70a91e2e4ecca4c",
   "reverseWorkflowMigrationVersion": "20261011205954",
-  "reverseWorkflowVerifiedSourceCommit": "30ec776921a82654175785536fdac639e89fcf89"
+  "reverseWorkflowVerifiedSourceCommit": "30ec776921a82654175785536fdac639e89fcf89",
+  "partnerUxVersion": 1,
+  "partnerUxVerifiedSourceCommit": "f42ba542723a173456af4639d8871b738793fb91"
 }

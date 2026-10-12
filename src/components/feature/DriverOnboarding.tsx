@@ -55,14 +55,16 @@ export default function DriverOnboarding({ applicationId, onReviewed }: { applic
     }} className="underline text-primary-700">{busy ? 'Отваряме пакета…' : 'Коригирай пакета'}</button><p className="text-xs">Запазените условия и документи остават. Поправи необходимото и изпрати пакета отново.</p></div>;
   const required = a.has_vehicle ? ['license', 'insurance', 'vehicle_registration'] : ['license'];
   const ready = prepared && (!a.has_vehicle || !!a.vehicle_details) && required.every(type => bundle.documents.some(x => x.type === type && (type === 'vehicle_registration' || !documentExpired(x.expires_at))));
+  const step = a.status === 'approved' ? 5 : a.submitted_at ? 4 : prepared ? 3 : 2;
   return <div className="space-y-4">
-    <p className="font-semibold text-primary-700">Присъединяване към {bundle.company_name}</p>
-    <ol className="space-y-1 text-sm" aria-label="Стъпки за присъединяване"><li>1. {prepared ? '✓ ' : ''}Права, задължения и подготовка</li><li>2. {ready ? '✓ ' : ''}Документи и автомобил</li><li>3. {a.submitted_at ? '✓ ' : ''}Общ преглед от фирмата</li></ol>
+    <ol className="grid grid-cols-4 gap-2 text-center" aria-label="Стъпки за присъединяване">{['Данни', 'Обучение', 'Документи', 'Одобрение'].map((label, i) => <li key={label} aria-current={step === i + 1 ? 'step' : undefined} className={`rounded-xl py-3 px-1 ${step === i + 1 ? 'bg-primary-50 border border-primary-200' : 'bg-background-50 border border-transparent'}`}>
+      <span className={`mx-auto mb-2 flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${step > i + 1 ? 'bg-primary-500 text-white' : step === i + 1 ? 'bg-primary-100 text-primary-800' : 'bg-background-200 text-foreground-500'}`}>{step > i + 1 ? '✓' : i + 1}</span><span className="text-[10px] sm:text-xs font-medium text-foreground-600">{label}</span>
+    </li>)}</ol>
     {a.status === 'approved' ? <div role="status"><p>Фирмата одобри профила ти. Влез в шофьорската част.</p><button className="underline text-primary-700" onClick={() => void refreshProfile()}>Обнови профила</button></div> : <>
       {prepared ? <details className="rounded-xl border border-background-200 p-3"><summary className="text-sm font-semibold cursor-pointer">✓ Подготовката е завършена · условия и запис</summary><div className="mt-3"><DriverPreparationForm materials={bundle.preparation} acceptPreparation={async () => {}} onUncertain={() => void refresh()} /></div></details>
         : <DriverPreparationForm key={bundle.preparation.content_hash} materials={bundle.preparation} acceptPreparation={async answers => { await acceptApplicationPreparation(bundle, answers); await refresh(); }} onUncertain={() => void refresh()} />}
       {prepared && <section className="space-y-4">
-        <h4 className="font-semibold">2. Документи и автомобил</h4>
+        <h4 className="font-semibold">Документи и автомобил</h4>
         <VehicleForm key={a.id + ':' + a.has_vehicle} application={a} onSaved={refresh} />
         <p className="text-xs text-foreground-500">Четлив JPG, PNG, WebP или PDF до 5 MB. Документите са частни и достъпни за проверката от твоята фирма. Не качвай лична карта.</p>
         {(required as ('license' | 'insurance' | 'vehicle_registration')[]).map(type => <ApplicationDocumentCard key={a.id + ':' + a.company_id + ':' + type} bundle={bundle} type={type} onSaved={refresh} />)}
