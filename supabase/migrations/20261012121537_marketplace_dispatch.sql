@@ -351,7 +351,8 @@ BEGIN
         END IF;
       EXCEPTION WHEN OTHERS THEN NULL; END;
       INSERT INTO public.notifications(user_id,company_id,type,title,message,data,is_read)
-        VALUES(recipient,NEW.company_id,notification_type,title,message,payload->'data',false);
+        VALUES(recipient,CASE WHEN kind='new_request' THEN (SELECT company_id FROM public.drivers WHERE user_id=recipient) ELSE NEW.company_id END,
+          notification_type,title,message,payload->'data',false);
     END IF;
   END LOOP;
   IF kind<>'new_request' THEN
@@ -363,6 +364,6 @@ BEGIN
   END IF;
   PERFORM private.dispatch_push_outbox();
   RETURN NEW;
-END $function$
+END $function$;
 NOTIFY pgrst,'reload schema';
 COMMIT;

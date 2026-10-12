@@ -53,6 +53,8 @@ SELECT pg_temp.market_denied('SELECT private.accept_marketplace_request(ride) FR
 SELECT pg_temp.market_denied('SELECT public.marketplace_quote_types(43.2,25.6)');
 RESET ROLE;
 DO $$ BEGIN IF (SELECT count(*) FROM public.request_push_recipients((SELECT ride FROM market_ids)))<>2 THEN RAISE EXCEPTION 'FAIL both carriers must receive offer'; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.notifications WHERE user_id=(SELECT a_user FROM market_ids) AND company_id=(SELECT company_a FROM market_ids) AND type='new_request')
+ THEN RAISE EXCEPTION 'FAIL notification carrier ownership'; END IF; END $$;
 SELECT set_config('request.jwt.claims',json_build_object('sub',b_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids) AND estimated_price=12) THEN RAISE EXCEPTION 'FAIL B own tariff'; END IF; END $$;

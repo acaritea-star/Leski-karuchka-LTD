@@ -42,7 +42,8 @@ test('mobile booking keeps the price action visible and reuses the category rout
  expect(routes).toBe(1);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:720,height:390}]) {
   await page.setViewportSize(size);await expect(order).toBeInViewport({ratio:1});
-  await page.getByLabel('Превозвач').scrollIntoViewIfNeeded();await expect(page.getByLabel('Превозвач')).toBeInViewport();
+  const priceNotice=page.getByText('Фирмите имат различни тарифи.',{exact:false});
+  await priceNotice.scrollIntoViewIfNeeded();await expect(priceNotice).toBeInViewport();
   await expect(order).toBeInViewport({ratio:1});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }

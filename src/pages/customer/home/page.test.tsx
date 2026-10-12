@@ -254,3 +254,11 @@ it('reconciles a lost driver at submit without pretending that a request was cre
   expect(screen.queryByRole('heading',{name:'Търсим твоя шофьор'})).toBeNull();
   expect(screen.getByRole('alert').textContent).toContain('Няма свободен шофьор');
 });
+it('reuses the quoted route when nearby availability disappears and returns', async () => {
+  await mount();await chooseRoute();expect(fake.route).toHaveBeenCalledOnce();
+  fake.counts={standard:0};fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>{});
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+  fake.counts={standard:1};fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>{});
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
+  await act(async()=>vi.advanceTimersByTimeAsync(400));expect(fake.route).toHaveBeenCalledOnce();
+});

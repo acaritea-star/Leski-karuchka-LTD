@@ -138,6 +138,7 @@ export default function CustomerHome() {
   const [calculating, setCalculating] = useState(false);
   const quoteCompany = 'marketplace';
   const quoteInput = JSON.stringify([pickup, destination, quoteCompany]);
+  const lastQuotedInput = useRef('');
   const requestedType = useRef(vehicleType);
   requestedType.current = vehicleType;
   const selectedQuote = route?.quotes?.find(quote => quote.vehicle_type_id === vehicleType);
@@ -390,6 +391,9 @@ export default function CustomerHome() {
   // Only a server-created quote can be booked. A failed route never becomes a guessed fare.
   useEffect(() => {
     if (!pickup || !destination || !quoteReady || activeRequestId) return;
+    const quoteKey = JSON.stringify([quoteInput, quoteRefresh]);
+    // A temporary availability loss must not buy the same valid route again.
+    if (lastQuotedInput.current === quoteKey) return;
     let active = true;
     const vehicleTypeForQuote = requestedType.current;
     setRoute(null); setRequestError(''); setCalculating(true);
@@ -403,6 +407,7 @@ export default function CustomerHome() {
             setRoute(null);
             setRequestError(t(result?.code==='ROUTE_DAILY_LIMIT'?'route_daily_limit':result?.code==='ROUTE_USER_LIMIT'?'route_user_limit':result?.status===429?'route_rate_limit':'route_failed'));
           } else {
+            lastQuotedInput.current = quoteKey;
             setRoute(result);
             setRouteVehicleType(vehicleTypeForQuote);
             setVisualRoute({ endpoints, route: result });
