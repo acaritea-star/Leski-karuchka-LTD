@@ -17,10 +17,26 @@ export default function DriverOffersProvider({ children }: { children: ReactNode
     if (!uid) return;
     let active = true;
     let channel: RealtimeChannel | undefined;
+    let refreshing = false;
+    let pending = false;
     const reconcile = () => {
       if (!active) return;
-      void queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(uid) }, { cancelRefetch: false });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(uid) }, { cancelRefetch: false });
+      pending = true;
+      if (refreshing) return;
+      refreshing = true;
+      void (async () => {
+        try {
+          // A hint during an existing read needs one trailing read. Coalesce
+          // bursts so old snapshots cannot swallow offers or multiply reads.
+          while (active && pending) {
+            pending = false;
+            await Promise.allSettled([
+              queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(uid) }, { cancelRefetch: false }),
+              queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(uid) }, { cancelRefetch: false }),
+            ]);
+          }
+        } finally { refreshing = false; }
+      })().catch(() => { /* Bounded polling recovers a failed reconciliation. */ });
     };
     // Serialize teardown/rejoin for fast reauthentication and StrictMode.
     void removal.current.then(() => {

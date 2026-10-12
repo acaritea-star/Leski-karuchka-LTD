@@ -20,6 +20,7 @@ let lastFixAt = 0, lastWriteAt = 0, lastConfirmedFixAt = 0;
 let lastError = '';
 let stopListeners: (() => void) | null = null;
 let bufferOwner: string | undefined;
+let trackedDriverId: string | undefined;
 
 type Callbacks = { onUpdate?: () => void; onError?: (message: string) => void };
 
@@ -72,11 +73,12 @@ export async function setDriverOnline(driver: { id: string; company_id: string; 
       ? String(cause.message) : 'Промяната не е потвърдена.');
   }
   if (online && driver.user_id) setLocationEnabled(driver.user_id, true);
-  if (!online) stopDriverGps();
+  if (!online) stopDriverGps(true, driver.id);
   return confirmed;
 }
 export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}, userId?: string): boolean {
   stopDriverGps(false);
+  trackedDriverId = id;
   if (bufferOwner && bufferOwner !== userId) clearGpsBuffer(bufferOwner);
   bufferOwner = userId;
   if (getLocationEnabled(userId) === false) { callbacks.onError?.('Местоположението е изключено от настройките.'); return false; }
@@ -196,7 +198,10 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
   };
   return true;
 }
-export function stopDriverGps(clearBuffer = true) {
+export function stopDriverGps(clearBuffer = true, expectedDriverId?: string) {
+  // An old offline write can finish after another account started tracking.
+  if (expectedDriverId && trackedDriverId !== expectedDriverId) return;
+  trackedDriverId = undefined;
   if (clearBuffer && bufferOwner) { clearGpsBuffer(bufferOwner); bufferOwner = undefined; }
   generation++;
   unsubscribeGps?.();

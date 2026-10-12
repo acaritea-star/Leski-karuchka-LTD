@@ -115,7 +115,7 @@ export default function DriverRequests() {
       return data ?? [];
     },
     enabled: !!user?.company_id && isOnline && !!driver?.id && !activeRequest,
-    refetchInterval: requestsRealtime ? 15_000 : 8000,
+    refetchInterval: offersConnected ? 30_000 : 8000,
   });
   const freshIncoming = useFreshRequests(incomingQuery.data ?? []);
   const heardOffers = useRef(new Set<string>());

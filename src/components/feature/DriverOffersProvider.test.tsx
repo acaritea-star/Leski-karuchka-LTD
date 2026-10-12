@@ -45,3 +45,24 @@ it('waits for old-account teardown and ignores old hints during a fast account s
 it('does not create a driver offer connection for a customer', async () => {
   fake.user={id:'customer',role:'CUSTOMER'};setup();await act(async()=>{});expect(fake.sockets).toHaveLength(0);
 });
+it('coalesces hints during an in-flight read into one trailing reconciliation', async () => {
+  const view=setup();await act(async()=>{});
+  let finish!: () => void;
+  const pending=new Promise<void>(resolve=>{finish=resolve;});let calls=0;
+  view.invalidate.mockImplementation(()=> ++calls<=2 ? pending : Promise.resolve());
+  act(()=>fake.sockets[0].hint?.());expect(view.invalidate).toHaveBeenCalledTimes(2);
+  for(let i=0;i<10;i++)act(()=>fake.sockets[0].hint?.());
+  expect(view.invalidate).toHaveBeenCalledTimes(2);
+  await act(async()=>finish());expect(view.invalidate).toHaveBeenCalledTimes(4);
+});
+it('does not replay a queued old-account hint after account switching', async () => {
+  const view=setup();await act(async()=>{});
+  let finish!: () => void;const pending=new Promise<void>(resolve=>{finish=resolve;});
+  view.invalidate.mockReturnValue(pending);
+  act(()=>{fake.sockets[0].hint?.();fake.sockets[0].hint?.();});
+  fake.user={id:'two',role:'DRIVER'};view.rerender(view.content());await act(async()=>{});
+  const before=view.invalidate.mock.calls.length;await act(async()=>finish());
+  expect(view.invalidate).toHaveBeenCalledTimes(before);
+  act(()=>fake.sockets[1].hint?.());
+  expect(view.invalidate).toHaveBeenLastCalledWith({queryKey:queryKeys.driverIncomingRequests('two')},{cancelRefetch:false});
+});

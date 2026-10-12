@@ -66,6 +66,66 @@ RESET ROLE;
 DO $$ BEGIN IF (SELECT count(*) FROM public.request_push_recipients((SELECT ride FROM market_ids)))<>2 THEN RAISE EXCEPTION 'FAIL both carriers must receive offer'; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.notifications WHERE user_id=(SELECT a_user FROM market_ids) AND company_id=(SELECT company_a FROM market_ids) AND type='new_request')
  THEN RAISE EXCEPTION 'FAIL notification carrier ownership'; END IF; END $$;
+-- The durable worker can deliver to both carriers, independently of Broadcast.
+SAVEPOINT worker_delivery;
+DO $$ DECLARE j private.push_outbox; token uuid; claimed jsonb; delivered int:=0; BEGIN
+ FOR j IN SELECT * FROM private.push_outbox WHERE request_id=(SELECT ride FROM market_ids) AND event_type='new_request' LOOP
+  token:=gen_random_uuid();
+  UPDATE private.push_outbox SET status='processing',lease_token=token,lease_until=clock_timestamp()+interval '30 seconds',claimed_at=NULL WHERE id=j.id;
+  claimed:=public.claim_push_job(j.id,token);
+  IF claimed IS NULL OR claimed->>'recipient_id'<>j.recipient_id::text THEN RAISE EXCEPTION 'FAIL cross-carrier worker delivery'; END IF;
+  IF public.claim_push_job(j.id,token) IS NOT NULL THEN RAISE EXCEPTION 'FAIL replayed marketplace worker lease'; END IF;
+  delivered:=delivered+1;
+ END LOOP;
+ IF delivered<>2 THEN RAISE EXCEPTION 'FAIL two carrier worker jobs'; END IF;
+END $$;
+ROLLBACK TO worker_delivery;
+RELEASE SAVEPOINT worker_delivery;
+
+-- A common offer without an assigned driver is not either carrier's order.
+SAVEPOINT unassigned_company_report;
+UPDATE public.profiles SET role='COMPANY_ADMIN' WHERE id=(SELECT b_user FROM market_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',b_user,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN IF (public.company_dashboard((SELECT company_b FROM market_ids))->'stats'->>'activeOrders')::int<>0
+ THEN RAISE EXCEPTION 'FAIL unassigned market offer counted as firm order'; END IF; END $$;
+RESET ROLE;
+SELECT set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+UPDATE public.taxi_requests SET status='cancelled',cancel_reason='customer_requested' WHERE id=(SELECT ride FROM market_ids);
+RESET ROLE;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=(SELECT ride FROM market_ids) AND outcome='cancelled')
+ THEN RAISE EXCEPTION 'FAIL platform cancellation evidence lost'; END IF; END $$;
+SELECT set_config('request.jwt.claims',json_build_object('sub',b_user,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE report jsonb; today date:=(clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date; BEGIN
+ report:=public.accounting_report(today,today+1,(SELECT company_b FROM market_ids));
+ IF (report->'totals'->>'cancelled')::int<>0 OR (report->>'outcome_count')::int<>0
+  OR (public.company_dashboard((SELECT company_b FROM market_ids))->'stats'->>'cancelledOrders')::int<>0
+ THEN RAISE EXCEPTION 'FAIL platform-only cancellation attributed to firm'; END IF;
+END $$;
+RESET ROLE;
+ROLLBACK TO unassigned_company_report;
+RELEASE SAVEPOINT unassigned_company_report;
+
+-- A refusal survives a fresh server read and prevents a later push retry.
+SAVEPOINT refused_market_offer;
+SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+INSERT INTO public.request_declines(request_id,driver_id) SELECT i.ride,d.id FROM market_ids i JOIN public.drivers d ON d.user_id=i.a_user;
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids))
+ THEN RAISE EXCEPTION 'FAIL refused offer returned before list limit'; END IF; END $$;
+RESET ROLE;
+DO $$ DECLARE j private.push_outbox; token uuid:=gen_random_uuid(); BEGIN
+ IF EXISTS(SELECT 1 FROM public.request_push_recipients((SELECT ride FROM market_ids)) WHERE user_id=(SELECT a_user FROM market_ids))
+  OR NOT EXISTS(SELECT 1 FROM public.request_push_recipients((SELECT ride FROM market_ids)) WHERE user_id=(SELECT b_user FROM market_ids))
+ THEN RAISE EXCEPTION 'FAIL refusal push recipient selection'; END IF;
+ SELECT * INTO j FROM private.push_outbox WHERE request_id=(SELECT ride FROM market_ids) AND event_type='new_request' AND recipient_id=(SELECT a_user FROM market_ids);
+ UPDATE private.push_outbox SET status='processing',lease_token=token,lease_until=clock_timestamp()+interval '30 seconds',claimed_at=NULL WHERE id=j.id;
+ IF public.claim_push_job(j.id,token) IS NOT NULL THEN RAISE EXCEPTION 'FAIL refused offer push replay'; END IF;
+END $$;
+ROLLBACK TO refused_market_offer;
+RELEASE SAVEPOINT refused_market_offer;
 SELECT set_config('request.jwt.claims',json_build_object('sub',b_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids) AND estimated_price=12) THEN RAISE EXCEPTION 'FAIL B own tariff'; END IF; END $$;
@@ -93,6 +153,25 @@ DO $$ DECLARE r public.taxi_requests; BEGIN
  IF r.company_id<>(SELECT company_a FROM market_ids) OR r.vehicle_type_id<>(SELECT type_a FROM market_ids) OR r.estimated_price<>10
  OR r.accepted_at IS NULL OR (r.fare_breakdown->>'total')::numeric<>10 OR r.fare_breakdown->'marketplace' ? 'offers' THEN RAISE EXCEPTION 'FAIL carrier/tariff assignment'; END IF;
 END $$;
+-- Once assigned, cancellation belongs to the accepting carrier's report.
+SAVEPOINT assigned_company_report;
+RESET ROLE;
+SELECT set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+UPDATE public.taxi_requests SET status='cancelled',cancel_reason='customer_requested' WHERE id=(SELECT ride FROM market_ids);
+RESET ROLE;
+UPDATE public.profiles SET role='COMPANY_ADMIN' WHERE id=(SELECT a_user FROM market_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE report jsonb; today date:=(clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date; BEGIN
+ report:=public.accounting_report(today,today+1,(SELECT company_a FROM market_ids));
+ IF (report->'totals'->>'cancelled')::int<>1 OR (report->>'outcome_count')::int<>1
+  OR (public.company_dashboard((SELECT company_a FROM market_ids))->'stats'->>'cancelledOrders')::int<>1
+ THEN RAISE EXCEPTION 'FAIL assigned cancellation missing from firm report'; END IF;
+END $$;
+RESET ROLE;
+ROLLBACK TO assigned_company_report;
+RELEASE SAVEPOINT assigned_company_report;
 UPDATE public.taxi_requests SET status='arrived' WHERE id=(SELECT ride FROM market_ids);
 UPDATE public.taxi_requests SET status='in_progress' WHERE id=(SELECT ride FROM market_ids);
 UPDATE public.taxi_requests SET status='completed',final_price=99 WHERE id=(SELECT ride FROM market_ids);
