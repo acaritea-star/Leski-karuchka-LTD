@@ -30,7 +30,9 @@ async function train(page: Page) {
   await page.getByRole('button', { name: 'Приеми условията и завърши подготовката' }).click();
 }
 
-for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole === 'DRIVER' ? 'orphan driver recovers through its personal invitation and' : 'invited candidate'} prepares a complete own-car package before verification, recovering a lost training reply`, async ({ page, context }) => {
+for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole === 'DRIVER' ? 'orphan driver recovers through its personal invitation and' : 'invited candidate'} prepares a complete own-car package before verification, recovering a lost training reply`, async ({ page, context }, testInfo) => {
+  // This end-to-end flow also captures five screens for visual review.
+  testInfo.setTimeout(60_000);
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   const user = await session(page, account); let a: ReturnType<typeof app> | null = null, r: ReturnType<typeof receipt> | null = null;
   const docs: Record<string, unknown>[] = []; let accepts = 0, submits = 0, google = 0;
@@ -70,26 +72,34 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
   });
   await page.goto('/driver/login?invite=' + application);
   await expect(page).toHaveURL(/\/driver\/access/);
-  await expect(page.getByRole('heading', { name: 'Подготовка за Поканилата фирма' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Добре дошъл!' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Фирма, към която кандидатстваш' })).toHaveCount(0);
+  if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-01-welcome.png'), fullPage: true });
   await page.locator('select[name=experience]').selectOption('1–3'); await page.locator('select[name=vehicle]').selectOption('own');
   await page.getByRole('button', { name: 'Запази и продължи към обучението' }).click();
   await expect(page.getByRole('form', { name: 'Качване: Шофьорска книжка' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Как работи приложението', exact: true })).toBeVisible();
+  if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-02-training.png'), fullPage: true });
   await train(page);
   await expect(page.getByRole('heading', { name: 'Документи и автомобил' })).toBeVisible();
   await page.getByLabel('Марка', { exact: true }).fill('Тест'); await page.getByLabel('Модел', { exact: true }).fill('Автомобил');
   await page.getByLabel('Регистрационен номер', { exact: true }).fill('A1234BC');
   await page.getByLabel('Застраховка до', { exact: true }).fill('2099-01-01'); await page.getByLabel('Технически преглед до', { exact: true }).fill('2099-02-01');
   await page.getByRole('button', { name: 'Запази избора и данните' }).click();
+  await expect(page.getByRole('form', { name: /^Качване:/ })).toHaveCount(1);
+  if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-03-document.png'), fullPage: true });
   for (const name of ['Шофьорска книжка', 'Застраховка на автомобила', 'Свидетелство за регистрация на автомобила']) {
     const form = page.getByRole('form', { name: 'Качване: ' + name });
     if (name !== 'Свидетелство за регистрация на автомобила') await form.getByLabel('Валиден до').fill('2099-01-01');
     await form.getByLabel('Файл').setInputFiles({ name: 'fixture.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF synthetic') });
+    expect(await form.getByRole('button', { name: 'Качи документа', exact: true }).evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     await form.getByRole('button', { name: 'Качи документа', exact: true }).click();
     await expect(form).toHaveCount(0);
   }
+  if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-04-ready.png'), fullPage: true });
   await page.getByRole('button', { name: 'Изпрати целия пакет за проверка' }).click();
   await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
+  if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-05-waiting.png'), fullPage: true });
   await page.reload(); await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
   expect(profileRole).toBe('CUSTOMER'); expect(profileWrites).toBe(0);
   expect(accepts).toBe(1); expect(submits).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
