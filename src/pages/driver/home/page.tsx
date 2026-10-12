@@ -1,3 +1,5 @@
+import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
+import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { loadDriverDay } from '@/lib/serverSummaries';
 import { useSofiaDay } from '@/hooks/useSofiaDay';
 import { acceptTaxiRequest } from '@/lib/rideOperations';
@@ -45,6 +47,7 @@ export default function DriverHome() {
   const gpsError = toggleError || gps.error;
   const gpsStatus = gps.status;
   const [requestsRealtime, setRequestsRealtime] = useState(false);
+  const offersConnected = useDriverOfferConnection();
 
   // Unlock audio on first user interaction (browsers block AudioContext until then)
   useEffect(() => {
@@ -60,6 +63,8 @@ export default function DriverHome() {
   // ── Driver record ──
   const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
+  const identity = useDriverDispatchIdentity(user?.id, driver?.vehicle_id);
+  const readyForRequests = !!driver?.is_online && gpsStatus === 'tracking';
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
@@ -93,15 +98,10 @@ export default function DriverHome() {
 
   // ── Pending list (to surface the next non-declined request) ──
   const pendingListQuery = useQuery({
-    queryKey: user?.company_id ? queryKeys.driverPendingList(user.company_id) : ['taxi_requests', 'company', 'none', 'pending-list'],
+    queryKey: user?.id ? queryKeys.driverPendingList(user.id) : ['taxi_requests', 'company', 'none', 'pending-list'],
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(abort => supabase
-        .from('taxi_requests')
-        .select('*')
-        .eq('company_id', user!.company_id!)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(10).abortSignal(abort), 10_000, signal);
+        .rpc('driver_incoming_requests', { p_limit: 50 }).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
@@ -110,6 +110,16 @@ export default function DriverHome() {
   });
   // The badge renders 9+ beyond nine; the existing ten-row snapshot is enough.
   const freshPending = useFreshRequests(pendingListQuery.data ?? []);
+  const heardOffers = useRef(new Set<string>());
+  useEffect(() => { heardOffers.current = new Set(); }, [driver?.id]);
+  useEffect(() => {
+    if (!driver?.is_online) return;
+    const newOffers = freshPending.filter(row => !heardOffers.current.has(row.id));
+    for (const row of freshPending) heardOffers.current.add(row.id);
+    if (newOffers.length) playDriverSound();
+    if (heardOffers.current.size > 200) heardOffers.current = new Set(freshPending.map(row => row.id));
+  }, [freshPending, driver?.is_online, playDriverSound]);
+
   const { declinedIds, decline, declineError, declinesReady, declinesLoadError, refreshDeclines } = useDriverDeclines(driver?.id, freshPending.map(r => r.id));
   const refusalError = declineError || declinesLoadError;
   const displayedError = gpsError || (refusalError ? refusalError instanceof Error ? refusalError.message : 'Отказът не е потвърден. Обнови заявките.' : '');
@@ -153,16 +163,16 @@ export default function DriverHome() {
       if (driver?.id) {
         cacheDriverRequest(queryClient, driver.id, confirmed);
       }
-      if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.company_id) });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) });
       }
       navigate('/driver/requests');
     },
     onError: (err) => {
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setGpsError(err instanceof Error ? err.message : t('request_missed'));
-      if (user?.company_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.company_id) });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) });
       }
     },
   });
@@ -177,23 +187,11 @@ export default function DriverHome() {
 
   // ── Realtime: taxi_requests ──
   useEffect(() => {
-    if (!driver?.id || !user?.company_id) return;
-    const companyId = user.company_id;
+    if (!driver?.id || !user?.id) return;
     setRequestsRealtime(false);
 
     const channel = supabase
-      .channel(`driver-requests-${driver.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` },
-        (payload) => {
-          const newRow = payload.new as TaxiRequest;
-          if (driver.is_online && newRow.company_id === companyId && newRow.status === 'pending') {
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
-            playDriverSound();
-          }
-        },
-      )
+      .channel('driver-requests-' + driver.id)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `driver_id=eq.${driver.id}` },
@@ -207,24 +205,17 @@ export default function DriverHome() {
           }
         },
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `company_id=eq.${companyId}` }, (payload) => {
-        const newRow = payload.new as TaxiRequest;
-        // RLS may omit old.status. Reconcile the small list on company changes.
-        if (driver.is_online && newRow.company_id === companyId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
-        }
-      })
       .subscribe(status => {
         setRequestsRealtime(status === 'SUBSCRIBED');
         if (status === 'SUBSCRIBED') {
           queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) }, { cancelRefetch: false });
-          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(companyId) }, { cancelRefetch: false });
+          queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) }, { cancelRefetch: false });
         }
       });
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [driver?.id, driver?.is_online, user?.company_id, queryClient, playDriverSound]);
+  }, [driver?.id, driver?.is_online, user?.id, queryClient]);
 
   // ── Decorative Google Maps background ──
   const [mapOpened, setMapOpened] = useState(false);
@@ -336,10 +327,11 @@ export default function DriverHome() {
           <div className="mx-auto w-full max-w-3xl space-y-4">
             <section aria-label="Твоят работен статус" className="space-y-2">
               <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-foreground-500">ШОФЬОРСКИ ПАНЕЛ</p>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : driver?.is_online ? 'bg-primary-100 text-primary-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? 'Онлайн' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground-950 break-words">Здравей{user?.first_name ? ', ' + user.first_name : ''}!</h1>
-              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? 'Онлайн режимът е включен. Следи връзката и местоположението си.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? readyForRequests ? 'Готов си за заявки от твоята фирма и категория.' : 'Онлайн режимът е включен, но изчакваме актуален GPS. Докато няма потвърдена позиция, не си достъпен за нови заявки.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+              {identity.data?.company && <p className="text-sm text-foreground-700"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}<span className="block text-xs text-foreground-500 mt-1">Получаваш подходящите заявки от общия пазар в радиуса на фирмата. Цената на офертата е по вашата тарифа.</span></p>}
             </section>
             {driver && !driver.is_verified && !activeRequest && <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 space-y-3" aria-label="Подготовка за работа">
               <h2 className="font-semibold text-foreground-950">Следваща стъпка: профил и документи</h2>

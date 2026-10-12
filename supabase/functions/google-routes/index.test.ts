@@ -67,3 +67,20 @@ it('passes Google rate-limit retry guidance back to the browser',async()=>{
   const response=await call();
   expect(response.status).toBe(429);expect(response.headers.get('Retry-After')).toBe('120');
 });
+it('uses one route request for the whole marketplace and preserves both carrier prices',async()=>{
+  const types=[{id:'eco-a',company_id:'a',service_class:'standard',multiplier:1,base_fare:2,price_per_km:1,price_per_minute:0,min_fare:0,currency:'EUR'},
+    {id:'standard-b',company_id:'b',service_class:'standard',multiplier:1,base_fare:4,price_per_km:1,price_per_minute:0,min_fare:0,currency:'EUR'}];
+  fake.rpc.mockImplementation(async name=>({data:name==='marketplace_quote_types'?types:{allowed:true},error:null}));
+  let rows: Array<Record<string,unknown>>=[];
+  fake.from.mockImplementation(()=>({insert:(input:typeof rows)=>{rows=input;return{select:async()=>({data:input.map(row=>({id:row.id,expires_at:new Date(Date.now()+120000).toISOString()})),error:null})};}}));
+  const response=await call({origin:body.origin,destination:body.destination,quote:{marketplace:true,vehicle_type_id:'standard',pickup_address:'A',destination_address:'B'}});
+  expect(response.status).toBe(200);expect(fetch).toHaveBeenCalledOnce();expect(rows).toHaveLength(1);
+  const reply=await response.json();expect(reply).toMatchObject({vehicle_type_id:'standard',price_min:5,price_max:7,breakdown:{marketplace:{min:5,max:7}}});
+  expect(reply.breakdown.marketplace.offers).toBeUndefined();
+  expect(rows[0]).toMatchObject({payload:{breakdown:{marketplace:{offers:[{company_id:'a',total:5},{company_id:'b',total:7}]}}}});
+});
+it('never contacts Google for a marketplace category without a nearby eligible driver',async()=>{
+  fake.rpc.mockResolvedValue({data:[],error:null});
+  expect((await call({origin:body.origin,destination:body.destination,quote:{marketplace:true,vehicle_type_id:'standard'}})).status).toBe(409);
+  expect(fetch).not.toHaveBeenCalled();
+});

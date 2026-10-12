@@ -15,8 +15,8 @@ export const queryKeys = {
   driverRequestSnapshot: (driverId: string, requestId: string) => ['taxi_requests', 'driver', driverId, 'snapshot', requestId] as const,
   driverTodayStats: (driverId: string, day?: string) => day ? ['taxi_requests', 'driver', driverId, 'today', day] as const : ['taxi_requests', 'driver', driverId, 'today'] as const,
   driverPendingCount: (companyId: string) => ['taxi_requests', 'company', companyId, 'pending-count'] as const,
-  driverPendingList: (companyId: string) => ['taxi_requests', 'company', companyId, 'pending-list'] as const,
-  driverIncomingRequests: (companyId: string) => ['taxi_requests', 'company', companyId, 'incoming'] as const,
+  driverPendingList: (userId: string) => ['taxi_requests', 'driver-user', userId, 'pending-list'] as const,
+  driverIncomingRequests: (userId: string) => ['taxi_requests', 'driver-user', userId, 'incoming'] as const,
   driverHistory: (driverId: string, filter: string) => ['taxi_requests', 'driver', driverId, 'history', filter] as const,
   driverEarnings: (driverId: string) => ['taxi_requests', 'driver', driverId, 'earnings'] as const,
 

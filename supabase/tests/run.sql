@@ -6,6 +6,10 @@ SET LOCAL statement_timeout = '30s';
 SAVEPOINT regression_suite;
 RESET ROLE;
 SELECT set_config('request.jwt.claims','{}',true);
+\ir booking_availability.sql
+ROLLBACK TO regression_suite;
+RESET ROLE;
+SELECT set_config('request.jwt.claims','{}',true);
 \ir scale_security.sql
 ROLLBACK TO regression_suite;
 RESET ROLE;
@@ -60,3 +64,4 @@ ROLLBACK;
 \ir partner_invitations.sql
 \ir tenant_reliability.sql
 \ir reverse_workflows.sql
+\ir marketplace_dispatch.sql

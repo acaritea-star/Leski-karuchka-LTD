@@ -9,6 +9,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import type { Tables } from '@/lib/database.types';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
+import CategoryEditor from './CategoryEditor';
 
 type VehicleWithDriver = Tables<'vehicles'> & { driver_id: string | null; driver_name: string | null };
 type DriverOption = { id: string; name: string };
@@ -43,6 +44,7 @@ function VehiclesEditor() {
   const saveId = useRef(crypto.randomUUID());
   const saveLatch = useRef(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [createCategory, setCreateCategory] = useState(0);
 
   const vehiclesQuery = useQuery({
     queryKey: companyId ? queryKeys.adminVehicles(companyId) : ['vehicles', 'company', 'none'],
@@ -206,6 +208,11 @@ function VehiclesEditor() {
 
   return (
     <AdminLayout title={t('nav_vehicles')}>
+      {companyId && <CategoryEditor companyId={companyId} categories={vehicleTypes} disabled={loading || !!queryError || saveMutation.isPending} createRequest={createCategory} onSaved={category => {
+        queryClient.setQueryData<{vehicles:VehicleWithDriver[];drivers:DriverOption[];vehicleTypes:Tables<'vehicle_types'>[]}>(queryKeys.adminVehicles(companyId), previous => previous ? {...previous,vehicleTypes:[...previous.vehicleTypes.filter(type => type.id !== category.id),category]} : previous);
+        if (category.is_active) setForm(current => ({...current,vehicle_type_id:category.id}));
+        void queryClient.invalidateQueries({queryKey:queryKeys.adminVehicles(companyId)});
+      }} />}
       {(error || queryError) && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -219,7 +226,7 @@ function VehiclesEditor() {
 
       {!loading && !queryError && companyId && !activeTypes.length && (
         <p role="status" className="mb-4 text-sm text-foreground-600">
-          Фирмата няма активна категория автомобил. Необходимо е администратор да добави или активира категория.
+          Фирмата няма активна категория автомобил. Добави или активирай категория от секцията по-горе.
         </p>
       )}
 
@@ -410,6 +417,8 @@ function VehiclesEditor() {
                       </option>
                     ))}
                   </select>
+                  <button type="button" disabled={saveMutation.isPending || !!queryError} onClick={() => setCreateCategory(n => n + 1)} className="mt-2 text-xs text-primary-700 underline disabled:opacity-50">Добави нова категория</button>
+                  {activeTypes.length === 1 && <p className="text-xs text-foreground-500 mt-1">Това е единствената активна категория на фирмата. Можеш да добавиш още.</p>}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-foreground-500 block mb-1">Места</label>

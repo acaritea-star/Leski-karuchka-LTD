@@ -20,7 +20,7 @@ vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ 
 vi.mock('@/hooks/useDriverDeclines', () => ({ useDriverDeclines: () => ({ declinedIds:fake.declined,decline:vi.fn(),declineError:null,isDeclining:false }) }));
 vi.mock('@/pages/driver/components/DriverRouteMap', () => ({ default: () => null }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc:(...args:unknown[])=>({abortSignal:()=>fake.accept(...args)}),
+  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?Promise.resolve({data:fake.incoming,error:null}):fake.accept(...args)}),
   removeChannel:vi.fn(), channel: (name:string) => { const channel={
     on:(_event:string,filter:{table?:string;filter?:string})=>{fake.filters.push(filter);return channel;},
     subscribe:(status?:(status:string)=>void)=>{if(status)fake.statuses.set(name,status);return channel;},

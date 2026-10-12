@@ -20,13 +20,14 @@ test('mobile booking keeps the price action visible and reuses the category rout
   if(u.pathname.endsWith('/auth/v1/user')) data=user;
   else if(u.pathname.endsWith('/profiles')) data={id:customer,role:'CUSTOMER',company_id:company,first_name:'Тест',last_name:'Клиент',is_active:true,email:user.email};
   else if(u.pathname.endsWith('/companies')) data=[{id:company,name:'Тестова фирма',is_active:true}];
-  else if(u.pathname.endsWith('/vehicle_types')) data=[{id:'eco',company_id:company,name:'Economy',capacity:4,is_active:true},{id:'comfort',company_id:company,name:'Comfort',capacity:4,is_active:true}];
+  else if(u.pathname.endsWith('/vehicle_types')) data=[{id:'standard',company_id:company,name:'Economy',capacity:4,is_active:true},{id:'comfort',company_id:company,name:'Comfort',capacity:4,is_active:true}];
   else if(u.pathname.endsWith('/legal_acceptances')) data={id:'accepted'};
   else if(u.pathname.endsWith('/taxi_requests')) data=null;
+  else if(u.pathname.endsWith('/marketplace_availability')) data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:['standard','comfort'].map(id=>({id,drivers:1,configured:true}))};
   else if(u.pathname.endsWith('/carrier_identity')) data={id:company,name:'Тестова фирма',verified:false};
   else if(u.pathname.endsWith('/google-routes')) {
    routes++;
-   const quotes=['eco','comfort'].map((id,i)=>({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:new Date(Date.now()+120000).toISOString(),price:5+i,breakdown:{total:5+i}}));
+   const quotes=['standard','comfort'].map((id,i)=>({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:new Date(Date.now()+120000).toISOString(),price:5+i,breakdown:{total:5+i}}));
    data={success:true,...quotes[0],quotes,distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};
   }
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data),headers:{'access-control-allow-origin':'*'}});
@@ -41,7 +42,8 @@ test('mobile booking keeps the price action visible and reuses the category rout
  expect(routes).toBe(1);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:720,height:390}]) {
   await page.setViewportSize(size);await expect(order).toBeInViewport({ratio:1});
-  await page.getByLabel('Превозвач').scrollIntoViewIfNeeded();await expect(page.getByLabel('Превозвач')).toBeInViewport();
+  const priceNotice=page.getByText('Фирмите имат различни тарифи.',{exact:false});
+  await priceNotice.scrollIntoViewIfNeeded();await expect(priceNotice).toBeInViewport();
   await expect(order).toBeInViewport({ratio:1});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }

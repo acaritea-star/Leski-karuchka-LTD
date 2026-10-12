@@ -138,7 +138,13 @@ test('company admin reviews files and verifies a complete package with one actio
   await page.getByRole('button', { name: 'Прегледай целия пакет' }).click();
   const approve = page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' });
   await expect(approve).toBeDisabled();
-  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Прегледай', exact: true }).first().click();
+  // Wait for each signed document to be confirmed before selecting the next.
+  const unopened = page.getByRole('button', { name: 'Прегледай', exact: true });
+  for (let remaining = 3; remaining > 0; remaining--) {
+    await expect(unopened).toHaveCount(remaining);
+    await unopened.first().click();
+    await expect(unopened).toHaveCount(remaining - 1);
+  }
   await page.getByRole('checkbox', { name: /Проверих четливостта/ }).check();
   await expect(approve).toBeEnabled(); await approve.click();
   await expect(page.getByText('Верифициран', { exact: true })).toBeVisible();

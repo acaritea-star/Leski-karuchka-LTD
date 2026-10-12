@@ -8,6 +8,10 @@ import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { availabilityFresh, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
+import { SERVICE_CLASSES, marketplaceRange } from '@/lib/marketplace';
+import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -47,6 +51,7 @@ interface ActiveRequest {
   destination_longitude: number;
   destination_address: string;
   estimated_price: number | null;
+  fare_breakdown?: import('@/lib/database.types').Json | null;
   cancelled_by?: string | null;
   updated_at?: string;
 }
@@ -118,10 +123,9 @@ export default function CustomerHome() {
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
 
   // Booking options
-  const [vehicleType, setVehicleType] = useState('');
-  const [vehicleTypes, setVehicleTypes] = useState<Tables<'vehicle_types'>[]>([]);
+  const [vehicleType, setVehicleType] = useState('standard');
+  const vehicleTypes = SERVICE_CLASSES;
   const [quoteRefresh, setQuoteRefresh] = useState(0);
-  const [configAttempt, setConfigAttempt] = useState(0);
   const bookingId = useRef(crypto.randomUUID());
   const bookingInFlight = useRef(false);
 
@@ -132,9 +136,9 @@ export default function CustomerHome() {
   const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
-  const quoteCompany = vehicleTypes.find(type => type.id === vehicleType)?.company_id ?? user?.company_id;
+  const quoteCompany = 'marketplace';
   const quoteInput = JSON.stringify([pickup, destination, quoteCompany]);
-  const quoteReady = !!vehicleType;
+  const lastQuotedInput = useRef('');
   const requestedType = useRef(vehicleType);
   requestedType.current = vehicleType;
   const selectedQuote = route?.quotes?.find(quote => quote.vehicle_type_id === vehicleType);
@@ -179,10 +183,33 @@ export default function CustomerHome() {
     };
   }, []);
 
+  const availability = useQuery({
+    queryKey: ['marketplace-availability', user?.id, pickup?.lat, pickup?.lng],
+    queryFn: ({ signal }) => loadMarketplaceAvailability(pickup!.lat, pickup!.lng, signal),
+    enabled: !!user?.id && !!pickup && !activeRequest && !recovering && requestStatus !== 'creating',
+    refetchInterval: 15_000, staleTime: 10_000, retry: 1,
+  });
+  const now = useFleetClock();
+  const availabilityConfirmed = !availability.isError && availabilityFresh(availability.data, now);
+  const readyCategory = availabilityConfirmed ? availability.data?.categories.find(c => c.id === vehicleType) : undefined;
+  const quoteReady = !!readyCategory?.drivers;
+  const availabilityMessage = availability.isPending ? 'Проверяваме свободните автомобили около началния адрес…'
+    : !availabilityConfirmed ? 'Наличността не е потвърдена. Провери връзката и обнови.'
+    : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
+    : `Свободни шофьори от партньорските фирми около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
+  useEffect(() => {
+    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating') return;
+    const current = availability.data.categories.find(c => c.id === vehicleType);
+    if (current?.drivers) return;
+    const next = availability.data.categories.find(c => c.drivers > 0);
+    if (next) setVehicleType(next.id);
+  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus]);
+
   const fare = currentRoute?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
   const canRequest = !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
+    && availabilityConfirmed && !!readyCategory?.drivers
     && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
@@ -296,8 +323,13 @@ export default function CustomerHome() {
     try {
       const data = await createTaxiRequest(quoteId, bookingId.current, user.id);
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
-    } catch {
-      setRequestError(t('request_failed_hint'));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : '';
+      const fleetChanged = reason.startsWith('QUOTE_FLEET_CHANGED:');
+      if (fleetChanged) setRoute(current => current ? {...current,quote_id:undefined,quotes:current.quotes?.map(q => ({...q,quote_id:undefined}))} : null);
+      setRequestError(fleetChanged ? reason.slice('QUOTE_FLEET_CHANGED:'.length).trim()
+        : reason.startsWith('NO_AVAILABLE_DRIVER:') ? reason.slice('NO_AVAILABLE_DRIVER:'.length).trim() : t('request_failed_hint'));
+      void availability.refetch();
       setRequestStatus('error');
     } finally { bookingInFlight.current = false; }
   };
@@ -363,12 +395,15 @@ export default function CustomerHome() {
   // Only a server-created quote can be booked. A failed route never becomes a guessed fare.
   useEffect(() => {
     if (!pickup || !destination || !quoteReady || activeRequestId) return;
+    const quoteKey = JSON.stringify([quoteInput, quoteRefresh]);
+    // A temporary availability loss must not buy the same valid route again.
+    if (lastQuotedInput.current === quoteKey) return;
     let active = true;
     const vehicleTypeForQuote = requestedType.current;
     setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
-      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,pickup_address:pickup.address,destination_address:destination.address}})
+      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
           setCalculating(false);
@@ -376,6 +411,7 @@ export default function CustomerHome() {
             setRoute(null);
             setRequestError(t(result?.code==='ROUTE_DAILY_LIMIT'?'route_daily_limit':result?.code==='ROUTE_USER_LIMIT'?'route_user_limit':result?.status===429?'route_rate_limit':'route_failed'));
           } else {
+            lastQuotedInput.current = quoteKey;
             setRoute(result);
             setRouteVehicleType(vehicleTypeForQuote);
             setVisualRoute({ endpoints, route: result });
@@ -428,30 +464,6 @@ export default function CustomerHome() {
     }
   };
 
-  // Fetch company pricing config
-  useEffect(() => {
-    if (!user?.id) return;
-    let active = true;
-    const load = async () => {
-      let companies = supabase.from('companies').select('id').eq('is_active',true).order('created_at').order('id').limit(1);
-      if (user?.company_id) companies = companies.eq('id',user.company_id);
-      const {data:company,error:companyError} = await withRequestTimeout(signal => companies.abortSignal(signal).maybeSingle());
-      if (companyError || !company) { if(active) setRequestError('Няма активна компания.'); return; }
-      const {data,error} = await withRequestTimeout(signal => supabase.from('vehicle_types').select('*').eq('company_id',company.id).order('multiplier').order('id').abortSignal(signal));
-      if (!active) return;
-      if(error || !data?.length) { setRequestError(t('no_vehicles_available')); return; }
-      setVehicleTypes(data);
-      const firstAvailable = data.find(v => v.is_active);
-      setVehicleType(current => {
-        const cur = data.find(v => v.id === current);
-        if (cur && cur.is_active) return current;
-        return firstAvailable ? firstAvailable.id : '';
-      });
-    };
-    void load().catch(() => { if (active) setRequestError('Не успяхме да заредим автомобилите. Провери връзката и опитай отново.'); });
-    return () => {active=false;};
-  }, [user?.id, user?.company_id, configAttempt, t]);
-
   // Redirect to orders after trip completed or cancelled
   useEffect(() => {
     if (activeRequest?.status === 'completed' || activeRequest?.status === 'cancelled') {
@@ -480,7 +492,7 @@ export default function CustomerHome() {
 
   return <CustomerLayout
     expanded={step === 'confirm' && !activeRequest}
-    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={vehicleType || undefined} />}
+    map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">
         <img src={LOGO_URL} alt="" />
@@ -496,7 +508,7 @@ export default function CustomerHome() {
         <p role="alert">{t('booking_recovery_error')}</p>
         <button type="button" className="booking-primary" onClick={() => setRecoveryAttempt(n => n + 1)}>{t('booking_retry')}</button>
       </div>
-      : activeRequest ? <RequestStatusCard request={activeRequest} price={price}
+      : activeRequest ? <RequestStatusCard request={activeRequest} price={price} priceRange={marketplaceRange(activeRequest.fare_breakdown) ?? undefined}
         confirmCancel={confirmCancel} cancelling={cancelling}
         onShowCancel={() => setConfirmCancel(true)} onKeepRequest={() => setConfirmCancel(false)}
         onCancel={cancelRequest} onReset={() => navigate('/customer/orders')}
@@ -506,13 +518,14 @@ export default function CustomerHome() {
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
         {step === 'confirm' && pickup && destination
           ? <BookingCard pickup={pickup} destination={destination}
-            companyId={vehicleTypes.find(v => v.id === vehicleType)?.company_id}
+            marketplace priceRange={currentRoute?.price_min != null && currentRoute.price_max != null ? {min:currentRoute.price_min,max:currentRoute.price_max} : undefined}
             onFieldClick={handleFieldClick} onSwap={swapLocations}
             vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
-            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: v.is_active }))}
+            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
             fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
             calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
-            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); if (!vehicleType) setConfigAttempt(n => n + 1); }} canRequest={canRequest}
+            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }} canRequest={canRequest}
+            availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()}
             creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}

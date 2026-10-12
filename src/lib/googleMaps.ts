@@ -27,10 +27,12 @@ export interface GeocodeResult {
 }
 
 export interface RouteResult {
-  quotes?: Array<{ vehicle_type_id: string; quote_id?: string; quote_expires_at: string; price: number; breakdown: import('@/lib/pricing').FareBreakdown }>;
+  quotes?: Array<{ vehicle_type_id: string; quote_id?: string; quote_expires_at: string; price: number; price_min?: number; price_max?: number; breakdown: import('@/lib/pricing').FareBreakdown }>;
   quote_id?: string;
   quote_expires_at?: string;
   price?: number;
+  price_min?: number;
+  price_max?: number;
   breakdown?: import('@/lib/pricing').FareBreakdown;
   success: boolean;
   distance_km: number;
@@ -105,7 +107,7 @@ export async function computeRoute(
     waypoints?: RoutePoint[];
     requestId?: string;
     purpose?: 'pickup' | 'destination' | 'context';
-    quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string };
+    quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string; marketplace?: boolean };
   }
 ): Promise<RouteResult | null> {
   const started=metricNow();

@@ -2,6 +2,10 @@
 RESET ROLE;
 UPDATE test_ids SET quote=gen_random_uuid(),request=gen_random_uuid();
 UPDATE public.companies SET dispatch_radius_km=5 WHERE id=(SELECT company FROM test_ids);
+-- A real booking now needs an eligible driver at creation; later assertions
+-- move/disable the driver to independently test feed and acceptance guards.
+UPDATE public.driver_locations SET latitude=42.6977,longitude=23.3219,position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.drivers SET is_online=true WHERE id=(SELECT driver FROM test_ids);
 INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
 SELECT quote,customer,company,vehicle_type,
  '{"pickup_latitude":42.6977,"pickup_longitude":23.3219,"destination_latitude":42.70,"destination_longitude":23.33,"pickup_address":"Test Sofia","destination_address":"Test destination","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}'::jsonb FROM test_ids;
@@ -35,7 +39,7 @@ BEGIN
 END $$;
 
 -- Same company, fresh GPS, but physically in Tarnovo: no Sofia order.
-UPDATE public.driver_locations SET latitude=43.0757,longitude=25.6172,position_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.driver_locations SET latitude=43.0757,longitude=25.6172,position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
 -- Even a mistakenly widened feed policy cannot bypass the acceptance trigger.
 DO $$ BEGIN EXECUTE format('CREATE POLICY test_dispatch_guard ON public.taxi_requests FOR ALL TO authenticated USING (id=%L::uuid)',(SELECT request FROM test_ids)); END $$;
@@ -47,14 +51,14 @@ DROP POLICY test_dispatch_guard ON public.taxi_requests;
 -- Boundary distances use the database's spherical geography, not rounded coordinates.
 UPDATE public.driver_locations SET
  latitude=public.st_y(public.st_project(public.st_setsrid(public.st_makepoint(23.3219,42.6977),4326)::public.geography,4900,0)::public.geometry),
- longitude=public.st_x(public.st_project(public.st_setsrid(public.st_makepoint(23.3219,42.6977),4326)::public.geography,4900,0)::public.geometry),position_at=now()
+ longitude=public.st_x(public.st_project(public.st_setsrid(public.st_makepoint(23.3219,42.6977),4326)::public.geography,4900,0)::public.geometry),position_at=clock_timestamp()
  WHERE driver_id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(true);
 UPDATE public.driver_locations SET
- latitude=public.st_y(public.st_project(public.st_setsrid(public.st_makepoint(23.3219,42.6977),4326)::public.geography,5100,0)::public.geometry),position_at=now()
+ latitude=public.st_y(public.st_project(public.st_setsrid(public.st_makepoint(23.3219,42.6977),4326)::public.geography,5100,0)::public.geometry),position_at=clock_timestamp()
  WHERE driver_id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
-UPDATE public.driver_locations SET latitude=42.6977,longitude=23.3219,position_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.driver_locations SET latitude=42.6977,longitude=23.3219,position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(true);
 
 -- A fresh upload of an old GPS fix must not qualify.
@@ -63,7 +67,7 @@ ALTER TABLE public.driver_locations DISABLE TRIGGER guard_location;
 UPDATE public.driver_locations SET position_at=now()-interval '46 seconds',updated_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
 ALTER TABLE public.driver_locations ENABLE TRIGGER guard_location;
 SELECT pg_temp.expect_dispatch(false);
-UPDATE public.driver_locations SET position_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.driver_locations SET position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);
 UPDATE public.drivers SET is_online=false WHERE id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.drivers SET is_online=true,is_verified=false WHERE id=(SELECT driver FROM test_ids);

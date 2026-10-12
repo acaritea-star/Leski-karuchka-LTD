@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.12-driver-invitation.1",
-  "baseCommit": "097c4006cd570310c027b045c9b2f471a62f1265",
-  "databaseMigration": "p1_ride_evidence_and_operations",
+  "release": "2026.10.12-marketplace-dispatch.1",
+  "baseCommit": "5a9f2f1c7a880ae220291b0410c29f5296302656",
+  "databaseMigration": "marketplace_dispatch",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261009074806",
-  "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "604c3439749d036f355a20b17ea8c1d39da12caa",
+  "databaseMigrationVersion": "20261012151552",
+  "googleRoutesVersion": 12,
+  "verifiedSourceCommit": "8c2a36dad7556b4dccff9dd59746ae3f1ac5db5a",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -17,7 +17,9 @@
     "20261011081118_partner_service_fee_training",
     "20261011172849_invited_partner_access",
     "20261011184333_tenant_reliability_and_live_status",
-    "20261011205954_reverse_workflow_reliability"
+    "20261011205954_reverse_workflow_reliability",
+    "20261012105718_booking_dispatch_availability",
+    "20261012151552_marketplace_dispatch"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -42,5 +44,10 @@
   "partnerUxVersion": 1,
   "partnerUxVerifiedSourceCommit": "f42ba542723a173456af4639d8871b738793fb91",
   "driverInvitationUxVersion": 1,
-  "driverInvitationUxVerifiedSourceCommit": "604c3439749d036f355a20b17ea8c1d39da12caa"
+  "driverInvitationUxVerifiedSourceCommit": "604c3439749d036f355a20b17ea8c1d39da12caa",
+  "dispatchAvailabilityMigrationVersion": "20261012105718",
+  "dispatchAvailabilityVerifiedSourceCommit": "efbe9ee7eddd8df9a00e970539d9e1fbfe8cb8ac",
+  "marketplaceDispatchMigrationVersion": "20261012151552",
+  "marketplaceDispatchVerifiedSourceCommit": "8c2a36dad7556b4dccff9dd59746ae3f1ac5db5a",
+  "marketplaceDispatchVersion": 1
 }

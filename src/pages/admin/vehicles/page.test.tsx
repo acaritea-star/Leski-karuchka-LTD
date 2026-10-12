@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({ companyId: 'company', read: vi.fn(), rpc: vi.fn() }));
@@ -93,4 +93,27 @@ it('blocks a category that was disabled while the vehicle form was open', async 
   await waitFor(() => expect((screen.getByRole('button', { name: 'Запази' }) as HTMLButtonElement).disabled).toBe(true));
   expect(screen.getByRole('option', { name: /Категорията е неактивна/ })).toBeTruthy();
   expect(api.rpc).not.toHaveBeenCalled();
+});
+it.each(['object', 'array'])('adds a category from a confirmed %s response without losing car details or duplicating the write', async shape => {
+  api.rpc.mockImplementation(async (method: string, input: Record<string, unknown>) => {
+    if(method !== 'save_vehicle_category') return {data:'car',error:null};
+    const category={...standard,...input.p_details as Record<string, unknown>,id:input.p_id as string};
+    categories=[...categories,category];return {data:shape === 'array' ? [category] : category,error:null};
+  });
+  mount();await openForm();fillCar();fireEvent.click(screen.getByRole('button',{name:'Добави нова категория'}));
+  fireEvent.change(screen.getByLabelText('Име на категорията'),{target:{value:'Комфорт'}});
+  fireEvent.change(screen.getByLabelText('Клас за заявки'),{target:{value:'comfort'}});
+  const save=screen.getByRole('button',{name:'Запази категорията'});fireEvent.click(save);fireEvent.click(save);
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Нова категория'})).toBeNull());
+  expect(api.rpc.mock.calls.filter(call=>call[0]==='save_vehicle_category')).toHaveLength(1);
+  expect(api.rpc.mock.calls[0][1]).toMatchObject({p_company:'company',p_expected_at:null,p_details:{name:'Комфорт',service_class:'comfort',capacity:4,multiplier:1}});
+  expect((screen.getByLabelText('Рег. номер') as HTMLInputElement).value).toBe(' A2255KX ');
+  await waitFor(()=>expect(screen.getByRole('option',{name:'Комфорт'})).toBeTruthy());
+});
+it('keeps an unconfirmed category out of the car selector and explains the failure', async () => {
+  api.rpc.mockResolvedValue({data:null,error:{message:'Denied category write'}});
+  mount();await openForm();fireEvent.click(screen.getByRole('button',{name:'Добави нова категория'}));
+  fireEvent.change(screen.getByLabelText('Име на категорията'),{target:{value:'Комфорт'}});
+  fireEvent.click(screen.getByRole('button',{name:'Запази категорията'}));
+  await screen.findByText('Denied category write');expect(within(screen.getByLabelText('Тип')).queryByRole('option',{name:'Комфорт'})).toBeNull();
 });

@@ -12,10 +12,11 @@ import { stopSharedGps } from '@/lib/sharedGps';
 import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
+  counts: null as Record<string, number> | null,
   readById: vi.fn(), notify: null as null | ((payload: { new: Record<string, unknown> }) => void),
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
-  vehicleTypes: [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }],
+  vehicleTypes: [{ id: 'standard', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }],
   user: { id: 'customer', company_id: 'company', first_name: 'Тест', email: 'test@example.test' },
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: fake.user, loading: false }) }));
@@ -27,10 +28,10 @@ vi.mock('@/components/feature/NotificationBell', () => ({ default: () => null })
 vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
 vi.mock('@/lib/places', () => ({ hasPlacesApi: () => false }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc: (...args: unknown[]) => ({ abortSignal: () => args[0] === 'carrier_identity' ? Promise.resolve({data:null,error:null}) : fake.rpc(...args) }), removeChannel: vi.fn(),
+  rpc: (...args: unknown[]) => ({ abortSignal: () => args[0] === 'marketplace_availability' ? Promise.resolve({data:{company_id:'marketplace',sampled_at:new Date().toISOString(),categories:fake.vehicleTypes.map(v=>({id:v.id,drivers:fake.counts?.[v.id] ?? 1,configured:true}))},error:null}) : args[0] === 'carrier_identity' ? Promise.resolve({data:null,error:null}) : fake.rpc(...args) }), removeChannel: vi.fn(),
   channel: () => { const channel = { on: (_event: string, _filter: unknown, callback: typeof fake.notify) => { fake.notify = callback; return channel; }, subscribe: () => channel }; return channel; },
   from: (table: string) => {
-    const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? { id: 'company' }
+    const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? [{ id: 'company', name:'Тестова фирма' }]
       : fake.vehicleTypes,
     error: table === 'taxi_requests' && fake.recoveryError ? { message: 'offline' } : null });
     let byId = false;
@@ -52,8 +53,8 @@ const chooseRoute = async () => {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); fake.active = null; fake.recoveryError = false;
-  fake.vehicleTypes = [{ id: 'eco', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }];
+  vi.useFakeTimers(); vi.clearAllMocks(); fake.counts=null; fake.active = null; fake.recoveryError = false;
+  fake.vehicleTypes = [{ id: 'standard', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }];
   fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
   fake.notify = null;
   fake.route.mockResolvedValue(quote());
@@ -73,7 +74,7 @@ describe('customer booking integration', () => {
   it('switches category with no new routing call and books that category quote', async () => {
     fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
     const result = quote();
-    result.quotes = ['eco','comfort'].map((id,i) => ({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:result.quote_expires_at!,
+    result.quotes = ['standard','comfort'].map((id,i) => ({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:result.quote_expires_at!,
       price:5+i,breakdown:{...result.breakdown!,total:5+i}}));
     fake.route.mockResolvedValue(result);
     await mount(); await chooseRoute();
@@ -230,4 +231,42 @@ it('releases a stuck booking button and retries with the same request ID without
   expect(screen.getByRole('heading', { name: 'Търсим твоя шофьор' })).toBeTruthy();
   await act(async () => done({ data: { ...fake.active, status: 'cancelled' }, error: null }));
   expect(screen.getByRole('heading', { name: 'Търсим твоя шофьор' })).toBeTruthy();
+});
+
+it('does not offer Comfort without an eligible driver or create an empty booking', async () => {
+  fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
+  fake.counts={standard:1,comfort:0};await mount();await chooseRoute();
+  expect((screen.getByRole('radio',{name:/Комфорт/}) as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
+  expect(fake.route).toHaveBeenCalledOnce();
+});
+it('explains no driver availability and prevents ordering despite a valid price', async () => {
+  fake.counts={standard:0};await mount();await chooseRoute();
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText(/Сега няма свободен шофьор/)).toBeTruthy();
+  expect(fake.rpc).not.toHaveBeenCalled();
+});
+it('reconciles a lost driver at submit without pretending that a request was created', async () => {
+  await mount();await chooseRoute();
+  fake.rpc.mockResolvedValueOnce({data:null,error:{code:'P0001',message:'NO_AVAILABLE_DRIVER: Няма свободен шофьор.'}});
+  fireEvent.click(screen.getByRole('button',{name:/Поръчай каручка/}));
+  await act(async()=>{});
+  expect(screen.queryByRole('heading',{name:'Търсим твоя шофьор'})).toBeNull();
+  expect(screen.getByRole('alert').textContent).toContain('Няма свободен шофьор');
+});
+it('reuses the quoted route when nearby availability disappears and returns', async () => {
+  await mount();await chooseRoute();expect(fake.route).toHaveBeenCalledOnce();
+  fake.counts={standard:0};fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>vi.advanceTimersByTimeAsync(1));
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+  fake.counts={standard:1};fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>vi.advanceTimersByTimeAsync(1));
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
+  await act(async()=>vi.advanceTimersByTimeAsync(400));expect(fake.route).toHaveBeenCalledOnce();
+});
+it('requires an explicit price refresh when a newly available carrier was not quoted', async () => {
+  await mount();await chooseRoute();
+  fake.rpc.mockResolvedValueOnce({data:null,error:{code:'P0001',message:'QUOTE_FLEET_CHANGED: Наличните фирми са се променили. Обнови цената.'}});
+  fireEvent.click(screen.getByRole('button',{name:/Поръчай каручка/}));await act(async()=>vi.advanceTimersByTimeAsync(1));
+  expect(screen.getByRole('alert').textContent).toContain('Обнови цената');
+  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
+  expect(fake.route).toHaveBeenCalledOnce();expect(screen.queryByRole('heading',{name:'Търсим твоя шофьор'})).toBeNull();
 });

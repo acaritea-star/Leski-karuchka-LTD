@@ -23,7 +23,7 @@ vi.mock('@/lib/serverSummaries', () => ({ loadDriverDay: async () => ({ trips: 3
 vi.mock('@/lib/googleMapsLoader', () => ({ loadGoogleMaps: fake.register }));
 vi.mock('@/lib/sharedGps', () => ({ getGpsPosition: () => null, subscribeGpsState: () => () => {} }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc:(...args:unknown[])=>({abortSignal:()=>fake.accept(...args)}),
+  rpc:(...args:unknown[])=>({abortSignal:()=>args[0]==='driver_incoming_requests'?Promise.resolve({data:fake.incoming,error:null}):fake.accept(...args)}),
   removeChannel:vi.fn(), channel: (name:string) => { const channel={
     on:(_event:string,filter:{table?:string;filter?:string})=>{fake.filters.push(filter);return channel;},
     subscribe:(status?:(status:string)=>void)=>{if(status)fake.statuses.set(name,status);return channel;},
@@ -85,4 +85,11 @@ it('initialises the optional map once when opened and reuses it after collapsing
   const toggle=async(open:boolean)=>{await act(async()=>{details.open=open;fireEvent(details,new Event('toggle'));await vi.advanceTimersByTimeAsync(0);});};
   expect(maps).not.toHaveBeenCalled();await toggle(true);expect(maps).toHaveBeenCalledOnce();
   await toggle(false);await toggle(true);expect(maps).toHaveBeenCalledOnce();expect(fake.register).toHaveBeenCalledOnce();client.clear();
+});
+
+it('does not present a stale GPS session as ready to receive new requests', async () => {
+  vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};const client=mount();
+  await act(async()=>vi.advanceTimersByTimeAsync(0));
+  expect(screen.getByText('Изчаква GPS')).toBeTruthy();
+  expect(screen.getByText(/не си достъпен за нови заявки/)).toBeTruthy();client.clear();
 });

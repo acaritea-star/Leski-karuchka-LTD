@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
+import { displayPriceRange, type PriceRange } from '@/lib/marketplace';
 
 export interface RequestData {
   id: string; status: string; pickup_address: string; destination_address: string;
   estimated_price: number | null; cancelled_by?: string | null;
 }
 interface RequestStatusCardProps {
+  priceRange?: PriceRange;
   request: RequestData; price: number | null; confirmCancel: boolean; cancelling?: boolean;
   onShowCancel: () => void; onKeepRequest: () => void; onCancel: () => void;
   onReset: () => void; onShare: () => void; onNewOrder?: () => void; requestError: string;
@@ -38,7 +40,7 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
         <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
         <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
       </div>}
-      {props.price != null && <div className="booking-meta"><span>{t('payment_in_cash')}</span><strong>{props.price.toFixed(2)} {t('lv')}</strong></div>}
+      {props.price != null && <div className="booking-meta"><span>{t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
       {props.requestError && <p className="booking-error" role="alert">{props.requestError}</p>}
     </div>
     <div className="booking-status-actions">
