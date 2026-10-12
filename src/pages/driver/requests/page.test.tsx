@@ -74,11 +74,11 @@ it('reconciles the active ride slowly on a healthy socket and every eight second
   client.setQueryData(queryKeys.driverRecord('user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('driver'),null);
   render(<QueryClientProvider client={client}><MemoryRouter><DriverRequests /></MemoryRouter></QueryClientProvider>);
   await act(async()=>vi.advanceTimersByTimeAsync(0));
-  act(()=>fake.statuses.get('driver-offers:user')?.('SUBSCRIBED'));
+  act(()=>fake.statuses.get('driver-requests-panel-driver')?.('SUBSCRIBED'));
   await act(async()=>vi.advanceTimersByTimeAsync(29_999));expect(fake.reads).not.toHaveBeenCalled();
   await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.reads).toHaveBeenCalledWith('taxi_requests');
   expect(fake.filters.filter(f=>f.table==='taxi_requests').every(f=>!!f.filter)).toBe(true);
-  fake.reads.mockClear();act(()=>fake.statuses.get('driver-offers:user')?.('CHANNEL_ERROR'));
+  fake.reads.mockClear();act(()=>fake.statuses.get('driver-requests-panel-driver')?.('CHANNEL_ERROR'));
   await act(async()=>vi.advanceTimersByTimeAsync(8000));expect(fake.reads).toHaveBeenCalledOnce();client.clear();
 });
 

@@ -1,3 +1,4 @@
+import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { loadDriverDay } from '@/lib/serverSummaries';
 import { useSofiaDay } from '@/hooks/useSofiaDay';
@@ -46,6 +47,7 @@ export default function DriverHome() {
   const gpsError = toggleError || gps.error;
   const gpsStatus = gps.status;
   const [requestsRealtime, setRequestsRealtime] = useState(false);
+  const offersConnected = useDriverOfferConnection();
 
   // Unlock audio on first user interaction (browsers block AudioContext until then)
   useEffect(() => {
@@ -189,12 +191,7 @@ export default function DriverHome() {
     setRequestsRealtime(false);
 
     const channel = supabase
-      .channel('driver-offers:' + user.id, { config: { private: true } })
-      .on('broadcast', { event: 'offer_changed' }, () => {
-        if (driver.is_online) {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) }, { cancelRefetch: false });
-        }
-      })
+      .channel('driver-requests-' + driver.id)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `driver_id=eq.${driver.id}` },

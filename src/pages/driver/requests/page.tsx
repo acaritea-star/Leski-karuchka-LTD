@@ -1,3 +1,4 @@
+import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
@@ -47,6 +48,7 @@ export default function DriverRequests() {
   const gpsError = toggleError || gps.error;
   const [error, setError] = useState('');
   const [requestsRealtime, setRequestsRealtime] = useState(false);
+  const offersConnected = useDriverOfferConnection();
   const [driverNavInfo, setDriverNavInfo] = useState<NavInfo | null>(null);
 
   // Unlock audio on first user interaction (required by browsers)
@@ -249,12 +251,7 @@ export default function DriverRequests() {
     let subscribed = false;
 
     const channel = supabase
-      .channel('driver-offers:' + user.id, { config: { private: true } })
-      .on('broadcast', { event: 'offer_changed' }, () => {
-        if (isOnline) {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) }, { cancelRefetch: false });
-        }
-      })
+      .channel('driver-requests-panel-' + driver.id)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `driver_id=eq.${driver.id}` },

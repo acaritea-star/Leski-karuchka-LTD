@@ -209,6 +209,7 @@ function VehiclesEditor() {
   return (
     <AdminLayout title={t('nav_vehicles')}>
       {companyId && <CategoryEditor companyId={companyId} categories={vehicleTypes} disabled={loading || !!queryError || saveMutation.isPending} createRequest={createCategory} onSaved={category => {
+        queryClient.setQueryData<{vehicles:VehicleWithDriver[];drivers:DriverOption[];vehicleTypes:Tables<'vehicle_types'>[]}>(queryKeys.adminVehicles(companyId), previous => previous ? {...previous,vehicleTypes:[...previous.vehicleTypes.filter(type => type.id !== category.id),category]} : previous);
         if (category.is_active) setForm(current => ({...current,vehicle_type_id:category.id}));
         void queryClient.invalidateQueries({queryKey:queryKeys.adminVehicles(companyId)});
       }} />}

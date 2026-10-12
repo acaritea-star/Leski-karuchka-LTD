@@ -10,6 +10,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 
 import DriverGpsProvider from '@/components/feature/DriverGpsProvider';
+import DriverOffersProvider from '@/components/feature/DriverOffersProvider';
 import CookieConsent from '@/components/feature/CookieConsent';
 import OperationTelemetry from '@/components/feature/OperationTelemetry';
 
@@ -28,11 +29,11 @@ function App() {
         <AuthProvider>
           <OperationTelemetry />
           <BrowserRouter basename={__BASE_PATH__}>
-            <DriverGpsProvider><AdminCompanyProvider>
+            <DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
               <Suspense fallback={<RouteFallback />}>
                 <AppRoutes />
               </Suspense>
-            </AdminCompanyProvider></DriverGpsProvider>
+            </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider>
             <CookieConsent />
           </BrowserRouter>
         </AuthProvider>

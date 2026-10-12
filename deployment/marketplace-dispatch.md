@@ -29,7 +29,7 @@ The current service-fee billing flag is unchanged. This release does not collect
 
 ## Delivery and recovery
 
-The database produces one durable push/outbox record and one targeted hint per eligible driver. Broadcast failure does not roll back a durable booking: the existing bounded reconciliation reads recover missed hints. Acceptance/cancellation also invalidate the original recipients' lists. Active-ride updates stay filtered to the assigned driver. Driver caches are keyed by auth UID so two accounts on one phone cannot share an incoming-request cache.
+The database produces one durable push/outbox record and one targeted hint per eligible driver. One root-level account-scoped subscription survives switching between driver pages. Teardown/rejoin is serialized for StrictMode and fast reauthentication; late callbacks from an old account are ignored. Broadcast failure does not roll back a durable booking: bounded reconciliation reads recover missed hints. Acceptance/cancellation also invalidate the original recipients' lists. Active-ride updates stay filtered to the assigned driver. Driver caches are keyed by auth UID so two accounts on one phone cannot share an incoming-request cache.
 
 Browser/PWA background GPS and push permissions remain device-dependent. One phone with an installed PWA and a background Safari account is not equivalent to two independently active driver devices. GPS freshness, document readiness, busy/offline status and category remain enforced.
 
