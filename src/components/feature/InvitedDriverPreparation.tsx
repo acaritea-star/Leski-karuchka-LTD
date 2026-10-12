@@ -17,9 +17,10 @@ export default function InvitedDriverPreparation({ access, onRefresh }: { access
   const latch = useRef(false);
   return <main className="brand-scope min-h-[100dvh] bg-background-50 p-4 sm:p-8"><div className="max-w-2xl mx-auto space-y-5">
     <div className="flex items-center justify-between gap-4"><Link to="/" className="font-heading font-semibold">Лески Каручка</Link><button onClick={logout} disabled={pending} className="text-xs underline">Изход</button></div>
-    <section className="bg-white border border-background-200 rounded-2xl p-5 space-y-3"><h1 className="font-heading text-xl font-semibold">Подготовка за {access.company_name}</h1>
-      <p className="text-sm text-foreground-600">1. Твои данни → 2. Права и обучение → 3. Документи и автомобил → 4. Едно одобрение от фирмата.</p>
-      <p className="text-xs text-foreground-500">Напредъкът по условията, обучението и документите се запазва. След одобрението ще можеш да включиш онлайн режима.</p>
+    <section className="bg-white border border-background-200 rounded-2xl p-5 sm:p-7 space-y-5"><div className="space-y-2"><p className="text-xs font-semibold text-primary-700">ДОБРЕ ДОШЪЛ В ЕКИПА</p><h1 className="font-heading text-2xl font-bold text-foreground-950 break-words">Подготовка за {access.company_name}</h1>
+      <p className="text-sm text-foreground-600">Попълни профила си, премини краткото обучение и изпрати документите за едно общо одобрение.</p>
+      <p className="text-xs text-foreground-500">Напредъкът се запазва. Онлайн режимът се отключва след одобрението.</p></div>
+      {!confirmedApplication && <div className="rounded-xl bg-primary-50 border border-primary-100 p-4"><p className="text-xs font-semibold text-primary-700 mb-1">СТЪПКА 1 ОТ 4</p><h2 className="font-semibold text-foreground-950">Започни с твоите данни</h2><p className="text-xs text-foreground-600 mt-1">След това: условия и обучение → документи → проверка от фирмата.</p></div>}
       {confirmedApplication ? <DriverOnboarding applicationId={confirmedApplication} onReviewed={() => { void onRefresh(); }} /> : <form aria-label="Данни на поканения шофьор" className="space-y-3" onSubmit={async e => {
         e.preventDefault(); if (latch.current) return;
         const f = new FormData(e.currentTarget); latch.current = true; setBusy(true); setError('');

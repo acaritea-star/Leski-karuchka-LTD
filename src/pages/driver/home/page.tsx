@@ -227,10 +227,12 @@ export default function DriverHome() {
   }, [driver?.id, driver?.is_online, user?.company_id, queryClient, playDriverSound]);
 
   // ── Decorative Google Maps background ──
+  const [mapOpened, setMapOpened] = useState(false);
   const mapBgRef = useRef<HTMLDivElement | null>(null);
+  const refreshMap = useRef<() => void>(() => {});
   useEffect(() => {
     const el = mapBgRef.current;
-    if (!el) return;
+    if (!el || !mapOpened) return;
     let cancelled = false;
     let mapInstance: google.maps.Map | null = null;
     let marker: google.maps.Marker | null = null;
@@ -241,7 +243,7 @@ export default function DriverHome() {
         if (cancelled) return;
         mapInstance = new google.maps.Map(el, {
           center: { lat: BULGARIA_CENTER.lat, lng: BULGARIA_CENTER.lng },
-          zoom: 14,
+          zoom: 7,
           disableDefaultUI: true,
           gestureHandling: 'none',
           keyboardShortcuts: false,
@@ -252,30 +254,32 @@ export default function DriverHome() {
 
         // Observe the shared fix; this decorative map never asks for GPS itself.
         const center = () => {
+          if (!el.closest('details')?.open) return;
           const pos = getGpsPosition();
           if (cancelled || !mapInstance) return;
           if (!pos) { marker?.setMap(null); marker = null; return; }
-          if (Date.now() - pos.timestamp > 45_000) return;
+          if (Date.now() - pos.timestamp > 45_000) { marker?.setMap(null); marker = null; return; }
           const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          if (marker) { marker.setPosition(here); return; }
+          if (marker) { marker.setPosition(here); mapInstance.setCenter(here); return; }
           mapInstance.setCenter(here); mapInstance.setZoom(16);
           const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="10" fill="#2563eb" fill-opacity="0.22"/><circle cx="11" cy="11" r="5.5" fill="#2563eb" stroke="#ffffff" stroke-width="2.5"/></svg>';
           marker = new google.maps.Marker({ position: here, map: mapInstance,
             icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
               scaledSize: new google.maps.Size(22, 22), anchor: new google.maps.Point(11, 11) } });
         };
+        refreshMap.current = center;
         center(); unsubscribe = subscribeGpsState(center);
       })
       .catch(() => {
         /* decorative — ignore load failures */
       });
     return () => {
-      cancelled = true; unsubscribe(); marker?.setMap(null);
+      cancelled = true; unsubscribe(); marker?.setMap(null); refreshMap.current = () => {};
       if (mapInstance) {
         google.maps.event.clearInstanceListeners(mapInstance);
       }
     };
-  }, [authLoading, driverQuery.isLoading]);
+  }, [authLoading, driverQuery.isLoading, mapOpened]);
 
   if (authLoading || driverQuery.isLoading) {
     return (
@@ -292,17 +296,11 @@ export default function DriverHome() {
   const accepting = acceptMutation.isPending;
 
   return (
-    <div className="relative min-h-screen bg-background-50 overflow-hidden">
-      {/* MAP BACKGROUND */}
-      <div className="fixed inset-0 z-0 h-[100vh]">
-        <div ref={mapBgRef} className="w-full h-full pointer-events-none select-none" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background-50/60 via-transparent to-background-50/95" />
-      </div>
-
+    <div className="brand-scope min-h-screen bg-background-50">
       {/* CONTENT */}
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen">
         {/* Header — refined */}
-        <header className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <header className="px-4 py-3 flex items-center justify-between bg-white border-b border-background-200 sticky top-0 z-30">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt={t('app_name')} className="h-7 w-auto rounded-md bg-white shadow-sm" />
             <div className="flex flex-col">
@@ -314,6 +312,7 @@ export default function DriverHome() {
             {pendingRequests > 0 && (
               <button
                 onClick={() => navigate('/driver/requests')}
+                aria-label="Входящи заявки"
                 className="relative w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur hover:bg-white transition-colors cursor-pointer shadow-sm"
               >
                 <i className="ri-notification-3-line text-foreground-600 text-base" />
@@ -324,6 +323,7 @@ export default function DriverHome() {
             )}
             <button
               onClick={() => navigate('/driver/profile')}
+              aria-label="Профил и документи"
               className="w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur hover:bg-white transition-colors cursor-pointer shadow-sm"
             >
               <i className="ri-user-3-line text-foreground-600 text-base" />
@@ -331,15 +331,21 @@ export default function DriverHome() {
           </div>
         </header>
 
-        {/* Enable push notifications (iOS requires a user tap) */}
-        <EnableNotificationsBanner />
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
         {/* Bottom panel */}
-        <div className="px-3 md:px-6 pb-safe-nav">
-          <div className="mx-auto w-full max-w-md space-y-2.5">
+        <main className="px-4 md:px-6 pt-5 pb-safe-nav">
+          <div className="mx-auto w-full max-w-3xl space-y-4">
+            <section aria-label="Твоят работен статус" className="space-y-2">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-foreground-500">ШОФЬОРСКИ ПАНЕЛ</p>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : driver?.is_online ? 'bg-primary-100 text-primary-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? 'Онлайн' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground-950 break-words">Здравей{user?.first_name ? ', ' + user.first_name : ''}!</h1>
+              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? 'Онлайн режимът е включен. Следи връзката и местоположението си.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+            </section>
+            {driver && !driver.is_verified && !activeRequest && <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 space-y-3" aria-label="Подготовка за работа">
+              <h2 className="font-semibold text-foreground-950">Следваща стъпка: профил и документи</h2>
+              <p className="text-sm text-foreground-600">Условия и обучение → документи и автомобил → одобрение от фирмата.</p>
+              <button type="button" onClick={() => navigate('/driver/profile')} className="rounded-xl bg-primary-500 px-4 py-3 text-sm text-white font-semibold">Продължи подготовката</button>
+            </section>}
             {/* Incoming Request Card — first priority */}
             {latestRequest && !activeRequest && driver?.is_online && (
               <div className="bg-white/95 backdrop-blur-xl rounded-2xl border-2 border-primary-300 p-4 animate-in zoom-in-95 fade-in duration-300">
@@ -406,7 +412,7 @@ export default function DriverHome() {
                   <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                     <i className="ri-user-star-line text-primary-600 text-xs" />
                   </div>
-                  <p className="text-xs font-semibold text-primary-600 uppercase tracking-wide">{t('new_request')}</p>
+                  <p className="text-sm font-semibold text-primary-700">Текущ курс</p>
                   <span className="ml-auto text-xs text-foreground-500">{t(`status_${activeRequest.status}`)}</span>
                 </div>
                 <div className="flex items-start gap-2">
@@ -426,11 +432,13 @@ export default function DriverHome() {
                     <i className="ri-arrow-right-s-line text-foreground-300 text-base" />
                   </div>
                 </div>
+                <p className="mt-3 pt-3 border-t border-background-100 text-sm text-primary-700 font-semibold flex items-center justify-between">Отвори текущия курс<i className="ri-arrow-right-line" aria-hidden="true" /></p>
               </button>
             )}
 
             {/* Main bottom panel: toggle + stats */}
-            <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-background-100 p-4">
+            <section className="bg-white rounded-2xl border border-background-200 p-4 md:p-5" aria-label="Онлайн режим">
+              <div className="flex justify-between items-center gap-3 mb-3"><h2 className="font-semibold text-foreground-950">{activeRequest ? 'Твоят режим' : 'Готов ли си за заявки?'}</h2><span className="text-xs text-foreground-500">{driver?.is_online ? 'Включен' : 'Изключен'}</span></div>
               {/* Online / Offline toggle — more prominent */}
               <button
                 onClick={() => {
@@ -439,9 +447,9 @@ export default function DriverHome() {
                   const goingOnline = !driver.is_online;
                   void queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) }).then(() => toggleMutation.mutate(goingOnline));
                 }}
-                disabled={toggling}
+                disabled={toggling || !driver || (!driver.is_verified && !driver.is_online)}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all duration-300 whitespace-nowrap cursor-pointer relative overflow-hidden mb-3
-                  ${toggling ? 'opacity-70' : 'active:scale-[0.98]'}
+                  ${toggling ? 'opacity-70' : 'active:scale-[0.98]'} disabled:opacity-50 disabled:cursor-not-allowed
                   ${driver?.is_online
                     ? 'bg-primary-500 text-white'
                     : 'bg-foreground-950 text-white hover:bg-foreground-800'
@@ -455,12 +463,12 @@ export default function DriverHome() {
                 ) : (
                   <span className="flex items-center justify-center gap-2.5">
                     <div className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${driver?.is_online ? 'bg-white animate-pulse' : 'bg-red-400'}`} />
-                    {driver?.is_online ? t('you_are_online') : t('you_are_offline')}
+                    {driver?.is_online ? 'Излез офлайн' : driver && !driver.is_verified ? 'Очаква верификация' : 'Включи онлайн'}
                   </span>
                 )}
               </button>
 
-              {driver && !driver.is_verified && <p className="text-xs text-foreground-600 my-3">Премини подготовката и качи документите преди верификация от фирмата. <button type="button" className="underline text-primary-700" onClick={() => navigate('/driver/profile')}>Към подготовката и документите</button> · <button type="button" className="underline" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
+              {(!driver || !driver.is_verified) && <p className="text-xs text-foreground-600 my-3">{driver ? 'Онлайн режимът се отключва след одобрението.' : 'Няма потвърден шофьорски запис.'} <button type="button" className="underline text-primary-700" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
               {displayedError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-2 flex items-center gap-2">
                   <i className="ri-error-warning-line text-red-500 text-sm" />
@@ -501,6 +509,9 @@ export default function DriverHome() {
               )}
 
               {/* Stats row — refined */}
+            </section>
+            <section className="bg-white rounded-2xl border border-background-200 p-4 md:p-5" aria-label="Твоят ден">
+              <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-semibold text-foreground-950">Твоят ден</h2><button type="button" onClick={() => navigate('/driver/earnings')} className="text-xs text-primary-700 font-semibold underline">Към отчета</button></div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-background-50 rounded-xl p-3 text-center">
                   <p className="text-lg font-bold text-foreground-950 font-heading">{todayStatsQuery.data ? todayStats.trips : '—'}</p>
@@ -510,18 +521,25 @@ export default function DriverHome() {
                   <p className="text-lg font-bold text-foreground-950 font-heading">
                     {todayStatsQuery.data ? todayStats.earnings.toFixed(2) : '—'}<span className="text-xs font-normal text-foreground-400"> {t('lv')}</span>
                   </p>
-                  <p className="text-[10px] text-foreground-500">{t('todays_earnings')}</p>
+                  <p className="text-[10px] text-foreground-500">Стойност на курсовете</p>
                 </div>
                 <div className="bg-background-50 rounded-xl p-3 text-center">
                   <p className="text-lg font-bold text-foreground-950 font-heading">
-                    {parseFloat(String(driver?.rating || 0)).toFixed(1)}
+                    {driver ? parseFloat(String(driver.rating || 0)).toFixed(1) : '—'}
                   </p>
                   <p className="text-[10px] text-foreground-500">{t('driver_rating')}</p>
                 </div>
               </div>
-            </div>
+              <p className="text-xs text-foreground-500 mt-3">Реалните плащания и разходи записваш в отчета.</p>
+            </section>
+            <details className="rounded-2xl border border-background-200 bg-white overflow-hidden" onToggle={event => { if (event.currentTarget.open) { setMapOpened(true); refreshMap.current(); } }}>
+              <summary className="p-4 cursor-pointer text-sm font-semibold text-foreground-600">Карта</summary>
+              <p className="px-4 pb-3 text-xs text-foreground-500">Местоположението се показва при актуален GPS сигнал. Навигацията е в текущия курс.</p>
+              {mapOpened && <div ref={mapBgRef} aria-label="Карта на местоположението" className="h-56 w-full pointer-events-none select-none" />}
+            </details>
+            <EnableNotificationsBanner />
           </div>
-        </div>
+        </main>
       </div>
 
       {/* Bottom Navigation */}

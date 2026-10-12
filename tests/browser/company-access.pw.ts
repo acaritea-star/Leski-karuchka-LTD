@@ -14,7 +14,7 @@ const company = (id: string, name: string) => ({ id, name, is_active: true, curr
   base_fare: 2, price_per_km: 1, price_per_minute: 0.2, dispatch_radius_km: 5,
   updated_at: '2026-10-11T09:00:00Z', created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
 
-async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOMER') {
+async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOMER' | 'DRIVER') {
   const user = { id: account, email: 'synthetic-admin@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
   const state = { companies: [company(ownCompany, 'Първа фирма')], profileWrites: 0, companyWrites: 0, companyFilters: [] as (string | null)[], invitations: [] as Record<string, unknown>[], errors: [] as string[], google: 0 };
   page.on('pageerror', error => state.errors.push(error.message));
@@ -22,6 +22,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
     const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
     localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, user }));
     localStorage.setItem('i18nextLng', 'bg');
+    localStorage.setItem('leski:auto-location:' + user.id, 'off');
     const savedAt = Date.now(); localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt, expiresAt: savedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
   }, user);
   await page.route('**/*', async route => {
@@ -36,7 +37,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
     if (url.pathname.endsWith('/auth/v1/user')) data = user;
     else if (url.pathname.endsWith('/profiles')) {
       if (request.method() !== 'GET') state.profileWrites++;
-      data = { id: account, email: user.email, first_name: 'Тест', last_name: 'Админ', role, company_id: role === 'COMPANY_ADMIN' ? ownCompany : null, is_active: true };
+      data = { id: account, email: user.email, first_name: 'Тест', last_name: 'Админ', role, company_id: role === 'COMPANY_ADMIN' || role === 'DRIVER' ? ownCompany : null, is_active: true };
     } else if (url.pathname.endsWith('/companies')) {
       if (request.method() === 'POST') {
         state.companyWrites++; const payload = request.postDataJSON();
@@ -50,6 +51,9 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
     else if (url.pathname.endsWith('/create_partner_invitation')) { const body = request.postDataJSON(); expect(body.p_kind).toBe('company'); expect(body.p_company).toBeUndefined(); state.invitations.push({ id: body.p_id, email: body.p_email, kind: 'company', status: 'pending', email_status: 'sent', expires_at: new Date(Date.now()+14*86400000).toISOString() }); data = body.p_id; }
     else if (url.pathname.endsWith('/partner_invitations')) data = state.invitations;
     else if (url.pathname.endsWith('/partner-invitation-email')) data = { status: 'sent' };
+    else if (url.pathname.endsWith('/drivers')) data = { id: account, user_id: account, company_id: ownCompany, is_online: false, is_verified: true, status: 'offline', rating: 4.8 };
+    else if (url.pathname.endsWith('/taxi_requests')) data = url.searchParams.get('driver_id') ? null : [];
+    else if (url.pathname.endsWith('/driver_day_summary')) data = { trips: 3, earnings: 12.50 };
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: account };
     else if (url.pathname.endsWith('/company_dashboard')) data = {
       stats: { totalDrivers: 0, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 },
@@ -109,7 +113,8 @@ test('company login does not turn an unassigned customer into a company administ
 });
 
 test('customer login keeps partner entry collapsed behind a discreet link', async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg'); });
+  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg');
+    localStorage.setItem('leski:auto-location:' + user.id, 'off'); });
   await page.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:4100' ? route.continue() : route.abort());
   await page.goto('/auth/login');
   await expect(page.getByRole('button', { name: /Google/ })).toHaveCount(1);
@@ -133,6 +138,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
     const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now()/1000)+3600 })), 'synthetic'].join('.');
     localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now()/1000)+3600, expires_in: 3600, user }));
     localStorage.setItem('i18nextLng', 'bg');
+    localStorage.setItem('leski:auto-location:' + user.id, 'off');
     const savedAt=Date.now(); localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt, expiresAt: savedAt+180*86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
   }, authUser);
   await context.route('**/*', async route => {
@@ -142,7 +148,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
     let data: unknown = [];
     if (url.pathname.endsWith('/auth/v1/user')) data = authUser;
-    else if (url.pathname.endsWith('/profiles')) data = { id: account, email: authUser.email, role, company_id: role === 'COMPANY_ADMIN' ? ownCompany : null, is_active: true, first_name: 'Тест', last_name: 'Фирма' };
+    else if (url.pathname.endsWith('/profiles')) data = { id: account, email: authUser.email, role, company_id: role === 'COMPANY_ADMIN' || role === 'DRIVER' ? ownCompany : null, is_active: true, first_name: 'Тест', last_name: 'Фирма' };
     else if (url.pathname.endsWith('/resolve_partner_access')) {
       if (role === 'CUSTOMER') { expect(request.postDataJSON().p_invitation).toBe(invite); role = 'COMPANY_ADMIN'; binds++; }
       data = { status: 'ready', role, company_id: ownCompany, destination: setupAt ? '/admin/dashboard' : '/company/setup' };
@@ -194,4 +200,45 @@ test('invited company binds after login, finishes setup and keeps its own prices
   await page.goto('/company/login'); await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
   expect(binds).toBe(1); expect(setups).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
+});
+
+
+test('company dashboard shortcuts and mobile menu preserve navigation without loading Google', async ({ page }, testInfo) => {
+  const state = await setup(page, 'COMPANY_ADMIN');
+  await page.goto('/admin/dashboard');
+  await expect(page.getByRole('link', { name: 'Отчети и каса', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Шофьори', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Автомобили', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('company-mobile.png'), fullPage: true });
+  const open = page.getByRole('button', { name: 'Отвори менюто', exact: true });
+  await open.click();
+  await expect(page.getByRole('button', { name: 'Затвори навигацията' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Изход', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(open).toBeFocused();
+  await expect(page.getByRole('navigation', { name: 'Основна навигация' })).not.toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.getByRole('navigation', { name: 'Основна навигация' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('company-desktop.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Шофьори', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/drivers$/);
+  expect(state.errors).toEqual([]); expect(state.google).toBe(0);
+});
+
+
+test('driver landing prioritises work and report actions without loading a decorative map', async ({ page }, testInfo) => {
+  const state = await setup(page, 'DRIVER');
+  await page.goto('/driver/home');
+  await expect(page.getByRole('heading', { name: 'Здравей, Тест!' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Включи онлайн', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Към отчета', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Карта на местоположението')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('driver-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: testInfo.outputPath('driver-desktop.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Профил и документи' }).click();
+  await expect(page).toHaveURL(/\/driver\/profile$/);
+  expect(state.errors).toEqual([]); expect(state.google).toBe(0);
 });

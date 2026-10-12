@@ -76,7 +76,7 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
   await page.getByRole('button', { name: 'Запази и продължи към обучението' }).click();
   await expect(page.getByRole('form', { name: 'Качване: Шофьорска книжка' })).toHaveCount(0);
   await train(page);
-  await expect(page.getByRole('heading', { name: '2. Документи и автомобил' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Документи и автомобил' })).toBeVisible();
   await page.getByLabel('Марка', { exact: true }).fill('Тест'); await page.getByLabel('Модел', { exact: true }).fill('Автомобил');
   await page.getByLabel('Регистрационен номер', { exact: true }).fill('A1234BC');
   await page.getByLabel('Застраховка до', { exact: true }).fill('2099-01-01'); await page.getByLabel('Технически преглед до', { exact: true }).fill('2099-02-01');

@@ -20,3 +20,10 @@ jobs:
       - run: npx --yes deno@2.5.4 check supabase/functions/*/index.ts
       - run: npx playwright install --with-deps chromium webkit
       - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partner-ux-previews
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 3
