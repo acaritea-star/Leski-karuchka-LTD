@@ -35,7 +35,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
     return query;
   },
 } }));
-afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();vi.useRealTimers(); });
+afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();vi.useRealTimers();vi.unstubAllGlobals(); });
 
 function mount() {
   const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});
@@ -73,4 +73,16 @@ it('lets a driver go offline after verification is revoked while retaining the a
   expect(screen.getByRole('button',{name:/Отвори текущия курс/})).toBeTruthy();
   fireEvent.click(button);await act(async()=>vi.advanceTimersByTimeAsync(0));
   expect(fake.change.mock.calls[0][1]).toBe(false);client.clear();
+});
+
+it('initialises the optional map once when opened and reuses it after collapsing', async () => {
+  vi.useFakeTimers();const maps=vi.fn();
+  class MapStub { constructor(){ maps(); } }
+  vi.stubGlobal('google',{maps:{Map:MapStub,event:{clearInstanceListeners:vi.fn()}}});
+  fake.register.mockResolvedValue(undefined);
+  const client=mount();await act(async()=>vi.advanceTimersByTimeAsync(0));
+  const details=screen.getByText('Карта').closest('details')!;
+  const toggle=async(open:boolean)=>{await act(async()=>{details.open=open;fireEvent(details,new Event('toggle'));await vi.advanceTimersByTimeAsync(0);});};
+  expect(maps).not.toHaveBeenCalled();await toggle(true);expect(maps).toHaveBeenCalledOnce();
+  await toggle(false);await toggle(true);expect(maps).toHaveBeenCalledOnce();expect(fake.register).toHaveBeenCalledOnce();client.clear();
 });

@@ -74,12 +74,12 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
             <img
               src={LOGO_URL}
               alt="Лески Каручка"
-              className="h-8 w-auto rounded"
+              className="h-8 w-16 object-contain shrink-0 rounded"
             />
             <h1 className="flex-1 min-w-0 break-words text-lg font-bold text-foreground-950 font-heading leading-tight">
               {roleTitle}
             </h1>
-            <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Затвори навигацията" className="ml-auto lg:hidden rounded-lg p-2 hover:bg-background-100"><i className="ri-close-line" aria-hidden="true" /></button>
+            <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Затвори навигацията" className="ml-auto shrink-0 lg:hidden rounded-lg p-2 hover:bg-background-100"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M6 18L18 6" /></svg></button>
           </div>
           <p className="text-xs text-foreground-500 mt-0.5">
             {user?.first_name} {user?.last_name}
@@ -145,7 +145,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
               ref={menuButton}
               className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
             >
-              <i className="ri-menu-line text-foreground-600 text-lg" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div><h1 className="lg:hidden text-[10px] text-foreground-500 font-semibold">{roleTitle}</h1><h2 className="text-base font-semibold text-foreground-950 font-heading">{title}</h2></div>
           </div>

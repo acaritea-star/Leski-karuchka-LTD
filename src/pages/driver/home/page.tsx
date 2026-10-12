@@ -302,7 +302,7 @@ export default function DriverHome() {
         {/* Header — refined */}
         <header className="px-4 py-3 flex items-center justify-between bg-white border-b border-background-200 sticky top-0 z-30">
           <div className="flex items-center gap-2.5">
-            <img src={LOGO_URL} alt={t('app_name')} className="h-7 w-auto rounded-md bg-white shadow-sm" />
+            <img src={LOGO_URL} alt={t('app_name')} className="h-7 w-14 object-contain shrink-0 rounded-md bg-white shadow-sm" />
             <div className="flex flex-col">
               <span className="text-sm font-bold text-foreground-950 font-heading leading-tight tracking-tight">{t('app_name')}</span>
               <span className="text-[10px] font-semibold text-foreground-500 leading-none">{t('role_driver')}</span>
@@ -326,7 +326,7 @@ export default function DriverHome() {
               aria-label="Профил и документи"
               className="w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur hover:bg-white transition-colors cursor-pointer shadow-sm"
             >
-              <i className="ri-user-3-line text-foreground-600 text-base" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0116 0v2" /></svg>
             </button>
           </div>
         </header>
