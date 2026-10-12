@@ -27,6 +27,8 @@ Quotes expire after two minutes. Availability and qualification are rechecked at
 
 The current service-fee billing flag is unchanged. This release does not collect new commission or email actual users.
 
+The complete offer matrix stays in the owned server quote for evidence. Route responses and driver incoming lists contain only the range and the relevant fare; assignment removes the unused matrix from the active ride. Every active-ride refresh therefore avoids retransmitting all firms' prices.
+
 ## Delivery and recovery
 
 The database produces one durable push/outbox record and one targeted hint per eligible driver. One root-level account-scoped subscription survives switching between driver pages. Teardown/rejoin is serialized for StrictMode and fast reauthentication; late callbacks from an old account are ignored. Broadcast failure does not roll back a durable booking: bounded reconciliation reads recover missed hints. Acceptance/cancellation also invalidate the original recipients' lists. Active-ride updates stay filtered to the assigned driver. Driver caches are keyed by auth UID so two accounts on one phone cannot share an incoming-request cache.

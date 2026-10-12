@@ -130,7 +130,7 @@ BEGIN
  OR fare IS DISTINCT FROM (offer->'breakdown'->>'total')::numeric THEN RAISE EXCEPTION 'Invalid saved fare'; END IF;
  UPDATE public.taxi_requests SET company_id=d.company_id,vehicle_type_id=(offer->>'vehicle_type_id')::uuid,
   driver_id=d.id,status='accepted',accepted_at=clock_timestamp(),estimated_price=fare,
-  fare_breakdown=(offer->'breakdown')||jsonb_build_object('marketplace',market)
+  fare_breakdown=(offer->'breakdown')||jsonb_build_object('marketplace',market-'offers')
  WHERE id=r.id AND status='pending' RETURNING * INTO r;
  IF NOT FOUND THEN RAISE EXCEPTION 'Заявката вече не е налична. Обнови списъка.'; END IF;
  INSERT INTO public.audit_log(company_id,actor_id,entity_type,entity_id,action,new_value)
@@ -172,7 +172,7 @@ BEGIN
     JOIN public.vehicles v ON v.id=own.vehicle_id
     WHERE o.value->>'company_id'=own.company_id::text AND o.value->>'vehicle_type_id'=v.vehicle_type_id::text;
    r.estimated_price:=(offer->>'total')::numeric;
-   r.fare_breakdown:=offer->'breakdown'||jsonb_build_object('marketplace',r.fare_breakdown->'marketplace');
+   r.fare_breakdown:=offer->'breakdown'||jsonb_build_object('marketplace',(r.fare_breakdown->'marketplace')-'offers');
   END IF;
   RETURN NEXT r;
  END LOOP;

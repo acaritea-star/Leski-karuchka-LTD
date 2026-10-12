@@ -184,7 +184,7 @@ export async function googleRoutes(req: Request): Promise<Response> {
           ? row.payload.breakdown.marketplace as ReturnType<typeof marketplaceQuotes>[number]['payload']['breakdown']['marketplace'] : undefined;
         return { vehicle_type_id:market?.service_class ?? row.vehicle_type_id,quote_id:row.id,
         quote_expires_at:saved.find(item => item.id === row.id)!.expires_at,
-        price:row.payload.total,breakdown:row.payload.breakdown,
+        price:row.payload.total,breakdown:market ? {...row.payload.breakdown,marketplace:{service_class:market.service_class,min:market.min,max:market.max}} : row.payload.breakdown,
         ...(market ? {price_min:market.min,price_max:market.max} : {}) };
       });
       const selected = quotes.find(item => item.vehicle_type_id === options.vehicle_type_id)!;

@@ -71,8 +71,16 @@ SET LOCAL ROLE authenticated;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids) AND estimated_price=12) THEN RAISE EXCEPTION 'FAIL B own tariff'; END IF; END $$;
 RESET ROLE;
 SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
+SELECT set_config('realtime.topic','driver-offers:'||a_user::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM realtime.messages WHERE topic='driver-offers:'||(SELECT a_user::text FROM market_ids) AND extension='broadcast' AND private)
+ THEN RAISE EXCEPTION 'FAIL private offer broadcast missing or own channel denied'; END IF; END $$;
+SELECT set_config('realtime.topic','driver-offers:'||b_user::text,true) FROM market_ids;
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM realtime.messages WHERE topic='driver-offers:'||(SELECT b_user::text FROM market_ids))
+ THEN RAISE EXCEPTION 'FAIL foreign driver broadcast allowed'; END IF; END $$;
+SELECT set_config('realtime.topic','driver-offers:'||a_user::text,true) FROM market_ids;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids) AND estimated_price=10) THEN RAISE EXCEPTION 'FAIL A own tariff'; END IF; END $$;
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids) AND fare_breakdown->'marketplace' ? 'offers') THEN RAISE EXCEPTION 'FAIL repeated whole-market payload'; END IF; END $$;
 SELECT pg_temp.market_denied('UPDATE public.taxi_requests SET company_id=(SELECT company_a FROM market_ids),estimated_price=0 WHERE id=(SELECT ride FROM market_ids)');
 SELECT pg_temp.market_denied('UPDATE public.taxi_requests SET status=''accepted'',driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids)) WHERE id=(SELECT ride FROM market_ids)');
 RESET ROLE;
@@ -83,7 +91,7 @@ SELECT public.accept_taxi_request(ride) FROM market_ids;
 DO $$ DECLARE r public.taxi_requests; BEGIN
  SELECT accepted.* INTO r FROM market_ids CROSS JOIN LATERAL public.accept_taxi_request(ride) accepted;
  IF r.company_id<>(SELECT company_a FROM market_ids) OR r.vehicle_type_id<>(SELECT type_a FROM market_ids) OR r.estimated_price<>10
- OR r.accepted_at IS NULL OR (r.fare_breakdown->>'total')::numeric<>10 THEN RAISE EXCEPTION 'FAIL carrier/tariff assignment'; END IF;
+ OR r.accepted_at IS NULL OR (r.fare_breakdown->>'total')::numeric<>10 OR r.fare_breakdown->'marketplace' ? 'offers' THEN RAISE EXCEPTION 'FAIL carrier/tariff assignment'; END IF;
 END $$;
 UPDATE public.taxi_requests SET status='arrived' WHERE id=(SELECT ride FROM market_ids);
 UPDATE public.taxi_requests SET status='in_progress' WHERE id=(SELECT ride FROM market_ids);
