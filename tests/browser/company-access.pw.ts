@@ -2,9 +2,17 @@ import { test, expect, type Page } from '@playwright/test';
 
 const account = '11111111-1111-4111-8111-111111111111';
 const ownCompany = '22222222-2222-4222-8222-222222222222';
+// Model Supabase's preflight too: WebKit checks the cross-origin headers even
+// for synthetic fulfilled requests during page/second-tab navigation.
+const corsHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
+  'access-control-allow-headers': 'authorization,apikey,content-type,x-client-info,x-supabase-api-version,prefer,accept-profile,content-profile,range,range-unit',
+  'access-control-expose-headers': 'content-range',
+};
 const company = (id: string, name: string) => ({ id, name, is_active: true, currency: 'EUR',
   base_fare: 2, price_per_km: 1, price_per_minute: 0.2, dispatch_radius_km: 5,
-  created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
+  updated_at: '2026-10-11T09:00:00Z', created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
 
 async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOMER') {
   const user = { id: account, email: 'synthetic-admin@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
@@ -23,6 +31,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
       if (/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(url.hostname)) state.google++;
       return route.abort();
     }
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
     let data: unknown = [];
     if (url.pathname.endsWith('/auth/v1/user')) data = user;
     else if (url.pathname.endsWith('/profiles')) {
@@ -47,7 +56,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
       days: Array.from({ length: 7 }, (_, i) => ({ day: '2026-10-' + String(i + 1).padStart(2, '0'), orders: 0, revenue: 0 })),
     };
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: { 'access-control-allow-origin': '*' } });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: corsHeaders });
   });
   return state;
 }
@@ -130,6 +139,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
     const request = route.request(), url = new URL(request.url());
     if (url.origin === 'http://127.0.0.1:4100') return route.continue();
     if (url.origin !== 'http://127.0.0.1:54329') { if (/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(url.hostname)) google++; return route.abort(); }
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
     let data: unknown = [];
     if (url.pathname.endsWith('/auth/v1/user')) data = authUser;
     else if (url.pathname.endsWith('/profiles')) data = { id: account, email: authUser.email, role, company_id: role === 'COMPANY_ADMIN' ? ownCompany : null, is_active: true, first_name: 'Тест', last_name: 'Фирма' };
@@ -138,7 +148,10 @@ test('invited company binds after login, finishes setup and keeps its own prices
       data = { status: 'ready', role, company_id: ownCompany, destination: setupAt ? '/admin/dashboard' : '/company/setup' };
     } else if (url.pathname.endsWith('/companies')) {
       expect(url.searchParams.get('id')).toBe('eq.' + ownCompany);
-      if (request.method() === 'PATCH') Object.assign(values, request.postDataJSON());
+      if (request.method() === 'PATCH') {
+        if (url.searchParams.get('updated_at') !== 'eq.' + values.updated_at) return route.fulfill({ status: 406, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST116', message: 'No matching tariff version' }), headers: corsHeaders });
+        Object.assign(values, request.postDataJSON(), { updated_at: new Date().toISOString() });
+      }
       data = request.headers().accept?.includes('vnd.pgrst.object') ? values : [values];
     } else if (url.pathname.endsWith('/complete_company_setup')) {
       const body = request.postDataJSON(); expect(body.p_company).toBe(ownCompany); setups++;
@@ -146,7 +159,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
     } else if (url.pathname.endsWith('/legal_acceptances')) data = { id: account };
     else if (url.pathname.endsWith('/company_dashboard')) data = { stats: { totalDrivers: 0, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 }, days: [] };
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: { 'access-control-allow-origin': '*' } });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: corsHeaders });
   });
   await page.goto('/company/login?invite=' + invite);
   await expect(page).toHaveURL(/\/company\/setup$/);
@@ -165,6 +178,20 @@ test('invited company binds after login, finishes setup and keeps its own prices
   await page.getByRole('button', { name: 'Запази', exact: true }).click();
   await expect(page.getByText('Настройките са запазени успешно.')).toBeVisible();
   await page.reload(); await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.41');
+  const otherPanel = await context.newPage();
+  await otherPanel.goto('/admin/pricing'); await expect(otherPanel.getByRole('spinbutton').nth(1)).toHaveValue('1.41');
+  await otherPanel.getByRole('spinbutton').nth(1).fill('1.70');
+  await otherPanel.getByRole('button', { name: 'Запази', exact: true }).click();
+  await expect(otherPanel.getByText('Настройките са запазени успешно.')).toBeVisible();
+  await page.getByRole('spinbutton').nth(1).fill('1.90');
+  await page.getByRole('button', { name: 'Запази', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Обнови тарифите' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Запази', exact: true })).toBeDisabled();
+  expect(values.price_per_km).toBe(1.7);
+  await page.getByRole('button', { name: 'Обнови тарифите' }).click();
+  await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.7');
+  await otherPanel.close();
   await page.goto('/company/login'); await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
   expect(binds).toBe(1); expect(setups).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });

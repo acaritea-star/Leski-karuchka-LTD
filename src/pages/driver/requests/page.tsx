@@ -72,13 +72,6 @@ export default function DriverRequests() {
   const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
   const isOnline = driver?.is_online ?? false;
-  const { declinedIds, decline, declineError, isDeclining } = useDriverDeclines(driver?.id);
-
-  useEffect(() => {
-    if (declineError) {
-      setError(declineError instanceof Error ? declineError.message : t('request_missed'));
-    }
-  }, [declineError, t]);
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
@@ -125,7 +118,10 @@ export default function DriverRequests() {
     refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
   const freshIncoming = useFreshRequests(incomingQuery.data ?? []);
-  const incomingRequests = freshIncoming.filter((r) => !declinedIds.has(r.id));
+  const { declinedIds, decline, declineError, isDeclining, declinesReady, declinesLoadError, refreshDeclines } = useDriverDeclines(driver?.id, freshIncoming.map(r => r.id));
+  const incomingRequests = declinesReady === false ? [] : freshIncoming.filter((r) => !declinedIds.has(r.id));
+  const refusalError = declineError || declinesLoadError;
+  const refusalMessage = refusalError ? refusalError instanceof Error ? refusalError.message : t('request_missed') : '';
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
@@ -389,13 +385,14 @@ export default function DriverRequests() {
 
       <div className="p-4 max-w-lg mx-auto">
         {/* ── Error ── */}
-        {error && (
+        {(error || refusalMessage) && (
           <div className="mb-3 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
             <i className="ri-error-warning-line" />
-            {error}
-            <button onClick={() => setError('')} className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 cursor-pointer">
+            {error || refusalMessage}
+            {declinesLoadError && <button className="underline" onClick={() => void refreshDeclines()}>Обнови заявките</button>}
+            {error && <button onClick={() => setError('')} className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 cursor-pointer">
               <i className="ri-close-line text-red-400 text-xs" />
-            </button>
+            </button>}
           </div>
         )}
 

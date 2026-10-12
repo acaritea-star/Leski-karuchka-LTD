@@ -4,6 +4,7 @@ import { acceptTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
+import { useFreshRequests } from '@/hooks/useFreshRequests';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { setDriverOnline } from '@/lib/driverLocation';
@@ -59,7 +60,6 @@ export default function DriverHome() {
   // ── Driver record ──
   const driverQuery = useQuery(driverRecordOptions(user?.id));
   const driver = driverQuery.data ?? null;
-  const { declinedIds, decline } = useDriverDeclines(driver?.id);
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
@@ -109,12 +109,15 @@ export default function DriverHome() {
     refetchInterval: requestsRealtime ? 15_000 : 8000,
   });
   // The badge renders 9+ beyond nine; the existing ten-row snapshot is enough.
-  const pendingRequests = driver?.is_online && !activeRequest ? pendingListQuery.data?.length ?? 0 : 0;
+  const freshPending = useFreshRequests(pendingListQuery.data ?? []);
+  const { declinedIds, decline, declineError, declinesReady, declinesLoadError, refreshDeclines } = useDriverDeclines(driver?.id, freshPending.map(r => r.id));
+  const refusalError = declineError || declinesLoadError;
+  const displayedError = gpsError || (refusalError ? refusalError instanceof Error ? refusalError.message : 'Отказът не е потвърден. Обнови заявките.' : '');
+  const pendingRequests = driver?.is_online && !activeRequest && declinesReady ? freshPending.filter(r => !declinedIds.has(r.id)).length : 0;
 
   const latestRequest = useMemo(() => {
-    const list = pendingListQuery.data ?? [];
-    return list.find((r) => !declinedIds.has(r.id)) ?? null;
-  }, [pendingListQuery.data, declinedIds]);
+    return declinesReady ? freshPending.find((r) => !declinedIds.has(r.id)) ?? null : null;
+  }, [freshPending, declinedIds, declinesReady]);
 
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
@@ -458,13 +461,14 @@ export default function DriverHome() {
               </button>
 
               {driver && !driver.is_verified && <p className="text-xs text-foreground-600 my-3">Премини подготовката и качи документите преди верификация от фирмата. <button type="button" className="underline text-primary-700" onClick={() => navigate('/driver/profile')}>Към подготовката и документите</button> · <button type="button" className="underline" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
-              {gpsError && (
+              {displayedError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-2 flex items-center gap-2">
                   <i className="ri-error-warning-line text-red-500 text-sm" />
-                  <p className="text-xs text-red-600 font-medium">{gpsError}</p>
+                  <p className="text-xs text-red-600 font-medium">{displayedError}</p>
+                  {declinesLoadError && <button className="text-xs underline" onClick={() => void refreshDeclines()}>Обнови заявките</button>}
                 </div>
               )}
-              {driver?.is_online && !gpsError && (
+              {driver?.is_online && !displayedError && (
                 <div className={`rounded-xl px-3 py-2 mb-3 flex items-center gap-2 ${
                   gpsStatus === 'tracking'
                     ? 'bg-emerald-50 border border-emerald-200'

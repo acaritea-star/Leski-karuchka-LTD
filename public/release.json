@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.11-tenant-reliability.1",
-  "baseCommit": "0ffb6ccad5a6e240a97c2dc961423ed037befd2a",
+  "release": "2026.10.12-reverse-workflow.1",
+  "baseCommit": "c9186350e3050bee48fb44499db333e85ddece7f",
   "databaseMigration": "p1_ride_evidence_and_operations",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261009074806",
   "googleRoutesVersion": 8,
-  "verifiedSourceCommit": "64a7e2b328c8761a2cf403ffc70a91e2e4ecca4c",
+  "verifiedSourceCommit": "30ec776921a82654175785536fdac639e89fcf89",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -16,7 +16,8 @@
     "20261010204407_unified_driver_onboarding",
     "20261011081118_partner_service_fee_training",
     "20261011172849_invited_partner_access",
-    "20261011184333_tenant_reliability_and_live_status"
+    "20261011184333_tenant_reliability_and_live_status",
+    "20261011205954_reverse_workflow_reliability"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -35,5 +36,7 @@
   "partnerAccessMigrationVersion": "20261011172849",
   "partnerAccessVerifiedSourceCommit": "67582911b34378fae2e02d87b6baa75ce521edad",
   "tenantReliabilityMigrationVersion": "20261011184333",
-  "tenantReliabilityVerifiedSourceCommit": "64a7e2b328c8761a2cf403ffc70a91e2e4ecca4c"
+  "tenantReliabilityVerifiedSourceCommit": "64a7e2b328c8761a2cf403ffc70a91e2e4ecca4c",
+  "reverseWorkflowMigrationVersion": "20261011205954",
+  "reverseWorkflowVerifiedSourceCommit": "30ec776921a82654175785536fdac639e89fcf89"
 }

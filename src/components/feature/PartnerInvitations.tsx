@@ -45,6 +45,9 @@ export default function PartnerInvitations({ kind, companyId }: { kind: PartnerK
         p_id: intent.current!.id, p_kind: kind, p_email: normalized, p_company: companyId,
       }).abortSignal(signal));
       if (error) throw error; if (!id) throw new Error('Поканата не е потвърдена.');
+      // Creation is confirmed. A later email failure must not keep an old
+      // operation ID alive after the invitation is revoked or expires.
+      intent.current = null;
       setNotice('Поканата е запазена. Изпращаме имейла…');
       await send(id); setEmail(''); intent.current = null;
     }); }}>

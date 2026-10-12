@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import { withRequestTimeout } from '@/lib/requestTimeout';
+import { isAmbiguousWrite } from '@/lib/rideOperations';
 import { estimateDuration } from '@/lib/geo';
 import { calculateFare, DEFAULT_CURRENCY } from '@/lib/pricing';
 
@@ -15,6 +16,7 @@ interface PricingConfig {
   dispatch_radius_km: number;
   currency: string;
 }
+const pricingColumns = 'id,base_fare,min_fare,price_per_km,price_per_minute,dispatch_radius_km,currency,updated_at' as const;
 
 export default function AdminPricing() {
   const { companyId } = useAdminCompany();
@@ -39,6 +41,9 @@ function PricingEditor() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [version, setVersion] = useState<string | null>(null);
+  const [needsReload, setNeedsReload] = useState(false);
+  const [blankFields, setBlankFields] = useState<Set<keyof PricingConfig>>(new Set());
 
   const fetchConfig = useCallback(async () => {
     if (!companyId) { setLoaded(false); setLoading(false); setError('Избери фирма или провери фирмения си достъп.'); return; }
@@ -48,12 +53,16 @@ function PricingEditor() {
     try {
       const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('base_fare, min_fare, price_per_km, price_per_minute, dispatch_radius_km, currency')
+        .select(pricingColumns)
         .eq('id', companyId)
         .abortSignal(signal).single());
 
       if (err) throw err;
       if (data) {
+        if (!data.updated_at) throw new Error('Версията на тарифите не е заредена. Опитай отново.');
+        setVersion(data.updated_at);
+        setNeedsReload(false);
+        setBlankFields(new Set());
         setLoaded(true);
         setConfig({
           base_fare: parseFloat(String(data.base_fare ?? 0)),
@@ -78,8 +87,8 @@ function PricingEditor() {
   }, [fetchConfig]);
 
   const handleSave = async () => {
-    if (!companyId || !loaded || savingRef.current) return;
-    if (![config.base_fare, config.min_fare, config.price_per_km, config.price_per_minute, config.dispatch_radius_km].every(Number.isFinite)
+    if (!companyId || !loaded || !version || needsReload || savingRef.current) return;
+    if (blankFields.size || ![config.base_fare, config.min_fare, config.price_per_km, config.price_per_minute, config.dispatch_radius_km].every(Number.isFinite)
       || config.min_fare < 0 || config.base_fare < 0 || config.price_per_km < 0 || config.price_per_minute < 0 || config.dispatch_radius_km <= 0) {
       setError('Въведи неотрицателни цени и радиус по-голям от нула.'); return;
     }
@@ -87,21 +96,34 @@ function PricingEditor() {
     setSaving(true);
     setError('');
     setSaved(false);
+    const submitted = { ...config, currency: DEFAULT_CURRENCY };
     try {
-      const { data, error: err } = await withRequestTimeout(signal => supabase
-        .from('companies')
-        .update({
-          base_fare: config.base_fare,
-          min_fare: config.min_fare,
-          price_per_km: config.price_per_km,
-          price_per_minute: config.price_per_minute,
-          dispatch_radius_km: config.dispatch_radius_km,
-          currency: DEFAULT_CURRENCY,
-        })
-        .eq('id', companyId).select('id,base_fare,min_fare,price_per_km,price_per_minute,dispatch_radius_km,currency').abortSignal(signal).single());
-
-      if (err) throw err;
-      if (!data || data.id !== companyId) throw new Error('Записът не е потвърден. Обнови тарифите.');
+      let data;
+      try {
+        const reply = await withRequestTimeout(signal => supabase.from('companies').update(submitted)
+          .eq('id', companyId).eq('updated_at', version).select(pricingColumns).abortSignal(signal).single());
+        if (reply.error) throw reply.error;
+        if (!reply.data || reply.data.id !== companyId || !reply.data.updated_at) throw new Error('Записът не е потвърден. Обнови тарифите.');
+        data = reply.data;
+      } catch (cause) {
+        if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'PGRST116') {
+          setNeedsReload(true);
+          throw new Error('Тарифите са променени или достъпът е променен. Обнови тарифите преди нов запис.');
+        }
+        if (isAmbiguousWrite(cause)) {
+          try {
+            // A cancelled HTTP request may already have committed. Confirm the
+            // exact submitted values once; never replay an uncertain write.
+            const check = await withRequestTimeout(signal => supabase.from('companies').select(pricingColumns)
+              .eq('id', companyId).abortSignal(signal).single(), 5000);
+            if (!check.error && check.data?.id === companyId && check.data.updated_at && check.data.updated_at !== version
+              && Object.entries(submitted).every(([key, value]) => key === 'currency'
+                ? check.data!.currency === value : Number(check.data![key as keyof PricingConfig]) === value)) data = check.data;
+          } catch { /* Keep the original error if the read cannot confirm it. */ }
+        }
+        if (!data) { setNeedsReload(true); throw cause; }
+      }
+      setVersion(data.updated_at);
       setConfig({ base_fare: Number(data.base_fare), min_fare: Number(data.min_fare), price_per_km: Number(data.price_per_km), price_per_minute: Number(data.price_per_minute), dispatch_radius_km: Number(data.dispatch_radius_km), currency: data.currency });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -115,8 +137,9 @@ function PricingEditor() {
   };
 
   const setNum = (key: keyof PricingConfig, value: string) => {
-    const num = parseFloat(value);
-    setConfig((prev) => ({ ...prev, [key]: isNaN(num) ? 0 : num }));
+    const num = value.trim() ? Number(value) : NaN;
+    setBlankFields(prev => { const next = new Set(prev); if (!Number.isFinite(num)) next.add(key); else next.delete(key); return next; });
+    if (Number.isFinite(num)) setConfig((prev) => ({ ...prev, [key]: num }));
   };
 
   return (
@@ -125,7 +148,7 @@ function PricingEditor() {
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
           {error}
-          {!loaded && <button className="underline" onClick={() => void fetchConfig()}>Опитай отново</button>}
+          {(!loaded || needsReload) && <button className="underline" disabled={saving} onClick={() => void fetchConfig()}>{needsReload ? 'Обнови тарифите' : 'Опитай отново'}</button>}
           <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
             <i className="ri-close-line text-red-400 text-xs" />
           </button>
@@ -151,13 +174,13 @@ function PricingEditor() {
             <h3 className="font-semibold text-foreground-950 mb-1">Тарифи</h3>
             <p className="text-sm text-foreground-500 mb-6">Цената се запазва при поръчване. Смята се по метри и секунди, с едно крайно закръгляне до евроцент. Множителят за категорията важи и за минималната цена.</p>
 
-            <div className="space-y-5">
+            <fieldset disabled={saving} className="space-y-5">
               <div>
                 <label className="text-sm font-medium text-foreground-700 block mb-1.5">Начална такса ({config.currency})</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={config.base_fare}
+                  value={blankFields.has('base_fare') ? '' : config.base_fare}
                   onChange={(e) => setNum('base_fare', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 />
@@ -167,7 +190,7 @@ function PricingEditor() {
                 <input
                   type="number"
                   step="0.01"
-                  value={config.price_per_km}
+                  value={blankFields.has('price_per_km') ? '' : config.price_per_km}
                   onChange={(e) => setNum('price_per_km', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 />
@@ -177,14 +200,14 @@ function PricingEditor() {
                 <input
                   type="number"
                   step="0.01"
-                  value={config.price_per_minute}
+                  value={blankFields.has('price_per_minute') ? '' : config.price_per_minute}
                   onChange={(e) => setNum('price_per_minute', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 />
               </div>
               <div>
                 <label htmlFor="minimum-fare" className="text-sm font-medium text-foreground-700 block mb-1.5">Минимална цена ({config.currency})</label>
-                <input id="minimum-fare" type="number" min="0" step="0.01" value={config.min_fare} onChange={e => setNum('min_fare', e.target.value)}
+                <input id="minimum-fare" type="number" min="0" step="0.01" value={blankFields.has('min_fare') ? '' : config.min_fare} onChange={e => setNum('min_fare', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200" />
               </div>
               <div>
@@ -192,7 +215,7 @@ function PricingEditor() {
                 <input
                   type="number"
                   step="0.5"
-                  value={config.dispatch_radius_km}
+                  value={blankFields.has('dispatch_radius_km') ? '' : config.dispatch_radius_km}
                   onChange={(e) => setNum('dispatch_radius_km', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200"
                 />
@@ -201,12 +224,12 @@ function PricingEditor() {
 
               <button
                 onClick={handleSave}
-                disabled={saving || !loaded}
+                disabled={saving || !loaded || needsReload}
                 className="w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
               >
                 {saving ? t('loading') : t('save')}
               </button>
-            </div>
+            </fieldset>
           </div>
 
           <div className="bg-white rounded-2xl border border-background-100 p-6 h-fit">
