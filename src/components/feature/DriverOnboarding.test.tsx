@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 import DriverOnboarding from './DriverOnboarding';
-const fake = vi.hoisted(() => ({ bundle: null as unknown, submit: vi.fn() }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ refreshProfile: vi.fn() }) }));
+const fake = vi.hoisted(() => ({ bundle: null as unknown, submit: vi.fn(), refresh: vi.fn(), reviewed: vi.fn() }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ refreshProfile: fake.refresh }) }));
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 vi.mock('@/lib/driverOnboarding', () => ({
   onboardingOptions: () => ({ queryKey: ['onboarding'], queryFn: async () => fake.bundle }),
@@ -13,13 +13,13 @@ vi.mock('@/lib/driverOnboarding', () => ({
   pendingApplicationUpload: () => null, prepareApplicationUpload: vi.fn(), registerApplicationUpload: vi.fn(), uploadApplicationDocument: vi.fn(),
 }));
 vi.mock('./DriverPreparationForm', () => ({ default: () => <p>Запазено обучение</p> }));
-afterEach(() => { cleanup(); fake.submit.mockReset(); });
+afterEach(() => { cleanup(); fake.submit.mockReset(); fake.refresh.mockReset(); fake.reviewed.mockReset(); });
 const document = (type: string, expires_at = '2099-01-01') => ({ type, expires_at, id: type });
-function mount(documents: unknown[], vehicle_details: unknown = { make: 'Тест', model: 'Кола', registration_number: 'A1234BC' }, submitted_at: string | null = null, has_vehicle = true) {
-  fake.bundle = { application: { id: 'application', company_id: 'company', user_id: 'user', status: 'pending', has_vehicle, vehicle_details, submitted_at }, documents, preparation: { receipt: {} } };
+function mount(documents: unknown[], vehicle_details: unknown = { make: 'Тест', model: 'Кола', registration_number: 'A1234BC' }, submitted_at: string | null = null, has_vehicle = true, status = 'pending') {
+  fake.bundle = { application: { id: 'application', company_id: 'company', user_id: 'user', status, has_vehicle, vehicle_details, submitted_at }, documents, preparation: { receipt: {} } };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(['onboarding'], fake.bundle);
-  render(<QueryClientProvider client={client}><DriverOnboarding applicationId="application" onReviewed={() => {}} /></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><DriverOnboarding applicationId="application" onReviewed={fake.reviewed} /></QueryClientProvider>);
   return client;
 }
 it('asks for vehicle details before exposing a single next document', () => {
@@ -54,4 +54,19 @@ it('asks only for the licence when the company provides the vehicle', () => {
   expect(screen.getAllByRole('form', { name: /^Качване:/ })).toHaveLength(1);
   expect(screen.getByRole('form', { name: 'Качване: Шофьорска книжка' })).toBeTruthy();
   expect(screen.queryByRole('textbox', { name: 'Регистрационен номер' })).toBeNull();client.clear();
+});
+
+it('refreshes access after approval even when the account already has the driver role', async () => {
+  fake.refresh.mockResolvedValue(undefined);
+  const client = mount([], null, null, false, 'approved');
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Към шофьорския панел' })); });
+  expect(fake.refresh).toHaveBeenCalledOnce(); expect(fake.reviewed).toHaveBeenCalledOnce();client.clear();
+});
+it('keeps the approved panel action retryable when the profile refresh fails', async () => {
+  fake.refresh.mockRejectedValue(new Error('Няма връзка'));
+  const client = mount([], null, null, false, 'approved');
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Към шофьорския панел' })); });
+  expect(screen.getByRole('alert').textContent).toContain('Няма връзка');
+  expect(fake.reviewed).not.toHaveBeenCalled();
+  expect((screen.getByRole('button', { name: 'Към шофьорския панел' }) as HTMLButtonElement).disabled).toBe(false);client.clear();
 });

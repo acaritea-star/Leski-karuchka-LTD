@@ -98,7 +98,12 @@ export default function DriverOnboarding({ applicationId, onReviewed }: { applic
   </section>;
   return <div ref={taskRef} tabIndex={-1} aria-label="Текуща стъпка" className="space-y-6 scroll-mt-4 focus:outline-none">
     <PreparationProgress step={step} />
-    {a.status === 'approved' ? <div role="status" className="rounded-2xl bg-primary-50 border border-primary-200 p-5 space-y-3"><h2 className="text-2xl font-semibold">Готов си за работа</h2><p className="text-base leading-relaxed">Фирмата одобри профила ти. Продължи към шофьорския панел.</p><button className="w-full rounded-xl bg-primary-500 text-white p-4 font-semibold" onClick={() => void refreshProfile()}>Към шофьорския панел</button></div> : a.submitted_at ? <>
+    {a.status === 'approved' ? <div className="rounded-2xl bg-primary-50 border border-primary-200 p-5 space-y-3"><h2 className="text-2xl font-semibold">Готов си за работа</h2><p role="status" className="text-base leading-relaxed">Фирмата одобри профила ти. Продължи към шофьорския панел.</p>{error && <p role="alert" className="text-base text-red-600">{error}</p>}<button disabled={busy} className="w-full rounded-xl bg-primary-500 text-white p-4 font-semibold disabled:opacity-50" onClick={async () => {
+      if (latch.current) return; latch.current = true; setBusy(true); setError('');
+      try { await refreshProfile(); onReviewed(); }
+      catch (e) { setError(workflowError(e, 'Не успяхме да отворим панела. Провери връзката и опитай отново.')); }
+      finally { latch.current = false; setBusy(false); }
+    }}>{busy ? 'Отваряме панела…' : 'Към шофьорския панел'}</button></div> : a.submitted_at ? <>
       <div role="status" className="rounded-2xl bg-primary-50 border border-primary-200 p-5 space-y-3"><h2 className="text-2xl font-semibold">Всичко е изпратено</h2><p className="text-base leading-relaxed text-foreground-700">Пакетът е изпратен. Сега е ред на фирмата да го прегледа.</p><p className="text-base leading-relaxed text-foreground-600">Не е нужно да качваш отново. Можеш да затвориш страницата и да провериш статуса по-късно със същия профил.</p></div>
       <details className="rounded-xl border border-background-200 p-4"><summary className="text-base font-semibold cursor-pointer">Преглед и промяна на изпратеното</summary><p className="my-4 text-sm leading-relaxed text-foreground-600">Ако промениш документ или автомобила, ще трябва да изпратиш пакета отново за проверка.</p>{documents}</details>
     </> : <>
