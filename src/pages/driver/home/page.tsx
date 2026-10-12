@@ -135,12 +135,14 @@ export default function DriverHome() {
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
 
       return await setDriverOnline(driver, goingOnline);
     },
-    onSuccess: async (confirmed) => {
+    onSuccess: async (confirmed, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
       if (confirmed.id !== driver?.id) return;
       if (user?.id) await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
       if (user?.id) queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
@@ -150,7 +152,8 @@ export default function DriverHome() {
       }
     },
     onSettled: () => { toggleInFlight.current = false; },
-    onError: (err) => {
+    onError: (err, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
       setGpsError(err instanceof Error ? err.message : t('gps_error'));
     },
   });
@@ -158,6 +161,7 @@ export default function DriverHome() {
   // ── Accept request ──
   const acceptMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
       const request = latestRequest;
@@ -171,7 +175,8 @@ export default function DriverHome() {
       return confirmed;
     },
     onSettled: () => { acceptInFlight.current = false; },
-    onSuccess: (confirmed) => {
+    onSuccess: (confirmed, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
       if (confirmed.driver_id !== driver?.id) return;
       setOfferError('');
       if (driver?.id) {
@@ -182,7 +187,8 @@ export default function DriverHome() {
       }
       navigate('/driver/requests');
     },
-    onError: (err) => {
+    onError: (err, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setOfferError(err instanceof Error ? err.message : t('request_missed'));
