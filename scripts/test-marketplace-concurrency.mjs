@@ -25,7 +25,7 @@ await sql(`BEGIN;
  VALUES('${user}','${n?companyB:company}','${n?categoryB:category}','Fixture','Race','RACE-${company.slice(0,8)}-${n}');
  UPDATE public.drivers SET document_verification_required=false,vehicle_id='${user}',is_verified=true WHERE user_id='${user}';
  INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
- SELECT id,company_id,42.6977,23.3219,10,clock_timestamp() FROM public.drivers WHERE user_id='${user}';`).join('\n')}
+ SELECT id,company_id,43.35,25.14,10,clock_timestamp() FROM public.drivers WHERE user_id='${user}';`).join('\n')}
  UPDATE public.drivers SET is_online=true WHERE company_id IN ('${company}','${companyB}'); COMMIT;`);
 const asUser = (user, command, tag = '') => `BEGIN; SET LOCAL statement_timeout='12s'; ${tag ? `SET LOCAL application_name='${tag}';` : ''}
  SELECT set_config('request.jwt.claims','{"sub":"${user}","role":"authenticated"}',true);
@@ -34,7 +34,7 @@ async function request(customer) {
  const quote = randomUUID(), ride = randomUUID();
  await sql(`INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
  VALUES('${quote}','${customer}','${company}','${category}',
- '{"pickup_latitude":42.6977,"pickup_longitude":23.3219,"destination_latitude":42.70,"destination_longitude":23.33,"pickup_address":"Race fixture","destination_address":"Destination fixture","distance_km":2,"duration_min":5,"total":6,"breakdown":{"total":6,"marketplace":{"service_class":"standard","min":5,"max":6,"offers":[{"company_id":"${company}","vehicle_type_id":"${category}","total":5,"breakdown":{"total":5}},{"company_id":"${companyB}","vehicle_type_id":"${categoryB}","total":6,"breakdown":{"total":6}}]}}}');`);
+ '{"pickup_latitude":43.35,"pickup_longitude":25.14,"destination_latitude":43.36,"destination_longitude":25.13,"pickup_address":"Race fixture","destination_address":"Destination fixture","distance_km":2,"duration_min":5,"total":6,"breakdown":{"total":6,"marketplace":{"service_class":"standard","min":5,"max":6,"offers":[{"company_id":"${company}","vehicle_type_id":"${category}","total":5,"breakdown":{"total":5}},{"company_id":"${companyB}","vehicle_type_id":"${categoryB}","total":6,"breakdown":{"total":6}}]}}}');`);
  await sql(asUser(customer, `SELECT public.create_taxi_request('${quote}','${ride}','cash');`));
  return ride;
 }

@@ -18,7 +18,7 @@ UPDATE public.profiles SET role='DRIVER',company_id=(SELECT company_b FROM marke
 UPDATE public.profiles SET role='DRIVER',company_id=(SELECT company_far FROM market_ids) WHERE id=(SELECT far_user FROM market_ids);
 INSERT INTO public.vehicle_types(id,company_id,name,service_class)
  SELECT type_a,company_a,'Eco','standard' FROM market_ids UNION ALL
- SELECT type_b,company_b,'Стандарт','standard' FROM market_ids UNION ALL
+ SELECT type_b,company_b,'Market Standard','standard' FROM market_ids UNION ALL
  SELECT type_far,company_far,'Far standard','standard' FROM market_ids;
 INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number)
  SELECT a_user,company_a,type_a,'Fixture','A','MA-'||left(a_user::text,8) FROM market_ids UNION ALL
@@ -41,12 +41,23 @@ INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload
 CREATE FUNCTION pg_temp.market_denied(q text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN BEGIN EXECUTE q; EXCEPTION WHEN OTHERS THEN IF SQLSTATE IN ('42501','P0001') THEN RETURN; END IF; RAISE; END;
  RAISE EXCEPTION 'FAIL unexpected access: %',q; END $$;
+CREATE TEMP TABLE incomplete_market_quote AS SELECT gen_random_uuid() id;
+GRANT SELECT ON incomplete_market_quote TO authenticated;
+INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
+ SELECT bad.id,q.customer_id,q.company_id,q.vehicle_type_id,
+ jsonb_set(q.payload,'{breakdown,marketplace,offers}',jsonb_build_array(q.payload->'breakdown'->'marketplace'->'offers'->0))
+ FROM public.ride_quotes q CROSS JOIN incomplete_market_quote bad WHERE q.id=(SELECT quote FROM market_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ DECLARE ready jsonb; BEGIN
  ready:=public.marketplace_availability(43.2,25.6);
  IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(ready->'categories') c WHERE c->>'id'='standard' AND (c->>'drivers')::int=2) THEN RAISE EXCEPTION 'FAIL combined carriers'; END IF;
  IF ready::text LIKE '%user_id%' OR ready::text LIKE '%latitude%' THEN RAISE EXCEPTION 'FAIL location/identity exposed'; END IF;
+END $$;
+DO $$ BEGIN
+ BEGIN PERFORM public.create_taxi_request((SELECT id FROM incomplete_market_quote),gen_random_uuid(),'cash');
+ EXCEPTION WHEN OTHERS THEN IF SQLERRM LIKE 'QUOTE_FLEET_CHANGED:%' THEN RETURN; END IF; RAISE; END;
+ RAISE EXCEPTION 'FAIL incomplete carrier quote accepted';
 END $$;
 SELECT public.create_taxi_request(quote,ride,'cash') IS NOT NULL FROM market_ids;
 SELECT pg_temp.market_denied('SELECT private.accept_marketplace_request(ride) FROM market_ids');
@@ -92,6 +103,17 @@ RESET ROLE;
 SELECT set_config('request.jwt.claims',json_build_object('sub',far_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN IF EXISTS(SELECT 1 FROM public.driver_incoming_requests() WHERE id=(SELECT ride FROM market_ids)) THEN RAISE EXCEPTION 'FAIL far driver receives offer'; END IF; END $$;
+RESET ROLE;
+UPDATE public.profiles SET role='COMPANY_ADMIN' WHERE id=(SELECT b_user FROM market_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',b_user,'role','authenticated')::text,true) FROM market_ids;
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE category public.vehicle_types; cid uuid:=gen_random_uuid(); BEGIN
+ category:=public.save_vehicle_category(cid,(SELECT company_b FROM market_ids),NULL,'{"name":"Comfort fixture","service_class":"comfort","capacity":4,"multiplier":1.30}');
+ IF category.company_id<>(SELECT company_b FROM market_ids) OR category.service_class<>'comfort' OR category.multiplier<>1.30 THEN RAISE EXCEPTION 'FAIL category creation'; END IF;
+ IF (public.save_vehicle_category(cid,(SELECT company_b FROM market_ids),NULL,'{"name":"Comfort fixture","service_class":"comfort","capacity":4,"multiplier":1.30}')).id<>cid THEN RAISE EXCEPTION 'FAIL category retry'; END IF;
+ PERFORM pg_temp.market_denied(format('SELECT public.save_vehicle_category(%L,%L,%L,''{"name":"Stale fixture","service_class":"comfort","capacity":4,"multiplier":1}'')',cid,(SELECT company_b FROM market_ids),clock_timestamp()-interval '1 day'));
+END $$;
+SELECT pg_temp.market_denied('SELECT public.save_vehicle_category(gen_random_uuid(),company_a,NULL,''{"name":"Foreign","service_class":"standard","capacity":4,"multiplier":1}'') FROM market_ids');
 RESET ROLE;
 DO $$ BEGIN IF has_function_privilege('anon','public.marketplace_availability(double precision,double precision)','EXECUTE')
  OR has_function_privilege('authenticated','public.marketplace_quote_types(double precision,double precision)','EXECUTE')

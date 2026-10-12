@@ -23,7 +23,7 @@ The customer chooses pickup, destination and service class. Eligible drivers fro
 
 One Google route measurement creates a quote per available shared class, with a saved tariff offer for each eligible carrier/category. Each offer uses the same raw metres and seconds and existing exact decimal arithmetic, with one final rounding to cents. The customer sees the minimum/maximum of those offers before ordering. The driver sees its own carrier's amount before acceptance. Acceptance binds company_id, vehicle_type_id, fare_breakdown and estimated_price atomically to that saved offer. Completed trips and reports use the winning carrier and amount; another driver cannot see the foreign completed trip.
 
-Quotes expire after two minutes. Availability and qualification are rechecked at creation and acceptance. A newly available carrier with no tariff in the saved quote needs a refreshed quote; it cannot accept at an unquoted price. No guessed tariff, silent surcharge or client-written price is permitted.
+Quotes expire after two minutes. Availability and qualification are rechecked at creation and acceptance. If another eligible carrier/category appears before submission without a saved tariff, creation fails clearly and the customer must explicitly refresh the quote. It cannot accept at an unquoted price. No guessed tariff, silent surcharge or client-written price is permitted.
 
 The current service-fee billing flag is unchanged. This release does not collect new commission or email actual users.
 

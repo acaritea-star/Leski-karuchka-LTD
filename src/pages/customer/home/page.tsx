@@ -324,7 +324,11 @@ export default function CustomerHome() {
       const data = await createTaxiRequest(quoteId, bookingId.current, user.id);
       setActiveRequest(data as ActiveRequest); setRequestStatus('created');
     } catch (error) {
-      setRequestError(error instanceof Error && error.message.startsWith('NO_AVAILABLE_DRIVER:') ? error.message.slice('NO_AVAILABLE_DRIVER:'.length).trim() : t('request_failed_hint'));
+      const reason = error instanceof Error ? error.message : '';
+      const fleetChanged = reason.startsWith('QUOTE_FLEET_CHANGED:');
+      if (fleetChanged) setRoute(current => current ? {...current,quote_id:undefined,quotes:current.quotes?.map(q => ({...q,quote_id:undefined}))} : null);
+      setRequestError(fleetChanged ? reason.slice('QUOTE_FLEET_CHANGED:'.length).trim()
+        : reason.startsWith('NO_AVAILABLE_DRIVER:') ? reason.slice('NO_AVAILABLE_DRIVER:'.length).trim() : t('request_failed_hint'));
       void availability.refetch();
       setRequestStatus('error');
     } finally { bookingInFlight.current = false; }

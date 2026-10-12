@@ -191,6 +191,8 @@ BEGIN
  IF p_id IS NULL OR label IS NULL OR length(label) NOT BETWEEN 2 AND 60 OR cls IS NULL OR cls NOT IN ('standard','comfort','van')
  OR cap IS NULL OR cap NOT BETWEEN 1 AND 8 OR mult IS NULL OR mult<=0 OR mult>10
  OR (cls='van' AND cap<5) OR (cls<>'van' AND cap>4) THEN RAISE EXCEPTION 'Invalid vehicle category'; END IF;
+ IF EXISTS(SELECT 1 FROM public.vehicle_types WHERE company_id=p_company AND id<>p_id AND lower(btrim(name))=lower(label))
+ THEN RAISE EXCEPTION 'Фирмата вече има категория с това име. Избери друго име или редактирай съществуващата.'; END IF;
  IF p_expected_at IS NULL THEN
   INSERT INTO public.vehicle_types(id,company_id,name,service_class,capacity,multiplier,is_active)
    VALUES(p_id,p_company,label,cls,cap,mult,coalesce((p_details->>'is_active')::boolean,true))
@@ -228,6 +230,12 @@ BEGIN
   IF p_request_id IS NULL OR p_payment_method<>'cash' THEN RAISE EXCEPTION 'Only cash payment is available for now'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=q.company_id AND is_active) THEN RAISE EXCEPTION 'Company unavailable'; END IF;
   b:=q.payload;
+  IF b->'breakdown'->'marketplace' IS NOT NULL AND EXISTS(
+    SELECT 1 FROM private.marketplace_drivers((b->>'pickup_latitude')::float8,(b->>'pickup_longitude')::float8) d
+    WHERE d.service_class=b->'breakdown'->'marketplace'->>'service_class'
+    AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(b->'breakdown'->'marketplace'->'offers') o
+      WHERE o.value->>'company_id'=d.company_id::text AND o.value->>'vehicle_type_id'=d.vehicle_type_id::text)
+  ) THEN RAISE EXCEPTION 'QUOTE_FLEET_CHANGED: Наличните фирми са се променили. Обнови цената преди поръчване.'; END IF;
   IF NOT EXISTS(SELECT 1 FROM private.eligible_offer_drivers(q.company_id,q.vehicle_type_id,
     (b->>'pickup_latitude')::float8,(b->>'pickup_longitude')::float8,b->'breakdown')) THEN
     RAISE EXCEPTION 'NO_AVAILABLE_DRIVER: Няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай отново.';
