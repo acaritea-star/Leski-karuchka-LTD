@@ -134,7 +134,7 @@ export default function CustomerHome() {
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeInput, setRouteInput] = useState('');
-    const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
+  const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
   const quoteCompany = 'marketplace';

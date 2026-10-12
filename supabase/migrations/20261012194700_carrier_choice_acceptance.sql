@@ -37,7 +37,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM public.taxi_requests WHERE driver_id=d.id AND status IN ('accepted','arrived','in_progress'))
  THEN RAISE EXCEPTION 'DRIVER_BUSY: Вече имаш започнат курс. Отвори текущия курс.'; END IF;
  SELECT * INTO loc FROM public.driver_locations WHERE driver_id=d.id AND company_id=d.company_id;
- IF NOT FOUND OR loc.updated_at<=clock_timestamp()-interval '45 seconds' OR loc.position_at<=clock_timestamp()-interval '45 seconds'
+ IF NOT FOUND OR loc.position_at IS NULL OR loc.updated_at<=clock_timestamp()-interval '45 seconds' OR loc.position_at<=clock_timestamp()-interval '45 seconds'
  OR loc.position_at>clock_timestamp()+interval '30 seconds' OR loc.accuracy IS NULL OR loc.accuracy NOT BETWEEN 0 AND 100
  THEN RAISE EXCEPTION 'GPS_STALE: Няма потвърдена актуална позиция. Обнови GPS и опитай отново.'; END IF;
  IF EXISTS(SELECT 1 FROM public.request_declines WHERE request_id=r.id AND driver_id=d.id)

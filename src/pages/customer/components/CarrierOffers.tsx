@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import type { CarrierOffer } from '@/lib/googleMaps';
 import { carrierOfferKey } from '@/lib/marketplace';
 import CarrierIdentity from '@/components/feature/CarrierIdentity';
@@ -45,6 +46,10 @@ export default function CarrierOffers({ offers, selected, onSelect, onBack, onRe
         <button type="button" disabled={creating || calculating} onClick={onRefresh}>Обнови офертите</button></div>}
       <div className="booking-meta"><button type="button" disabled={creating} onClick={onBack} className="underline">Маршрут и категория</button><span>{t('payment_in_cash')}</span></div>
       <p className="booking-fare-note">Заявката е само към избраната фирма. Ако няма кой да я приеме, можеш да избереш друга оферта.</p>
+      <p className="text-xs text-foreground-700 leading-relaxed px-1 py-2">{t('booking_legal_notice')}{' '}
+        <Link to="/terms" className="underline text-primary-700">{t('menu_terms')}</Link>{' · '}
+        <Link to="/privacy" className="underline text-primary-700">{t('menu_privacy')}</Link>
+      </p>
       {selected && <CarrierIdentity companyId={selected.company_id} />}
     </div>
     <button type="button" className="booking-primary" disabled={!canRequest || creating} onClick={onRequest} aria-busy={creating}>
