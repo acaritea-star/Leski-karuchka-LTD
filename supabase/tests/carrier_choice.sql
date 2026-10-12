@@ -61,7 +61,9 @@ DO $$ BEGIN
  RAISE EXCEPTION 'FAIL foreign carrier accepted exact offer'; END $$;
 RESET ROLE;
 -- Server receipt can be fresh while the underlying measurement is old.
-UPDATE public.driver_locations SET position_at=clock_timestamp()-interval '50 seconds' WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids));
+DELETE FROM public.driver_locations WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids));
+INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
+ SELECT id,company_id,43.2,25.6,10,clock_timestamp()-interval '50 seconds' FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
