@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.12-carrier-choice.1",
+  "release": "2026.10.13-carrier-choice.1",
   "baseCommit": "fa1d2d8262d9127639f75c760b016ea3d9eaf2cc",
   "databaseMigration": "carrier_choice_acceptance",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261012202035",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "2589c240790629406a3c05a318b72acf2a3f3e3b",
+  "verifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -56,5 +56,7 @@
   "marketplaceOfferRecoveryVerifiedSourceCommit": "44b75d63f10765f47225b0f3b9cd0ec8f9603898",
   "carrierChoiceVersion": 1,
   "carrierChoiceMigrationVersion": "20261012202035",
-  "carrierChoiceVerifiedSourceCommit": "2589c240790629406a3c05a318b72acf2a3f3e3b"
+  "carrierChoiceVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
+  "gpsAcquisitionVersion": 1,
+  "gpsAcquisitionVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694"
 }

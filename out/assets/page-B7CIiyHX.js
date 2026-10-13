@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-DpJIb57s.js";import{t}from"./SocialAuthPage-D_0QQ7Ab.js";var n=e();function r(){return(0,n.jsx)(t,{mode:`login`})}export{r as default};
