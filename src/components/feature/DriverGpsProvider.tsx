@@ -75,8 +75,11 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
         });
     }, 5000);
     const visibility = () => {
-      if (document.visibilityState === 'hidden') publishState({ status: 'stale', error: '', message: 'GPS е паузиран, докато приложението е скрито. Отвори го отново за актуална позиция.' });
-      else { acquisitionDeadline = Date.now() + 24_000; publishState({ ...acquiringState, message: 'Възстановяваме актуалната GPS позиция…' }); }
+      const hidden = document.visibilityState === 'hidden';
+      if (!hidden) acquisitionDeadline = Date.now() + 24_000;
+      setState(previous => previous.status === 'error' ? previous : hidden
+        ? { status: 'stale', error: '', message: 'GPS е паузиран, докато приложението е скрито. Отвори го отново за актуална позиция.' }
+        : { ...acquiringState, message: 'Възстановяваме актуалната GPS позиция…' });
     };
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pageshow', visibility);

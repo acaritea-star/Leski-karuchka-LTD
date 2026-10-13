@@ -38,6 +38,8 @@ it('keeps an unsuccessful acquisition unavailable after its deadline without pre
 it('shows permission denial immediately and never hides it behind the acquisition grace period',async()=>{
  const client=mount();act(()=>fake.callbacks!.onError('Разреши достъп до местоположението от настройките на браузъра.'));
  await act(async()=>vi.advanceTimersByTimeAsync(10000));expect(screen.getByTestId('state').textContent).toBe('error');
+ Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});act(()=>document.dispatchEvent(new Event('visibilitychange')));
+ Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});act(()=>window.dispatchEvent(new Event('pageshow')));
  expect(screen.getByRole('alert').textContent).toContain('Разреши');client.clear();
 });
 it('does not repaint driver consumers for repeated healthy GPS acknowledgements',()=>{
