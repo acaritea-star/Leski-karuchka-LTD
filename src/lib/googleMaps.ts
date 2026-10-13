@@ -26,8 +26,13 @@ export interface GeocodeResult {
   error?: string;
 }
 
+export interface CarrierOffer {
+  company_id: string; company_name: string; vehicle_type_id: string; type_name: string;
+  service_class: string; capacity: number; quote_id?: string; quote_expires_at: string;
+  price: number; breakdown: import('@/lib/pricing').FareBreakdown;
+}
 export interface RouteResult {
-  quotes?: Array<{ vehicle_type_id: string; quote_id?: string; quote_expires_at: string; price: number; price_min?: number; price_max?: number; breakdown: import('@/lib/pricing').FareBreakdown }>;
+  quotes?: Array<{ company_id?: string; company_name?: string; type_name?: string; service_class?: string; capacity?: number; vehicle_type_id: string; quote_id?: string; quote_expires_at: string; price: number; price_min?: number; price_max?: number; breakdown: import('@/lib/pricing').FareBreakdown }>;
   quote_id?: string;
   quote_expires_at?: string;
   price?: number;
@@ -107,7 +112,7 @@ export async function computeRoute(
     waypoints?: RoutePoint[];
     requestId?: string;
     purpose?: 'pickup' | 'destination' | 'context';
-    quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string; marketplace?: boolean };
+    quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string; marketplace?: boolean; carrier_choice?: boolean };
   }
 ): Promise<RouteResult | null> {
   const started=metricNow();

@@ -18,3 +18,14 @@ export function marketplaceRange(value: Json | undefined | null): PriceRange | n
 export function displayPriceRange(range: PriceRange): string {
   return range.min === range.max ? range.min.toFixed(2) : `${range.min.toFixed(2)}–${range.max.toFixed(2)}`;
 }
+
+/** Only complete exact server quotes can be shown as selectable carriers. */
+export function carrierOffers(route: import('./googleMaps').RouteResult | null, serviceClass: string): import('./googleMaps').CarrierOffer[] {
+  return (route?.quotes ?? []).filter((q): q is import('./googleMaps').CarrierOffer => q.service_class === serviceClass
+    && typeof q.company_id === 'string' && !!q.company_id && typeof q.company_name === 'string' && !!q.company_name.trim()
+    && typeof q.type_name === 'string' && !!q.type_name.trim() && typeof q.capacity === 'number' && Number.isInteger(q.capacity)
+    && q.capacity >= 1 && q.capacity <= 8 && Number.isFinite(q.price) && q.price >= 0
+    && q.breakdown?.total === q.price && Number.isFinite(Date.parse(q.quote_expires_at)))
+    .sort((a,b) => a.price - b.price || a.company_id.localeCompare(b.company_id) || a.vehicle_type_id.localeCompare(b.vehicle_type_id));
+}
+export const carrierOfferKey = (offer: Pick<import('./googleMaps').CarrierOffer,'company_id'|'vehicle_type_id'>) => `${offer.company_id}:${offer.vehicle_type_id}`;

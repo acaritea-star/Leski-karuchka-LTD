@@ -10,12 +10,12 @@ const fake = vi.hoisted(() => ({
   driver: { id:'driver',user_id:'user',company_id:'company',is_online:false,is_verified:true,status:'offline' },
   change: vi.fn(), declined: new Set<string>(), accept: vi.fn(), incoming: [] as Array<Record<string, unknown>>,
   sound:vi.fn(),unlock:vi.fn(),register:vi.fn(),reads:vi.fn(),
-  offersConnected: false, incomingReads: vi.fn(),
+  offersConnected: false, incomingReads: vi.fn(), userId:'user', ensure:vi.fn().mockResolvedValue(undefined),
   activeRow:null as Record<string, unknown>|null,statuses:new Map<string,(status:string)=>void>(),filters:[] as Array<{table?:string;filter?:string}>,
 }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:'user',company_id:'company',role:'DRIVER',first_name:'Иван' },loading:false }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user:{ id:fake.userId,company_id:'company',role:'DRIVER',first_name:'Иван' },loading:false }) }));
 vi.mock('@/hooks/useDriverOfferConnection', () => ({ useDriverOfferConnection: () => fake.offersConnected }));
-vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change }));
+vi.mock('@/lib/driverLocation', () => ({ setDriverOnline: fake.change, ensureDriverLocation: fake.ensure }));
 vi.mock('@/components/feature/DriverGpsProvider', () => ({ useDriverGps: () => ({ status:'idle',error:'' }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ unlockAudio:fake.unlock,playDriverSound:fake.sound }) }));
 vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register:fake.register }) }));
@@ -37,7 +37,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
     return query;
   },
 } }));
-afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();fake.offersConnected=false;fake.incomingReads.mockClear();vi.useRealTimers();vi.unstubAllGlobals(); });
+afterEach(() => { cleanup();fake.incoming=[];fake.activeRow=null;fake.driver={...fake.driver,is_online:false,is_verified:true,status:'offline'};fake.change.mockReset();fake.register.mockReset();fake.filters=[];fake.statuses.clear();fake.offersConnected=false;fake.incomingReads.mockClear();fake.userId='user';fake.ensure.mockReset().mockResolvedValue(undefined);fake.driver={...fake.driver,id:'driver',user_id:'user'};vi.useRealTimers();vi.unstubAllGlobals(); });
 
 it('uses private offer health for home reconciliation even when assigned updates remain connected', async () => {
   vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
@@ -108,4 +108,29 @@ it('does not present a stale GPS session as ready to receive new requests', asyn
   await act(async()=>vi.advanceTimersByTimeAsync(0));
   expect(screen.getByText('Изчаква GPS')).toBeTruthy();
   expect(screen.getByText(/не си достъпен за нови заявки/)).toBeTruthy();client.clear();
+});
+
+it('checks the request deadline again when clicking an offer after frozen browser timers',async()=>{
+ vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+ fake.incoming=[{id:'request',status:'pending',created_at:new Date().toISOString(),expires_at:new Date(Date.now()+10000).toISOString(),pickup_address:'Начало',destination_address:'Край',estimated_price:5}];
+ const client=mount();await act(async()=>vi.advanceTimersByTimeAsync(0));
+ const button=screen.getByRole('button',{name:/Приеми/});fake.accept.mockClear();
+ vi.setSystemTime(Date.now()+11000);fireEvent.click(button);await act(async()=>vi.advanceTimersByTimeAsync(0));
+ expect(fake.accept).not.toHaveBeenCalled();expect(screen.getByText(/Списъкът се обновява/)).toBeTruthy();
+ expect(screen.getByRole('button',{name:'Излез офлайн'})).toBeTruthy();client.clear();
+});
+
+it('does not carry an old account GPS rejection into the next driver panel',async()=>{
+ vi.useFakeTimers();fake.driver={...fake.driver,is_online:true,status:'available'};
+ fake.incoming=[{id:'request',status:'pending',created_at:new Date().toISOString(),pickup_address:'Начало',destination_address:'Край',estimated_price:5}];
+ let fail!:(error:Error)=>void;fake.ensure.mockReturnValueOnce(new Promise((_resolve,reject)=>{fail=reject;}));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});
+ client.setQueryData(queryKeys.driverRecord('user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('driver'),null);
+ const content=()=> <QueryClientProvider client={client}><MemoryRouter><DriverHome /></MemoryRouter></QueryClientProvider>;
+ const view=render(content());await act(async()=>vi.advanceTimersByTimeAsync(0));
+ fireEvent.click(screen.getByRole('button',{name:/Приеми/}));await act(async()=>vi.advanceTimersByTimeAsync(0));
+ fake.incoming=[];fake.userId='new-user';fake.driver={...fake.driver,id:'new-driver',user_id:'new-user'};
+ client.setQueryData(queryKeys.driverRecord('new-user'),fake.driver);client.setQueryData(queryKeys.driverActiveRequest('new-driver'),null);
+ view.rerender(content());await act(async()=>{fail(new Error('OLD GPS FAILURE'));await vi.advanceTimersByTimeAsync(0);});
+ expect(screen.queryByText('OLD GPS FAILURE')).toBeNull();expect(client.getQueryData(queryKeys.driverActiveRequest('new-driver'))).toBeNull();client.clear();
 });

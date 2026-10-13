@@ -84,3 +84,22 @@ it('never contacts Google for a marketplace category without a nearby eligible d
   expect((await call({origin:body.origin,destination:body.destination,quote:{marketplace:true,vehicle_type_id:'standard'}})).status).toBe(409);
   expect(fetch).not.toHaveBeenCalled();
 });
+it('saves independent exact named carrier quotes from one route and returns cheapest first',async()=>{
+  const types=[{id:'b',company_id:'firm-b',company_name:'Фирма Б',type_name:'Стандарт',capacity:4,service_class:'standard',multiplier:1,base_fare:4,price_per_km:1,price_per_minute:0,min_fare:0,currency:'EUR'},
+    {id:'a',company_id:'firm-a',company_name:'Фирма А',type_name:'Eco',capacity:4,service_class:'standard',multiplier:1,base_fare:2,price_per_km:1,price_per_minute:0,min_fare:0,currency:'EUR'}];
+  fake.rpc.mockImplementation(async name=>({data:name==='marketplace_quote_types'?types:{allowed:true},error:null}));
+  let rows: Array<Record<string,unknown>>=[];
+  fake.from.mockImplementation(()=>({insert:(input:typeof rows)=>{rows=input;return{select:async()=>({data:input.map(row=>({id:row.id,expires_at:new Date(Date.now()+120000).toISOString()})),error:null})};}}));
+  const response=await call({origin:body.origin,destination:body.destination,quote:{marketplace:true,carrier_choice:true,vehicle_type_id:'standard',pickup_address:'A',destination_address:'B'}});
+  expect(response.status).toBe(200);expect(fetch).toHaveBeenCalledOnce();expect(rows).toHaveLength(2);
+  const reply=await response.json();expect(reply.quotes).toMatchObject([{company_id:'firm-a',company_name:'Фирма А',service_class:'standard',price:5},{company_id:'firm-b',company_name:'Фирма Б',price:7}]);
+  expect(reply.quotes[0].quote_id).not.toBe(reply.quotes[1].quote_id);
+  expect(reply.price_min).toBeUndefined();expect(reply.price_max).toBeUndefined();
+  expect(rows[0]).toMatchObject({company_id:'firm-a',vehicle_type_id:'a',payload:{total:5,breakdown:{total:5,carrier_choice:{company_name:'Фирма А'}}}});
+  for(const row of rows) expect((row.payload as {breakdown:{marketplace?:unknown}}).breakdown.marketplace).toBeUndefined();
+});
+it('refuses incomplete named offers before reserving budget or calling Google',async()=>{
+  fake.rpc.mockResolvedValue({data:[{id:'a',service_class:'standard'}],error:null});
+  expect((await call({origin:body.origin,destination:body.destination,quote:{marketplace:true,carrier_choice:true,vehicle_type_id:'standard'}})).status).toBe(503);
+  expect(fetch).not.toHaveBeenCalled();expect(fake.rpc).toHaveBeenCalledOnce();
+});

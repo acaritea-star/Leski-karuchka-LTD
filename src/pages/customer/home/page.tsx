@@ -7,10 +7,10 @@ import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { availabilityFresh, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
-import { SERVICE_CLASSES, marketplaceRange } from '@/lib/marketplace';
+import { SERVICE_CLASSES, marketplaceRange, carrierOffers, carrierOfferKey } from '@/lib/marketplace';
 import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import NotificationBell from '@/components/feature/NotificationBell';
 import DriverTracking from '@/pages/customer/components/DriverTracking';
 import LocationPicker from '@/pages/customer/components/LocationPicker';
 import AppMenu from '@/pages/customer/components/AppMenu';
+import CarrierOffers from '@/pages/customer/components/CarrierOffers';
 import BookingCard from '@/pages/customer/components/BookingCard';
 import RequestStatusCard from '@/pages/customer/components/RequestStatusCard';
 import BookingMap from '@/pages/customer/components/BookingMap';
@@ -124,6 +125,7 @@ export default function CustomerHome() {
 
   // Booking options
   const [vehicleType, setVehicleType] = useState('standard');
+  const [carrierKey, setCarrierKey] = useState('');
   const vehicleTypes = SERVICE_CLASSES;
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const bookingId = useRef(crypto.randomUUID());
@@ -132,7 +134,6 @@ export default function CustomerHome() {
   // Real driving route (distance + duration from Google Routes, when available)
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeInput, setRouteInput] = useState('');
-  const [routeVehicleType, setRouteVehicleType] = useState('');
   const [visualRoute, setVisualRoute] = useState<{ endpoints: string; route: RouteResult } | null>(null);
   const endpoints = JSON.stringify([pickup?.lat, pickup?.lng, destination?.lat, destination?.lng]);
   const [calculating, setCalculating] = useState(false);
@@ -141,9 +142,12 @@ export default function CustomerHome() {
   const lastQuotedInput = useRef('');
   const requestedType = useRef(vehicleType);
   requestedType.current = vehicleType;
-  const selectedQuote = route?.quotes?.find(quote => quote.vehicle_type_id === vehicleType);
+  const offers = useMemo(() => carrierOffers(routeInput === quoteInput ? route : null, vehicleType), [routeInput, quoteInput, route, vehicleType]);
+  useEffect(() => { if (!carrierKey && offers.length) setCarrierKey(carrierOfferKey(offers[0])); }, [carrierKey, offers]);
+  const selectedCarrier = offers.find(offer => carrierOfferKey(offer) === carrierKey) ?? (!carrierKey ? offers[0] : undefined);
+  const selectedQuote = selectedCarrier;
   const currentRoute = routeInput !== quoteInput ? null : selectedQuote ? { ...route!, ...selectedQuote }
-    : routeVehicleType === vehicleType ? route : null;
+    : null;
   const gpsRevision = useRef(0);
 
   // Network connectivity state
@@ -198,16 +202,16 @@ export default function CustomerHome() {
     : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
     : `Свободни шофьори от партньорските фирми около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
   useEffect(() => {
-    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating') return;
+    if (!availabilityConfirmed || !availability.data || requestStatus === 'creating' || carrierKey) return;
     const current = availability.data.categories.find(c => c.id === vehicleType);
     if (current?.drivers) return;
     const next = availability.data.categories.find(c => c.drivers > 0);
     if (next) setVehicleType(next.id);
-  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus]);
+  }, [availabilityConfirmed, availability.data, vehicleType, requestStatus, carrierKey]);
 
   const fare = currentRoute?.breakdown ?? null;
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
-  const canRequest = !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
+  const canRequest = step === 'offers' && !!selectedCarrier && !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
     && availabilityConfirmed && !!readyCategory?.drivers
     && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
@@ -253,7 +257,7 @@ export default function CustomerHome() {
     setLocating(true); setLocationError('');
     const revision = ++gpsRevision.current;
     try {
-      const pos = await requestGps();
+      const pos = await requestGps({ maximumAgeMs: 5000 });
       if (gpsRevision.current !== revision) return;
       if (!Number.isFinite(pos.timestamp) || Date.now() - pos.timestamp > 30_000 || pos.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла. Опитай отново.');
       if (!Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy < 0 || pos.coords.accuracy > 100) throw new Error('Неточна GPS позиция. Избери адрес или изчакай по-добър сигнал.');
@@ -299,7 +303,7 @@ export default function CustomerHome() {
 
   // Handle field click
   const handleFieldClick = (field: BookingStep) => {
-    if (activeRequest || bookingInFlight.current || (field === 'confirm' && (!pickup || !destination))) return;
+    if (activeRequest || bookingInFlight.current || ((field === 'confirm' || field === 'offers') && (!pickup || !destination))) return;
     ++gpsRevision.current;
     setLocating(false);
     setLocationError('');
@@ -328,7 +332,7 @@ export default function CustomerHome() {
       const fleetChanged = reason.startsWith('QUOTE_FLEET_CHANGED:');
       if (fleetChanged) setRoute(current => current ? {...current,quote_id:undefined,quotes:current.quotes?.map(q => ({...q,quote_id:undefined}))} : null);
       setRequestError(fleetChanged ? reason.slice('QUOTE_FLEET_CHANGED:'.length).trim()
-        : reason.startsWith('NO_AVAILABLE_DRIVER:') ? reason.slice('NO_AVAILABLE_DRIVER:'.length).trim() : t('request_failed_hint'));
+        : reason.startsWith('NO_AVAILABLE_DRIVER:') ? 'Избраната фирма няма свободен шофьор в момента. Избери друга оферта или опитай отново.' : t('request_failed_hint'));
       void availability.refetch();
       setRequestStatus('error');
     } finally { bookingInFlight.current = false; }
@@ -403,7 +407,7 @@ export default function CustomerHome() {
     setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
-      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,pickup_address:pickup.address,destination_address:destination.address}})
+      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,carrier_choice:true,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
           setCalculating(false);
@@ -413,7 +417,6 @@ export default function CustomerHome() {
           } else {
             lastQuotedInput.current = quoteKey;
             setRoute(result);
-            setRouteVehicleType(vehicleTypeForQuote);
             setVisualRoute({ endpoints, route: result });
             setRouteInput(quoteInput);
             setRequestError('');
@@ -453,7 +456,8 @@ export default function CustomerHome() {
     setRequestStatus('idle');
     setRequestError('');
     setConfirmCancel(false);
-    setStep(pickup && destination ? 'confirm' : 'pickup');
+    setCarrierKey('');
+    setStep(pickup && destination ? 'offers' : 'pickup');
   };
 
   // Share active trip
@@ -469,9 +473,9 @@ export default function CustomerHome() {
     }
   };
 
-  // Redirect to orders after trip completed or cancelled
+  // Keep a cancelled search visible so the customer can choose another offer.
   useEffect(() => {
-    if (activeRequest?.status === 'completed' || activeRequest?.status === 'cancelled') {
+    if (activeRequest?.status === 'completed') {
       const timer = setTimeout(() => {
         if (activeRequest.status === 'completed' && activeRequest.driver_id) {
           navigate(`/customer/orders?rate=${activeRequest.id}`);
@@ -496,7 +500,7 @@ export default function CustomerHome() {
     : destination;
 
   return <CustomerLayout
-    expanded={step === 'confirm' && !activeRequest}
+    expanded={(step === 'confirm' || step === 'offers') && !activeRequest}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">
@@ -521,17 +525,24 @@ export default function CustomerHome() {
       : <>
         <BookingSteps step={step} canConfirm={!!pickup && !!destination}
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
-        {step === 'confirm' && pickup && destination
+        {step === 'offers' && pickup && destination ? <CarrierOffers
+          offers={offers} selected={selectedCarrier} onSelect={setCarrierKey}
+          onBack={() => handleFieldClick('confirm')} onRequest={createRequest}
+          onRefresh={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }}
+          creating={requestStatus === 'creating'} canRequest={canRequest} calculating={calculating}
+          expired={!calculating && !offers.some(q => q.quote_id && Date.parse(q.quote_expires_at) > now)} error={requestError || (carrierKey && !selectedCarrier && !calculating ? 'Избраната фирма вече няма оферта. Избери друга фирма.' : '')}
+          availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()} />
+          : step === 'confirm' && pickup && destination
           ? <BookingCard pickup={pickup} destination={destination}
-            marketplace priceRange={currentRoute?.price_min != null && currentRoute.price_max != null ? {min:currentRoute.price_min,max:currentRoute.price_max} : undefined}
+            marketplace chooseCarrier
             onFieldClick={handleFieldClick} onSwap={swapLocations}
-            vehicleType={vehicleType} onVehicleTypeChange={setVehicleType}
+            vehicleType={vehicleType} onVehicleTypeChange={id => { setVehicleType(id); setCarrierKey(''); }}
             vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
-            fare={fare} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
+            fare={null} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
             calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
-            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }} canRequest={canRequest}
+            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }} canRequest={offers.some(q => !!q.quote_id && Date.parse(q.quote_expires_at) > now) && quoteReady && !calculating}
             availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()}
-            creating={requestStatus === 'creating'} onRequest={createRequest} requestError={requestError} />
+            creating={requestStatus === 'creating'} onRequest={() => handleFieldClick('offers')} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}
             onUseCurrent={() => void detectLocation()} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}

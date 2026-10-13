@@ -6,10 +6,10 @@ import { acceptTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
-import { useFreshRequests } from '@/hooks/useFreshRequests';
+import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
-import { setDriverOnline } from '@/lib/driverLocation';
+import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 /* global google */
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -36,6 +36,8 @@ export default function DriverHome() {
   const { t } = useTranslation();
   const day = useSofiaDay();
   const { user, loading: authLoading } = useAuth();
+  const activeOwner = useRef(user?.id);
+  activeOwner.current = user?.id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { playDriverSound, unlockAudio } = useNotificationSound();
@@ -43,6 +45,7 @@ export default function DriverHome() {
   const toggleInFlight = useRef(false);
   const acceptInFlight = useRef(false);
   const [toggleError, setGpsError] = useState('');
+  const [offerError, setOfferError] = useState('');
   const gps = useDriverGps();
   const gpsError = toggleError || gps.error;
   const gpsStatus = gps.status;
@@ -132,12 +135,15 @@ export default function DriverHome() {
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
 
       return await setDriverOnline(driver, goingOnline);
     },
-    onSuccess: async (confirmed) => {
+    onSuccess: async (confirmed, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (confirmed.id !== driver?.id) return;
       if (user?.id) await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
       if (user?.id) queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
       setGpsError('');
@@ -146,7 +152,8 @@ export default function DriverHome() {
       }
     },
     onSettled: () => { toggleInFlight.current = false; },
-    onError: (err) => {
+    onError: (err, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
       setGpsError(err instanceof Error ? err.message : t('gps_error'));
     },
   });
@@ -154,12 +161,24 @@ export default function DriverHome() {
   // ── Accept request ──
   const acceptMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      return acceptTaxiRequest(requestId, driver.id);
+      const request = latestRequest;
+      if (!request || request.id !== requestId || !isOpenRequest(request)) throw new Error('Заявката вече не е налична. Списъкът се обновява.');
+      const owner = user?.id;
+      await ensureDriverLocation(driver);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      if (!isOpenRequest(request)) throw new Error('Заявката изтече, докато обновявахме GPS. Изчакай следващата.');
+      const confirmed = await acceptTaxiRequest(requestId, driver.id);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      return confirmed;
     },
     onSettled: () => { acceptInFlight.current = false; },
-    onSuccess: (confirmed) => {
+    onSuccess: (confirmed, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (confirmed.driver_id !== driver?.id) return;
+      setOfferError('');
       if (driver?.id) {
         cacheDriverRequest(queryClient, driver.id, confirmed);
       }
@@ -168,9 +187,11 @@ export default function DriverHome() {
       }
       navigate('/driver/requests');
     },
-    onError: (err) => {
+    onError: (err, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
-      setGpsError(err instanceof Error ? err.message : t('request_missed'));
+      setOfferError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) });
       }
@@ -178,6 +199,12 @@ export default function DriverHome() {
   });
   const acceptRequest = (id: string) => {
     if (acceptInFlight.current) return;
+    if (!latestRequest || latestRequest.id !== id || !isOpenRequest(latestRequest)) {
+      setOfferError('Заявката вече не е налична. Списъкът се обновява.');
+      if (user?.id) void queryClient.invalidateQueries({ queryKey: queryKeys.driverPendingList(user.id) });
+      return;
+    }
+    setOfferError('');
     acceptInFlight.current = true; acceptMutation.mutate(id);
   };
 
@@ -327,11 +354,11 @@ export default function DriverHome() {
           <div className="mx-auto w-full max-w-3xl space-y-4">
             <section aria-label="Твоят работен статус" className="space-y-2">
               <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-foreground-500">ШОФЬОРСКИ ПАНЕЛ</p>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : gpsStatus === 'acquiring' ? 'Уточняваме GPS' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground-950 break-words">Здравей{user?.first_name ? ', ' + user.first_name : ''}!</h1>
-              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? readyForRequests ? 'Готов си за заявки от твоята фирма и категория.' : 'Онлайн режимът е включен, но изчакваме актуален GPS. Докато няма потвърдена позиция, не си достъпен за нови заявки.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
-              {identity.data?.company && <p className="text-sm text-foreground-700"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}<span className="block text-xs text-foreground-500 mt-1">Получаваш подходящите заявки от общия пазар в радиуса на фирмата. Цената на офертата е по вашата тарифа.</span></p>}
+              <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? readyForRequests ? 'Готов си за подходящите заявки около теб.' : 'Онлайн режимът е включен, но изчакваме актуален GPS. Докато няма потвърдена позиция, не си достъпен за нови заявки.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
+              {identity.data?.company && <p className="text-sm text-foreground-700"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}<span className="block text-xs text-foreground-500 mt-1">Получаваш заявки в радиуса на фирмата, когато клиентът избере вашата оферта. Цената е по вашата тарифа.</span></p>}
             </section>
             {driver && !driver.is_verified && !activeRequest && <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 space-y-3" aria-label="Подготовка за работа">
               <h2 className="font-semibold text-foreground-950">Следваща стъпка: профил и документи</h2>
@@ -428,6 +455,7 @@ export default function DriverHome() {
               </button>
             )}
 
+            {offerError && <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800" role="status">{offerError}</div>}
             {/* Main bottom panel: toggle + stats */}
             <section className="bg-white rounded-2xl border border-background-200 p-4 md:p-5" aria-label="Онлайн режим">
               <div className="flex justify-between items-center gap-3 mb-3"><h2 className="font-semibold text-foreground-950">{activeRequest ? 'Твоят режим' : 'Готов ли си за заявки?'}</h2><span className="text-xs text-foreground-500">{driver?.is_online ? 'Включен' : 'Изключен'}</span></div>
@@ -468,30 +496,31 @@ export default function DriverHome() {
                   {declinesLoadError && <button className="text-xs underline" onClick={() => void refreshDeclines()}>Обнови заявките</button>}
                 </div>
               )}
+              {driver?.is_online && gpsStatus !== 'tracking' && <button type="button" className="text-sm text-primary-700 underline mb-3" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>}
               {driver?.is_online && !displayedError && (
                 <div className={`rounded-xl px-3 py-2 mb-3 flex items-center gap-2 ${
                   gpsStatus === 'tracking'
                     ? 'bg-emerald-50 border border-emerald-200'
-                    : gpsStatus === 'stale'
+                    : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                       ? 'bg-amber-50 border border-amber-200'
                       : 'bg-background-100'
                 }`}>
                   <span className={`w-2 h-2 rounded-full ${
                     gpsStatus === 'tracking'
                       ? 'bg-emerald-500 animate-pulse'
-                      : gpsStatus === 'stale'
+                      : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                         ? 'bg-amber-500'
                         : 'bg-foreground-300'
                   }`} />
                   <span className={`text-xs font-medium ${
                     gpsStatus === 'tracking'
                       ? 'text-emerald-700'
-                      : gpsStatus === 'stale'
+                      : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                         ? 'text-amber-700'
                         : 'text-foreground-500'
                   }`}>
                     {gpsStatus === 'tracking' && t('gps_live_shared')}
-                    {gpsStatus === 'stale' && t('gps_weak_signal')}
+                    {(gpsStatus === 'stale' || gpsStatus === 'acquiring') && (gps.message || t('gps_weak_signal'))}
                     {gpsStatus === 'idle' && t('gps_updating')}
                   </span>
                 </div>

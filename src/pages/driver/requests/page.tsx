@@ -6,7 +6,7 @@ import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
-import { setDriverOnline } from '@/lib/driverLocation';
+import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +38,8 @@ export default function DriverRequests() {
   const toggleInFlight = useRef(false);
   const acceptInFlight = useRef(false);
   const { user } = useAuth();
+  const activeOwner = useRef(user?.id);
+  activeOwner.current = user?.id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { playDriverSound, unlockAudio } = useNotificationSound();
@@ -136,12 +138,15 @@ export default function DriverRequests() {
   // ── Toggle online / offline ──
   const toggleMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (goingOnline: boolean) => {
       if (!driver) throw new Error('No driver record');
 
       return await setDriverOnline(driver, goingOnline);
     },
-    onSuccess: async (confirmed) => {
+    onSuccess: async (confirmed, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (confirmed.id !== driver?.id) return;
       if (user?.id) {
         await queryClient.cancelQueries({ queryKey: queryKeys.driverRecord(user.id) });
         queryClient.setQueryData(queryKeys.driverRecord(user.id), confirmed);
@@ -152,7 +157,8 @@ export default function DriverRequests() {
       }
     },
     onSettled: () => { toggleInFlight.current = false; },
-    onError: (err) => {
+    onError: (err, _target, context) => {
+      if (context?.owner !== activeOwner.current) return;
       setGpsError(err instanceof Error ? err.message : t('gps_error'));
     },
   });
@@ -167,12 +173,23 @@ export default function DriverRequests() {
   // ── Accept request ──
   const acceptMutation = useMutation({
     retry: false,
+    onMutate: () => ({ owner: user?.id }),
     mutationFn: async (requestId: string) => {
       if (!driver) throw new Error('No driver record');
-      return acceptTaxiRequest(requestId, driver.id);
+      const request = incomingRequests.find(row => row.id === requestId);
+      if (!request || !isOpenRequest(request)) throw new Error('Заявката вече не е налична. Списъкът се обновява.');
+      const owner = user?.id;
+      await ensureDriverLocation(driver);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      if (!isOpenRequest(request)) throw new Error('Заявката изтече, докато обновявахме GPS. Изчакай следващата.');
+      const confirmed = await acceptTaxiRequest(requestId, driver.id);
+      if (owner !== activeOwner.current) throw new DOMException('Account changed', 'AbortError');
+      return confirmed;
     },
     onSettled: () => { acceptInFlight.current = false; },
-    onSuccess: (confirmed) => {
+    onSuccess: (confirmed, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (confirmed.driver_id !== driver?.id) return;
       setError('');
       if (driver?.id) {
         cacheDriverRequest(queryClient, driver.id, confirmed);
@@ -181,7 +198,9 @@ export default function DriverRequests() {
         queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
       }
     },
-    onError: (err) => {
+    onError: (err, _requestId, context) => {
+      if (context?.owner !== activeOwner.current) return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('request_missed'));
       if (user?.id) {
@@ -368,16 +387,16 @@ export default function DriverRequests() {
           </span>
         )}
         {isOnline && (
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-accent-600 bg-accent-50 px-3 py-1.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
-            {gps.status === 'tracking' ? t('you_are_online') : 'Изчаква GPS'}
+          <span className={`ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full ${gps.status === 'tracking' ? 'text-accent-600 bg-accent-50' : 'text-amber-800 bg-amber-50'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${gps.status === 'tracking' ? 'bg-accent-500' : 'bg-amber-500'}`} />
+            {gps.status === 'tracking' ? t('you_are_online') : gps.status === 'acquiring' ? 'Уточняваме GPS' : 'Изчаква GPS'}
           </span>
         )}
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
         {identity.data?.company && <p className="text-sm text-foreground-700 mb-3"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}</p>}
-        {isOnline && gps.status !== 'tracking' && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.</p>}
+        {isOnline && gps.status !== 'tracking' && !gps.error && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">{gps.message || 'Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.'}</p>}
 
         {/* ── Error ── */}
         {(error || refusalMessage) && (
@@ -419,6 +438,7 @@ export default function DriverRequests() {
               )}
             </button>
             {driver && !driver.is_verified && <p className="text-xs text-foreground-600 my-3">Премини подготовката и качи документите преди верификация от фирмата. <button type="button" className="underline text-primary-700" onClick={() => navigate('/driver/profile')}>Към подготовката и документите</button> · <button type="button" className="underline" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
+              {isOnline && gps.status !== 'tracking' && <button type="button" className="text-sm text-primary-700 underline mb-2" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>}
               {gpsError && (
               <p className="text-xs text-red-500 mt-3 flex items-center justify-center gap-1">
                 <i className="ri-error-warning-line" /> {gpsError}

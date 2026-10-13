@@ -1,7 +1,7 @@
 import { isInBulgaria, SERVICE_AREA_ERROR } from '../_shared/serviceArea.ts';
 import { admin, authorize, validPoint } from '../_shared/auth.ts';
 import { calculateFare, pricingFromRow, applyVehicleMultiplier, type PricingRow } from '../_shared/pricing.ts';
-import { marketplaceQuotes, type MarketplaceTariff } from '../_shared/marketplacePricing.ts';
+import { marketplaceQuotes, carrierQuotes, type MarketplaceTariff } from '../_shared/marketplacePricing.ts';
 const API_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY') ?? '';
 
 function json(data: unknown, status = 200, extraHeaders: Record<string,string> = {}): Response {
@@ -78,12 +78,17 @@ export async function googleRoutes(req: Request): Promise<Response> {
   if (body.quote) {
     if (actor.role !== 'CUSTOMER' || requestId !== null || purpose !== null) return json({success:false,error:'Customer quote required'},403);
     quoteOptions = body.quote as Record<string,unknown>;
+    if (quoteOptions.carrier_choice != null && typeof quoteOptions.carrier_choice !== 'boolean') return badRequest('Invalid carrier choice flag');
+    if (quoteOptions.carrier_choice === true && quoteOptions.marketplace !== true) return badRequest('Marketplace carrier choice required');
     if (quoteOptions.marketplace != null && typeof quoteOptions.marketplace !== 'boolean') return badRequest('Invalid marketplace flag');
     if (quoteOptions.marketplace === true) {
       if (!['standard','comfort','van'].includes(String(quoteOptions.vehicle_type_id))) return badRequest('Invalid service class');
       const { data: tariffs, error: tariffsError } = await admin.rpc('marketplace_quote_types', {p_lat:origin.lat,p_lng:origin.lng});
       if (tariffsError || !Array.isArray(tariffs) || tariffs.length > 512) return json({success:false,error:'Marketplace tariffs unavailable'},503);
       if (!tariffs.length || !tariffs.some(type => type.service_class === quoteOptions!.vehicle_type_id)) return json({success:false,error:'No available drivers',code:'NO_AVAILABLE_DRIVER'},409);
+      if (quoteOptions.carrier_choice === true && tariffs.some(type => !type.company_name?.trim() || !type.type_name?.trim()
+        || !Number.isInteger(type.capacity) || type.capacity < 1 || type.capacity > 8))
+        return json({success:false,error:'Carrier identity unavailable'},503);
       marketplaceTariffs = tariffs;
       quoteCompany = { ...tariffs[0], id:tariffs[0].company_id };
     } else {
@@ -164,7 +169,7 @@ export async function googleRoutes(req: Request): Promise<Response> {
       const options = quoteOptions;
       // One routing result creates the fixed offers for every active category.
       // No long-lived Google route cache and no client-supplied pricing inputs.
-      const rows = marketplaceTariffs ? marketplaceQuotes(marketplaceTariffs, {
+      const rows = marketplaceTariffs ? (options.carrier_choice === true ? carrierQuotes : marketplaceQuotes)(marketplaceTariffs, {
         customer:actor.id,distanceMeters:distanceM,durationSeconds:durationSec,origin,destination,
         pickupAddress:String(options.pickup_address ?? ''),destinationAddress:String(options.destination_address ?? ''),
       }) : quoteVehicles.map(type => {
@@ -180,14 +185,16 @@ export async function googleRoutes(req: Request): Promise<Response> {
       const {data: saved,error: quoteError} = await admin.from('ride_quotes').insert(rows).select('id,expires_at');
       if (quoteError || saved?.length !== rows.length) return json({error:'Could not save quotes'},503);
       const quotes = rows.map(row => {
+        const carrier = 'carrier_choice' in row.payload.breakdown ? row.payload.breakdown.carrier_choice as {service_class:string;company_name:string;type_name:string;capacity:number} : undefined;
         const market = 'marketplace' in row.payload.breakdown
           ? row.payload.breakdown.marketplace as ReturnType<typeof marketplaceQuotes>[number]['payload']['breakdown']['marketplace'] : undefined;
         return { vehicle_type_id:market?.service_class ?? row.vehicle_type_id,quote_id:row.id,
+        ...(carrier ? {...carrier, company_id:row.company_id} : {}),
         quote_expires_at:saved.find(item => item.id === row.id)!.expires_at,
         price:row.payload.total,breakdown:market ? {...row.payload.breakdown,marketplace:{service_class:market.service_class,min:market.min,max:market.max}} : row.payload.breakdown,
         ...(market ? {price_min:market.min,price_max:market.max} : {}) };
       });
-      const selected = quotes.find(item => item.vehicle_type_id === options.vehicle_type_id)!;
+      const selected = quotes.find(item => ('service_class' in item ? item.service_class : item.vehicle_type_id) === options.vehicle_type_id)!;
       quote={...selected,quotes};
     }
     return json({

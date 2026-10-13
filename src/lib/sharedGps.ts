@@ -19,21 +19,29 @@ export const getGpsPosition = () => latest;
 
 const errorCode = (error: unknown) => error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 export const isGpsPermissionDenied = (error: unknown) => errorCode(error) === 1 || !!(error && typeof error === 'object' && 'name' in error && error.name === 'SecurityError');
-export function gpsErrorMessage(error: unknown, english = false): string {
+export function gpsErrorMessage(error: unknown, english = false, driver = false): string {
   if (isGpsPermissionDenied(error)) error = { code: 1 };
   switch (errorCode(error)) {
     case 1: return english ? 'Allow location access in your browser settings.' : 'Разреши достъп до местоположението от настройките на браузъра.';
     case 2: return english ? 'Location is unavailable. Turn on location services and try again.' : 'Местоположението е недостъпно. Включи локацията на устройството и опитай отново.';
-    case 3: return english ? 'Location took too long. Try again outdoors or choose an address.' : 'Локацията се забави. Опитай на открито или избери адрес.';
+    case 3: return driver ? 'Устройството още не е дало актуална позиция. Остави приложението отворено; GPS ще опита отново.'
+      : english ? 'Your device has not provided a current location. Try again or enter an address.' : 'Устройството още не е дало актуална позиция. Опитай отново или въведи адрес.';
+    case 'GPS_STALE': return driver ? 'Обновяваме последната позиция. Остави приложението отворено.'
+      : english ? 'Refreshing your location. Try again or enter an address.' : 'Не получихме актуална позиция. Опитай отново или въведи адрес.';
+    case 'GPS_ACCURACY': return driver ? 'Уточняваме GPS. Изчакваме по-точен сигнал от устройството.'
+      : english ? 'Location is still imprecise. Try again or enter an address.' : 'Позицията още е неточна. Опитай отново или въведи адрес.';
     default: return error instanceof Error ? error.message : english ? 'Check location services and your connection.' : 'Провери локацията на устройството и връзката.';
   }
 }
-function positionProblem(position: GeolocationPosition): Error | null {
+export function positionProblem(position: GeolocationPosition): Error | null {
   const { latitude, longitude, accuracy } = position.coords;
-  if (!Number.isFinite(position.timestamp) || Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000) return new Error('GPS позицията е остаряла.');
+  if (!Number.isFinite(position.timestamp) || Date.now() - position.timestamp > 30_000 || position.timestamp > Date.now() + 30_000)
+    return Object.assign(new Error('GPS позицията е остаряла.'), { code: 'GPS_STALE' });
   if (![latitude, longitude, accuracy].every(Number.isFinite) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || accuracy < 0) return new Error('Невалидна GPS позиция.');
+  if (accuracy > 100) return Object.assign(new Error('Изчакваме по-точна GPS позиция.'), { code: 'GPS_ACCURACY' });
   return null;
 }
+export const isTransientGpsError = (error: unknown) => [2, 3, 'GPS_STALE', 'GPS_ACCURACY'].includes(errorCode(error) as number | string);
 function publish(position: GeolocationPosition) {
   // A delayed native callback cannot rewind the shared position or the car.
   if (latest && (position.timestamp < latest.timestamp || position.timestamp === latest.timestamp && position.coords.accuracy >= latest.coords.accuracy)) return;
@@ -139,8 +147,10 @@ export function subscribeGps(position: Listener, error: Failure = () => {}) {
     }
   };
 }
-export function requestGps(): Promise<GeolocationPosition> {
+export function requestGps(options: { maximumAgeMs?: number } = {}): Promise<GeolocationPosition> {
   if (pending) return pending;
+  const problem = positionProblem;
+  if (latest && Date.now() - latest.timestamp <= Math.min(5000, options.maximumAgeMs ?? -1) && !problem(latest)) return Promise.resolve(latest);
   if (!navigator.geolocation) return Promise.reject(new Error('Браузърът не поддържа GPS.'));
   const run = epoch;
   const started = metricNow();
@@ -148,12 +158,28 @@ export function requestGps(): Promise<GeolocationPosition> {
   const task = new Promise<GeolocationPosition>((resolve, reject) => {
     let settled = false, attempt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let releaseRecovery: (() => void) | undefined;
     const timeout = { code: 3 };
     const cleanup = () => {
       if (timer !== undefined) clearTimeout(timer);
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      releaseRecovery?.();
+      observers.delete(freshWatch);
       document.removeEventListener('visibilitychange', checkDeadline);
       window.removeEventListener('pageshow', checkDeadline);
     };
+    const accept = (position: GeolocationPosition) => {
+      if (settled || run !== epoch || Date.now() >= deadline || problem(position)) return;
+      settled = true; cleanup(); permissionBlocked = false;
+      publish(position);
+      if (listeners.size) { attachLifecycle(); startWatch(); }
+      resolve(latest ?? position);
+    };
+    // A valid watch update can arrive while the one-shot read is timing out.
+    // Both consumers must use it instead of surfacing a redundant timeout.
+    const freshWatch = () => { if (latest) accept(latest); };
+    observers.add(freshWatch);
     const fail = (error: unknown) => {
       if (settled) return;
       settled = true; cleanup(); reject(error);
@@ -167,7 +193,18 @@ export function requestGps(): Promise<GeolocationPosition> {
       const failure = (error: unknown) => {
         if (settled || token !== attempt) return;
         if (timer !== undefined) clearTimeout(timer);
-        if (precise && !isGpsPermissionDenied(error) && Date.now() < deadline) read(false);
+        if (precise && !isGpsPermissionDenied(error) && errorCode(error) !== 'GPS_ACCURACY' && Date.now() < deadline) read(false);
+        else if (isTransientGpsError(error) && Date.now() < deadline) {
+          // Some browser/OS combinations return an old fix even with
+          // maximumAge:0. Keep the original deadline and wait for a real fix.
+          timer = setTimeout(() => fail(timeout), deadline - Date.now());
+          if (['GPS_STALE', 'GPS_ACCURACY'].includes(String(errorCode(error))) && attempt < 3)
+            retryTimer = setTimeout(() => { clearTimeout(timer); read(errorCode(error) === 'GPS_ACCURACY'); }, Math.min(1000, deadline - Date.now()));
+          if (!listeners.size) {
+            const release = subscribeGps(accept);
+            if (settled) release(); else releaseRecovery = release;
+          }
+        }
         else { if (isGpsPermissionDenied(error)) { permissionBlocked = true; clearWatch(); report(error); } fail(error); }
       };
       // Browsers can suspend or omit their native timeout. Keep our own limit.
@@ -177,12 +214,9 @@ export function requestGps(): Promise<GeolocationPosition> {
           if (settled || token !== attempt) return;
           if (run !== epoch) { fail(new Error('Местоположението е изключено.')); return; }
           if (Date.now() >= deadline) { fail(timeout); return; }
-          const problem = positionProblem(position);
-          if (problem) { failure(problem); return; }
-          settled = true; cleanup(); permissionBlocked = false;
-          publish(position);
-          if (listeners.size) { attachLifecycle(); startWatch(); }
-          resolve(latest ?? position);
+          const invalid = problem(position);
+          if (invalid) { failure(invalid); return; }
+          accept(position);
         }, failure, { enableHighAccuracy: precise, timeout: precise ? 12_000 : 8000, maximumAge: 0 });
       } catch (error) { failure(error); }
     };

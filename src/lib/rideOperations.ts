@@ -33,7 +33,9 @@ async function confirmedWrite(write: (signal: AbortSignal) => PromiseLike<Reply>
         if (!error && data?.id === requestId && confirms(data)) return data;
       } catch { /* Keep the original actionable error if reconciliation fails. */ }
     }
-    throw message(cause);
+    const failure = message(cause);
+    failure.message = failure.message.replace(/^(REQUEST_CLOSED|DRIVER_OFFLINE|DRIVER_BUSY|GPS_STALE|DRIVER_UNAVAILABLE):\s*/, '');
+    throw failure;
   }
 }
 

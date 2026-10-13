@@ -65,3 +65,5 @@ ROLLBACK;
 \ir tenant_reliability.sql
 \ir reverse_workflows.sql
 \ir marketplace_dispatch.sql
+
+\ir carrier_choice.sql

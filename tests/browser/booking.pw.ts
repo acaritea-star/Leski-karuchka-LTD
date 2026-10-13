@@ -27,7 +27,7 @@ test('mobile booking keeps the price action visible and reuses the category rout
   else if(u.pathname.endsWith('/carrier_identity')) data={id:company,name:'Тестова фирма',verified:false};
   else if(u.pathname.endsWith('/google-routes')) {
    routes++;
-   const quotes=['standard','comfort'].map((id,i)=>({vehicle_type_id:id,quote_id:`quote-${id}`,quote_expires_at:new Date(Date.now()+120000).toISOString(),price:5+i,breakdown:{total:5+i}}));
+   const quotes=['standard','comfort'].map((id,i)=>({service_class:id,company_id:company,company_name:'Тестова фирма',type_name:id==='comfort'?'Комфорт':'Стандарт',capacity:4,vehicle_type_id:'type-'+id,quote_id:`quote-${id}`,quote_expires_at:new Date(Date.now()+120000).toISOString(),price:5+i,breakdown:{total:5+i}}));
    data={success:true,...quotes[0],quotes,distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};
   }
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data),headers:{'access-control-allow-origin':'*'}});
@@ -36,13 +36,15 @@ test('mobile booking keeps the price action visible and reuses the category rout
  await expect(page.getByRole('heading',{name:'Откъде тръгваш?'})).toBeVisible();
  await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();
  await page.getByRole('button',{name:/Край.*Гара/}).click();
+ await page.getByRole('button',{name:'Виж офертите Избери фирма'}).click();
  const order=page.getByRole('button',{name:/Поръчай каручка/});
  await expect(order).toBeEnabled();await expect(order).toContainText('5.00');
- await page.getByRole('radio',{name:/Комфорт/}).check();await expect(order).toContainText('6.00');
+ await page.getByRole('button',{name:'Маршрут и категория'}).click();await page.getByRole('radio',{name:/Комфорт/}).check();
+ await page.getByRole('button',{name:/Виж офертите/}).click();await expect(order).toContainText('6.00');
  expect(routes).toBe(1);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:720,height:390}]) {
   await page.setViewportSize(size);await expect(order).toBeInViewport({ratio:1});
-  const priceNotice=page.getByText('Фирмите имат различни тарифи.',{exact:false});
+  const priceNotice=page.getByText('Заявката е само към избраната фирма.',{exact:false});
   await priceNotice.scrollIntoViewIfNeeded();await expect(priceNotice).toBeInViewport();
   await expect(order).toBeInViewport({ratio:1});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

@@ -32,7 +32,7 @@ async function request(customer) {
  const quote = randomUUID(), ride = randomUUID();
  await sql(`INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
  VALUES('${quote}','${customer}','${company}','${category}',
- '{"pickup_latitude":42.6977,"pickup_longitude":23.3219,"destination_latitude":42.70,"destination_longitude":23.33,"pickup_address":"Race fixture","destination_address":"Destination fixture","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5}}');`);
+ '{"pickup_latitude":42.6977,"pickup_longitude":23.3219,"destination_latitude":42.70,"destination_longitude":23.33,"pickup_address":"Race fixture","destination_address":"Destination fixture","distance_km":2,"duration_min":5,"total":5,"breakdown":{"total":5,"carrier_choice":{"service_class":"standard","company_name":"Acceptance race","type_name":"Race category","capacity":4}}}');`);
  await sql(asUser(customer, `SELECT public.create_taxi_request('${quote}','${ride}','cash');`));
  return ride;
 }
@@ -77,7 +77,7 @@ const winnerOf = results => {
  const successes = results.filter(r => r.status === 'fulfilled');
  const failures = results.filter(r => r.status === 'rejected');
  if (successes.length !== 1 || failures.length !== results.length - 1) throw Error('Race must have exactly one winner');
- if (failures.some(r => !String(r.reason.stderr).includes('Заявката вече не е налична.'))) throw Error('Race failed with an unexpected database error');
+ if (failures.some(r => !/(REQUEST_CLOSED:|DRIVER_BUSY:)/.test(String(r.reason.stderr)))) throw Error('Race failed with an unexpected database error');
  return JSON.parse(successes[0].value.split('\n').at(-1));
 };
 const lockedRequest = ride => `SELECT id FROM public.taxi_requests WHERE id='${ride}' FOR UPDATE`;

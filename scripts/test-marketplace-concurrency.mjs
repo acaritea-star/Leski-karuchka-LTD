@@ -79,7 +79,7 @@ const winnerOf = results => {
  const successes = results.filter(r => r.status === 'fulfilled');
  const failures = results.filter(r => r.status === 'rejected');
  if (successes.length !== 1 || failures.length !== results.length - 1) throw Error('Race must have exactly one winner');
- if (failures.some(r => !String(r.reason.stderr).includes('Заявката вече не е налична.'))) throw Error('Race failed with an unexpected database error');
+ if (failures.some(r => !/(REQUEST_CLOSED:|DRIVER_BUSY:)/.test(String(r.reason.stderr)))) throw Error('Race failed with an unexpected database error');
  return JSON.parse(successes[0].value.split('\n').at(-1));
 };
 const lockedRequest = ride => `SELECT id FROM public.taxi_requests WHERE id='${ride}' FOR UPDATE`;
