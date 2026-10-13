@@ -23,7 +23,7 @@ let bufferOwner: string | undefined;
 let trackedDriverId: string | undefined;
 let confirmTrackedPosition: ((position: GeolocationPosition, savedAt: string) => void) | undefined;
 
-type Callbacks = { onUpdate?: () => void; onError?: (message: string) => void };
+type Callbacks = { onUpdate?: () => void; onError?: (message: string, recoverable?: boolean) => void };
 
 export function isFreshTimestamp(value: string | null | undefined, now = Date.now()): boolean {
   const time = Date.parse(value ?? '');
@@ -33,7 +33,8 @@ export function getCurrentPosition(): Promise<GeolocationPosition> { return requ
 function validatePosition(position: GeolocationPosition) {
   const problem = positionProblem(position);
   if (problem) throw problem;
-  if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy < 0 || position.coords.accuracy > GPS_MAX_ACCURACY_METERS) throw new Error('Неточна GPS позиция. Изчакай по-добър сигнал.');
+  if (!Number.isFinite(position.coords.accuracy) || position.coords.accuracy < 0 || position.coords.accuracy > GPS_MAX_ACCURACY_METERS)
+    throw Object.assign(new Error('Неточна GPS позиция. Изчакай по-добър сигнал.'), { code: 'GPS_ACCURACY' });
   if (!isInBulgaria(position.coords.latitude, position.coords.longitude)) throw new Error(SERVICE_AREA_ERROR);
 }
 /** Before an offer claim, refresh only when the confirmed GPS is getting old. */
@@ -126,7 +127,8 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     // position. Permission revocation stops dispatch immediately.
     if (isGpsPermissionDenied(error)) { lastWriteAt = 0; lastConfirmedFixAt = 0; }
     else if (isTransientGpsError(error) && Date.now() - lastWriteAt < GPS_STALE_MS && Date.now() - lastConfirmedFixAt < GPS_STALE_MS) return;
-    callbacks.onError?.(lastError);
+    if (isTransientGpsError(error)) callbacks.onError?.(lastError, true);
+    else callbacks.onError?.(lastError);
   };
   const schedule = () => {
     if (retry !== undefined || !queued || writing || run !== generation || document.visibilityState === 'hidden' || navigator.onLine === false) return;

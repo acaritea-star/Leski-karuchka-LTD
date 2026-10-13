@@ -387,16 +387,16 @@ export default function DriverRequests() {
           </span>
         )}
         {isOnline && (
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-accent-600 bg-accent-50 px-3 py-1.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
-            {gps.status === 'tracking' ? t('you_are_online') : 'Изчаква GPS'}
+          <span className={`ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full ${gps.status === 'tracking' ? 'text-accent-600 bg-accent-50' : 'text-amber-800 bg-amber-50'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${gps.status === 'tracking' ? 'bg-accent-500' : 'bg-amber-500'}`} />
+            {gps.status === 'tracking' ? t('you_are_online') : gps.status === 'acquiring' ? 'Уточняваме GPS' : 'Изчаква GPS'}
           </span>
         )}
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
         {identity.data?.company && <p className="text-sm text-foreground-700 mb-3"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}</p>}
-        {isOnline && gps.status !== 'tracking' && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.</p>}
+        {isOnline && gps.status !== 'tracking' && !gps.error && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">{gps.message || 'Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.'}</p>}
 
         {/* ── Error ── */}
         {(error || refusalMessage) && (

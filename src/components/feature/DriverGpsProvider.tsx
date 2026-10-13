@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference';
@@ -8,7 +8,7 @@ import { isInBulgaria } from '@/lib/serviceArea';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { ensureDriverLocation, startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS } from '@/lib/driverLocation';
 
-type GpsState = { status: 'idle' | 'tracking' | 'stale' | 'error'; error: string };
+type GpsState = { status: 'idle' | 'acquiring' | 'tracking' | 'stale' | 'error'; error: string; message?: string };
 const Context = createContext<GpsState & { retryLocation: () => void; retrying: boolean }>({ status: 'idle', error: '', retryLocation: () => {}, retrying: false });
 export const useDriverGps = () => useContext(Context);
 
@@ -24,6 +24,8 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     enabled: isDriver, refetchInterval: isDriver ? 15_000 : false, refetchOnWindowFocus: true,
   });
   const [state, setState] = useState<GpsState>({ status: 'idle', error: '' });
+  const publishState = useCallback((next: GpsState) => setState(current => current.status === next.status
+    && current.error === next.error && current.message === next.message ? current : next), []);
   const [retrying, setRetrying] = useState(false);
   useEffect(() => setRetrying(false), [user?.id]);
   // Offline drivers can center their map without sharing a working location.
@@ -42,25 +44,43 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (!isDriver || !driver?.is_online || !allowLocation) { stopDriverGps(); setState({ status: 'idle', error: !allowLocation && driver?.is_online ? 'Местоположението е изключено.' : '' }); return; }
-    setState({ status: 'stale', error: 'Изчакване на потвърдена локация…' });
+    let alive = true;
+    let acquisitionDeadline = Date.now() + 24_000;
+    const acquiringState = { status: 'acquiring', error: '', message: 'Уточняваме GPS. Новите заявки се отключват след потвърдена точна позиция.' } as const;
+    publishState(acquiringState);
     startDriverGps(driver.id, driver.company_id, {
       onUpdate: () => {
+        if (!alive) return;
         if (user?.id && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
-        setState(getGpsStats().lastConfirmedFixAgeMs < GPS_STALE_MS ? { status: 'tracking', error: '' } : { status: 'stale', error: 'Изчакване на актуална локация…' });
+        const stats = getGpsStats();
+        const confirmed = stats.lastWriteAgeMs < GPS_STALE_MS && stats.lastConfirmedFixAgeMs < GPS_STALE_MS;
+        if (confirmed) acquisitionDeadline = 0;
+        publishState(confirmed ? { status: 'tracking', error: '' } : { status: 'stale', error: '', message: 'Изчакване на актуална локация…' });
       },
-      onError: error => setState({ status: 'error', error }),
+      onError: (error, recoverable) => {
+        if (!alive) return;
+        publishState(recoverable ? Date.now() < acquisitionDeadline ? acquiringState : { status: 'stale', error: '', message: error }
+          : { status: 'error', error });
+      },
     }, user?.id);
     const timer = setInterval(() => {
       const stats = getGpsStats();
-      if (stats.lastWriteAgeMs >= GPS_STALE_MS || stats.lastConfirmedFixAgeMs >= GPS_STALE_MS) setState({ status: 'stale', error: stats.error || 'Локацията не се обновява. Провери GPS и интернета.' });
+      if (document.visibilityState === 'hidden') return;
+      if (stats.lastWriteAgeMs >= GPS_STALE_MS || stats.lastConfirmedFixAgeMs >= GPS_STALE_MS)
+        setState(previous => {
+          if (previous.status === 'error') return previous;
+          const next: GpsState = Date.now() < acquisitionDeadline ? acquiringState
+            : { status: 'stale', error: '', message: stats.error || 'Още няма потвърдена позиция. Обнови GPS и провери локацията на устройството.' };
+          return previous.status === next.status && previous.error === next.error && previous.message === next.message ? previous : next;
+        });
     }, 5000);
-    const visibility = () => setState({ status: 'stale', error: document.visibilityState === 'hidden'
-      ? 'GPS е паузиран, докато приложението е скрито. Отворете го отново за актуална позиция.'
-      : 'Възстановяване на актуалната позиция…' });
+    const visibility = () => {
+      if (document.visibilityState === 'hidden') publishState({ status: 'stale', error: '', message: 'GPS е паузиран, докато приложението е скрито. Отвори го отново за актуална позиция.' });
+      else { acquisitionDeadline = Date.now() + 24_000; publishState({ ...acquiringState, message: 'Възстановяваме актуалната GPS позиция…' }); }
+    };
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pageshow', visibility);
     let lock: WakeLockSentinel | null = null;
-    let alive = true;
     let acquiring = false;
     const wake = async () => {
       if (acquiring || lock || document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;
@@ -79,14 +99,15 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility);
       document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
-  }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation]);
-  const retryLocation = () => {
+  }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation, publishState]);
+  const retryLocation = useCallback(() => {
     if (!isDriver || !driver?.is_online || !allowLocation || retrying) return;
     const startedOwner = user?.id;
     setRetrying(true);
     void ensureDriverLocation(driver, true).catch(error => {
       if (owner.current === startedOwner) setState({status: 'error', error: error instanceof Error ? error.message : 'GPS още не е потвърден.'});
     }).finally(() => { if (owner.current === startedOwner) setRetrying(false); });
-  };
-  return <Context.Provider value={{ ...state, retryLocation, retrying }}>{children}</Context.Provider>;
+  }, [isDriver, driver, allowLocation, retrying, user?.id]);
+  const value = useMemo(() => ({ ...state, retryLocation, retrying }), [state, retryLocation, retrying]);
+  return <Context.Provider value={value}>{children}</Context.Provider>;
 }

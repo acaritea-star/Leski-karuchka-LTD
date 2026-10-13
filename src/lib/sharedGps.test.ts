@@ -189,3 +189,14 @@ it('reuses only a measured fix younger than five seconds when explicitly allowed
  await vi.advanceTimersByTimeAsync(5001);const next=requestGps({maximumAgeMs:5000});read(fix());await next;
  expect(get).toHaveBeenCalledTimes(2);
 });
+
+it('waits for an accurate first fix instead of resolving the initial coarse device location',async()=>{
+ const task=requestGps(),coarse={...fix(),coords:{...fix().coords,accuracy:900}};read(coarse);
+ expect(getGpsPosition()).toBeNull();const measured=fix();receive(measured);
+ await expect(task).resolves.toBe(measured);expect(clear).toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+});
+it('never reuses a cached coarse fix to enable driver availability',async()=>{
+ releases.push(subscribeGps(()=>{}));receive({...fix(),coords:{...fix().coords,accuracy:500}});
+ const task=requestGps({maximumAgeMs:5000});expect(get).toHaveBeenCalledOnce();read(fix());
+ await expect(task).resolves.toMatchObject({coords:{accuracy:10}});
+});

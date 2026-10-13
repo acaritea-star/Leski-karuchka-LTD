@@ -354,7 +354,7 @@ export default function DriverHome() {
           <div className="mx-auto w-full max-w-3xl space-y-4">
             <section aria-label="Твоят работен статус" className="space-y-2">
               <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-foreground-500">ШОФЬОРСКИ ПАНЕЛ</p>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${activeRequest ? 'bg-secondary-100 text-secondary-800' : readyForRequests ? 'bg-primary-100 text-primary-800' : driver?.is_online ? 'bg-amber-100 text-amber-800' : 'bg-background-200 text-foreground-600'}`}>{activeRequest ? 'В курс' : driver?.is_online ? readyForRequests ? 'Онлайн' : gpsStatus === 'acquiring' ? 'Уточняваме GPS' : 'Изчаква GPS' : driver && !driver.is_verified ? 'Подготовка' : 'Офлайн'}</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground-950 break-words">Здравей{user?.first_name ? ', ' + user.first_name : ''}!</h1>
               <p className="text-sm text-foreground-500">{activeRequest ? 'Имаш текущ курс. Отвори го, за да продължиш.' : !driver ? 'Шофьорският запис не е зареден. Провери профила си или обнови статуса.' : !driver.is_verified ? 'Довърши подготовката и документите. Фирмата ще потвърди профила ти.' : driver.is_online ? readyForRequests ? 'Готов си за подходящите заявки около теб.' : 'Онлайн режимът е включен, но изчакваме актуален GPS. Докато няма потвърдена позиция, не си достъпен за нови заявки.' : 'Включи онлайн, когато си готов да получаваш заявки.'}</p>
@@ -501,26 +501,26 @@ export default function DriverHome() {
                 <div className={`rounded-xl px-3 py-2 mb-3 flex items-center gap-2 ${
                   gpsStatus === 'tracking'
                     ? 'bg-emerald-50 border border-emerald-200'
-                    : gpsStatus === 'stale'
+                    : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                       ? 'bg-amber-50 border border-amber-200'
                       : 'bg-background-100'
                 }`}>
                   <span className={`w-2 h-2 rounded-full ${
                     gpsStatus === 'tracking'
                       ? 'bg-emerald-500 animate-pulse'
-                      : gpsStatus === 'stale'
+                      : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                         ? 'bg-amber-500'
                         : 'bg-foreground-300'
                   }`} />
                   <span className={`text-xs font-medium ${
                     gpsStatus === 'tracking'
                       ? 'text-emerald-700'
-                      : gpsStatus === 'stale'
+                      : (gpsStatus === 'stale' || gpsStatus === 'acquiring')
                         ? 'text-amber-700'
                         : 'text-foreground-500'
                   }`}>
                     {gpsStatus === 'tracking' && t('gps_live_shared')}
-                    {gpsStatus === 'stale' && t('gps_weak_signal')}
+                    {(gpsStatus === 'stale' || gpsStatus === 'acquiring') && (gps.message || t('gps_weak_signal'))}
                     {gpsStatus === 'idle' && t('gps_updating')}
                   </span>
                 </div>

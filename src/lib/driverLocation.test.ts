@@ -51,7 +51,7 @@ describe('driver GPS writes',()=>{
     const coarse={...fix(),coords:{...fix().coords,accuracy:101}};
     watch(coarse);await flush();
     expect(upsert).not.toHaveBeenCalled();expect(onUpdate).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledWith(expect.stringContaining('Неточна'));
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('Уточняваме'),true);
     watch(fix());await flush();expect(onUpdate).toHaveBeenCalledTimes(1);
   });
   it('allows only one write in flight',async()=>{
