@@ -154,7 +154,7 @@
 .carrier-offer-list { display:grid; gap:8px; padding:2px 2px 8px; }
 .carrier-offer { position:relative; min-width:0; cursor:pointer; }
 .carrier-offer input { position:absolute; width:1px; height:1px; opacity:0; }
-.carrier-offer-body { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:10px; min-height:82px; border:1.5px solid var(--line); border-radius:15px; padding:12px; background:white; }
+.carrier-offer-body { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:10px; min-height:78px; border:1.5px solid var(--line); border-radius:15px; padding:10px 12px; background:white; }
 .carrier-offer input:checked + span { border-color:var(--ink); background:#edf4e9; }
 .carrier-offer input:focus-visible + span { outline:3px solid #b88440; outline-offset:2px; }
 .carrier-offer input:disabled + span { opacity:.55; cursor:default; }
