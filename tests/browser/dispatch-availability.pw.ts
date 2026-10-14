@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 const actor='11111111-1111-4111-8111-111111111111',a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333';
 async function setup(page:Page) {
- const state={google:0,routes:0,unavailable:[] as string[],extra:0,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
+ const state={google:0,routes:0,unavailable:[] as string[],extra:0,connectionLost:false,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
  page.on('pageerror',e=>state.errors.push(e.message));
  page.on('requestfinished',r=>{if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(new URL(r.url()).hostname))state.google++;});
  const user={id:actor,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
@@ -17,6 +17,7 @@ async function setup(page:Page) {
   if(u.origin!=='http://127.0.0.1:54329')return route.abort();
   const headers={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,PATCH,OPTIONS','access-control-allow-headers':'authorization,apikey,content-type,x-client-info,x-supabase-api-version,prefer,accept-profile,content-profile,range,range-unit'};
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(state.connectionLost && u.pathname.endsWith('/marketplace_availability'))return route.abort('failed');
   let data:unknown=[];
   if(u.pathname.endsWith('/auth/v1/user'))data=user;
   else if(u.pathname.endsWith('/profiles'))data={id:actor,role:'CUSTOMER',company_id:null,is_active:true,email:user.email};
@@ -106,4 +107,22 @@ test('many firms can be searched without replacing the selection or requesting a
  await expect(page.getByRole('radio',{name:/ОРИОН/})).toBeChecked();await expect(order).toBeInViewport({ratio:1});
  await page.screenshot({path:testInfo.outputPath('many-carrier-offers.png'),fullPage:true});
  expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);expect(state.google).toBe(0);expect(state.errors).toEqual([]);
+});
+
+test('lost availability connection blocks booking and recovers the same chosen firm and quote',async({page})=>{
+ const state=await setup(page);await chooseRoute(page);
+ const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ const chosen=page.getByRole('radio',{name:/Втора фирма/});await chosen.check();
+ await expect(order).toContainText('9.00');
+ state.connectionLost=true;await page.getByRole('button',{name:'Обнови наличността'}).click();
+ await expect(order).toBeDisabled();await expect(chosen).toBeChecked();await expect(chosen).toBeDisabled();
+ await expect(page.getByText('Наличността не е потвърдена. Провери връзката и обнови.')).toBeVisible();
+ await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: Втора фирма');
+ expect(state.bookings).toHaveLength(0);
+ state.connectionLost=false;await page.getByRole('button',{name:'Обнови наличността'}).click();
+ await expect(order).toBeEnabled();await expect(chosen).toBeChecked();await expect(order).toContainText('9.00');
+ expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);
+ await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
+ expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');
+ expect(state.google).toBe(0);expect(state.errors).toEqual([]);
 });
