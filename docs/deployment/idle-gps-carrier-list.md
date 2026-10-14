@@ -10,6 +10,10 @@ Briefly switching visible windows restores valid readiness without an acquisitio
 
 Carrier offers are full-width radio rows ordered by the existing price sort. The selected company is named immediately above a fixed order action. The comparison sheet gets more vertical space, supports vertical scrolling and keeps names and prices together. Choice, quoted amount, category, payment and firm routing contracts do not change. The map refits an excessively wide camera and responds to sheet resizing.
 
-Apply `20261013191612_idle_location_validity.sql` after database regression, then publish the frontend. Rollback: `deployment/idle-location-validity.rollback.sql` restores the previous function bodies and removes only the two new helpers. No profile, location, request, trip or accounting data is rewritten.
+Apply `20261014051154_idle_location_validity.sql` after database regression, then publish the frontend. Rollback: `deployment/idle-location-validity.rollback.sql` restores the previous function bodies and removes only the two new helpers. No profile, location, request, trip or accounting data is rewritten.
 
 Validation includes a 60-second native sampling simulation, original timestamp expiry, moving and idle SQL boundaries, exact carrier acceptance with an older valid idle measurement, existing concurrency/privacy/accounting tests, and mobile Chromium/WebKit comparison layouts. Browser fixtures block external Google requests.
+
+Verified source `bb5b15d1d0a5cb3a57d1e7edc46a51eb1e40664f`: 531 unit tests, 40 Chromium/WebKit browser scenarios, lint, build, immutable legal-source checks and Edge type checks passed in GitHub run 38515055287. Disposable SQL lifecycle/privacy/accounting, overlapping acceptance races and rollback passed in run 38515055438.
+
+The migration was applied as `20261014051154_idle_location_validity` on 2026-10-14. Live read-only assertions confirmed the 61-second idle/unknown-speed case, strict 45-second moving expiry, 90-second idle expiry, future timestamp rejection, fleet alignment and anonymous denial. Advisor findings did not increase. Release `2026.10.14-gps-offers.1` must still be pulled and published in Readdy; a GitHub merge alone does not publish the domain.
