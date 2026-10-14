@@ -94,7 +94,10 @@ test('company entry uses the assigned firm and shows only company navigation', a
   await page.goto('/admin/companies');
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await page.goto('/');
-  await expect(page.locator('a[href="/admin/dashboard"]').first()).toBeAttached();
+  // Signed-in visitors are redirected immediately; the landing link can
+  // disappear before WebKit observes it. Assert the stable destination.
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
   expect(state.companyFilters.length).toBeGreaterThan(0);
   expect(state.companyFilters.every(filter => filter === 'eq.' + ownCompany)).toBe(true);
   expect(state.profileWrites).toBe(0); expect(state.companyWrites).toBe(0);
