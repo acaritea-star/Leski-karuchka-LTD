@@ -6,7 +6,7 @@ import { gpsPermission, getGpsPosition, requestGps, stopSharedGps } from '@/lib/
 import { useAuth } from '@/hooks/useAuth';
 import { isInBulgaria } from '@/lib/serviceArea';
 import { driverRecordOptions } from '@/lib/driverRecord';
-import { ensureDriverLocation, startDriverGps, stopDriverGps, getGpsStats, GPS_STALE_MS } from '@/lib/driverLocation';
+import { ensureDriverLocation, startDriverGps, stopDriverGps, getGpsStats } from '@/lib/driverLocation';
 
 type GpsState = { status: 'idle' | 'acquiring' | 'tracking' | 'stale' | 'error'; error: string; message?: string };
 const Context = createContext<GpsState & { retryLocation: () => void; retrying: boolean }>({ status: 'idle', error: '', retryLocation: () => {}, retrying: false });
@@ -53,7 +53,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
         if (!alive) return;
         if (user?.id && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
         const stats = getGpsStats();
-        const confirmed = stats.lastWriteAgeMs < GPS_STALE_MS && stats.lastConfirmedFixAgeMs < GPS_STALE_MS;
+        const confirmed = stats.confirmed;
         if (confirmed) acquisitionDeadline = 0;
         publishState(confirmed ? { status: 'tracking', error: '' } : { status: 'stale', error: '', message: 'Изчакване на актуална локация…' });
       },
@@ -66,7 +66,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     const timer = setInterval(() => {
       const stats = getGpsStats();
       if (document.visibilityState === 'hidden') return;
-      if (stats.lastWriteAgeMs >= GPS_STALE_MS || stats.lastConfirmedFixAgeMs >= GPS_STALE_MS)
+      if (!stats.confirmed)
         setState(previous => {
           if (previous.status === 'error') return previous;
           const next: GpsState = Date.now() < acquisitionDeadline ? acquiringState
@@ -79,7 +79,8 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       if (!hidden) acquisitionDeadline = Date.now() + 24_000;
       setState(previous => previous.status === 'error' ? previous : hidden
         ? { status: 'stale', error: '', message: 'GPS е паузиран, докато приложението е скрито. Отвори го отново за актуална позиция.' }
-        : { ...acquiringState, message: 'Възстановяваме актуалната GPS позиция…' });
+        : getGpsStats().confirmed ? { status: 'tracking', error: '' }
+          : { ...acquiringState, message: 'Възстановяваме актуалната GPS позиция…' });
     };
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pageshow', visibility);

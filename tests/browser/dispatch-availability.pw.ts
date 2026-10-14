@@ -58,3 +58,24 @@ test('a driver disappearing at submission keeps the customer out of a false sear
  state.vanished=true;await order.click();await expect(page.getByRole('alert')).toContainText('няма свободен шофьор');await expect(order).toBeDisabled();
  await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toHaveCount(0);expect(state.bookings).toHaveLength(1);expect(state.errors).toEqual([]);expect(state.google).toBe(0);
 });
+test('carrier names and prices are visible together above the fixed action on small phones',async({page},testInfo)=>{
+ const state=await setup(page);await chooseRoute(page);await page.getByRole('button',{name:/Виж офертите/}).click();
+ for(const size of [{width:320,height:568},{width:390,height:650},{width:430,height:820},{width:720,height:390}]) {
+  await page.setViewportSize(size);
+  const cards=page.locator('.carrier-offer');const order=page.getByRole('button',{name:/Поръчай каручка/});
+  await cards.first().scrollIntoViewIfNeeded();
+  await page.screenshot({path:testInfo.outputPath(`carrier-layout-${size.width}.png`),fullPage:true});
+  if(size.height>=568) {
+   await expect(cards.nth(0)).toBeInViewport({ratio:1});await expect(cards.nth(1)).toBeInViewport({ratio:1});
+   for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:1});
+  }
+  await cards.nth(1).scrollIntoViewIfNeeded();await cards.nth(1).getByRole('radio').check();
+  await expect(order).toContainText('9.00');await expect(order).toBeInViewport({ratio:1});
+  await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: Втора фирма');
+  const cardBox=await cards.nth(1).boundingBox(),footerBox=await page.locator('.carrier-offer-footer').boundingBox();
+  expect(cardBox!.y+cardBox!.height).toBeLessThanOrEqual(footerBox!.y+1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:testInfo.outputPath(`carrier-list-${size.width}.png`),fullPage:true});
+ }
+ expect(state.google).toBe(0);expect(state.bookings).toHaveLength(0);expect(state.errors).toEqual([]);
+});

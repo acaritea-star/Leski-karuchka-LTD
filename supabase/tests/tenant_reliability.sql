@@ -75,7 +75,7 @@ RESET ROLE;
 -- A recent heartbeat cannot refresh an old device fix.
 -- Seed a naturally expired fix only in this session; restore triggers before every authorization assertion.
 SET LOCAL session_replication_role='replica';
-UPDATE public.driver_locations SET position_at=now()-interval '60 seconds' WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT user_a FROM tenant_test));
+UPDATE public.driver_locations SET speed=5,position_at=now()-interval '60 seconds' WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT user_a FROM tenant_test));
 SET LOCAL session_replication_role='origin';
 SET LOCAL ROLE authenticated;
 DO $test$ BEGIN

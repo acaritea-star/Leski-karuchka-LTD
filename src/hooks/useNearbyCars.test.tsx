@@ -27,7 +27,7 @@ it('makes no preview requests while hidden, signed out, missing a point or outsi
 it('expires original GPS positions after an error and never preserves fake available cars',async()=>{
  const view=renderHook(()=>useNearbyCars(point,'customer'));await act(async()=>{});
  vi.mocked(supabase.rpc).mockReturnValue({abortSignal:()=>Promise.reject(new Error('offline'))} as never);
- await act(async()=>vi.advanceTimersByTime(45000));expect(view.result.current).toEqual([]);
+ await act(async()=>vi.advanceTimersByTime(90000));expect(view.result.current).toEqual([]);
 });
 it('prevents overlapping requests and discards replies after owner/type changes',async()=>{
  let done!:(v:unknown)=>void;vi.mocked(supabase.rpc).mockReturnValue({abortSignal:()=>new Promise(resolve=>{done=resolve;})} as never);

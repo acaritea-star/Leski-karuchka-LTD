@@ -21,10 +21,14 @@ export function frameMapPoints(map: google.maps.Map, points: readonly RoutePoint
     const usableSouth = sw.lat() + latSpan * padding.bottom / height;
     const usableEast = ne.lng() - lngSpan * padding.right / width;
     const usableWest = sw.lng() + lngSpan * padding.left / width;
-    if (north <= usableNorth && south >= usableSouth && east <= usableEast && west >= usableWest) return 'none';
+    // A route can fit inside a continent-wide camera and still be unreadable.
+    // Refocus after a bad initial fit, but keep a reasonably framed view steady.
+    const tooWide = points.length > 1 && latSpan > .025 && lngSpan > .025 &&
+      north - south < (usableNorth - usableSouth) * .2 && east - west < (usableEast - usableWest) * .2;
+    if (!tooWide && north <= usableNorth && south >= usableSouth && east <= usableEast && west >= usableWest) return 'none';
     // Include breathing room around the pins. Geographic ratios approximate
     // screen space for these local views; wide routes use Maps' bounds fitting.
-    if (north - south < (usableNorth - usableSouth) * .85 && east - west < (usableEast - usableWest) * .85) {
+    if (!tooWide && north - south < (usableNorth - usableSouth) * .85 && east - west < (usableEast - usableWest) * .85) {
       map.panTo({ lat: (north + south) / 2 + latSpan * (padding.top - padding.bottom) / (2 * height),
         lng: (east + west) / 2 - lngSpan * (padding.left - padding.right) / (2 * width) });
       return 'pan';

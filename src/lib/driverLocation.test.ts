@@ -85,6 +85,26 @@ describe('location freshness',()=>{
  });
 });
 
+it('survives a desktop provider measuring only every minute without restamping old fixes', async () => {
+  let measured = fix();
+  vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation(cb => cb(measured));
+  const onError = vi.fn();
+  startDriverGps('driver', 'company', { onError }); watch(measured); await flush();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(getGpsStats().confirmed).toBe(true);
+  expect(upsert).toHaveBeenCalledOnce();
+  await ensureDriverLocation({ id: 'driver', company_id: 'company', is_online: true });
+  expect(upsert).toHaveBeenCalledOnce();
+  measured = fix(); watch(measured); await flush();
+  expect(upsert).toHaveBeenCalledTimes(2);
+  expect(onError).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(91_000);
+  expect(getGpsStats().confirmed).toBe(false);
+  expect(upsert).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(24_000);
+  expect(onError).toHaveBeenCalled();
+});
+
 it('rejects GPS outside Bulgaria without writing to the database', async () => {
   const onError=vi.fn();startDriverGps('driver','company',{onError});
   watch({...fix(),coords:{...fix().coords,latitude:51.507,longitude:-.128}});await flush();

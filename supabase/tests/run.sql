@@ -67,3 +67,5 @@ ROLLBACK;
 \ir marketplace_dispatch.sql
 
 \ir carrier_choice.sql
+
+\ir idle_location_validity.sql

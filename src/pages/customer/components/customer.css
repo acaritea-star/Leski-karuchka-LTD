@@ -142,20 +142,33 @@
 .route-pin-label{flex:0 0 20px;width:20px;height:24px;border-radius:10px 10px 10px 2px;background:#bd8129;color:white;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
 .route-pin-label-end{background:#19382b}
 
-.carrier-offer-heading { display:flex; align-items:center; gap:8px; }
-.carrier-offer-heading .booking-hint { flex:1; }
-.carrier-offer-controls { display:flex; flex-shrink:0; }
-.carrier-offer-rail { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x proximity; padding:4px 2px 10px; }
-.carrier-offer { position:relative; flex:0 0 min(260px, 83%); scroll-snap-align:start; cursor:pointer; }
+.customer-experience[data-offers=true] { --sheet-height: clamp(430px, 65svh, 570px); }
+.customer-experience[data-offers=true] .booking-heading h1 { font-size:22px; }
+.customer-experience[data-offers=true] .booking-steps button { width:30px; }
+.carrier-offer-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 2px 6px; font-size:12px; color:var(--muted); }
+.carrier-offer-heading p { display:flex; flex-wrap:wrap; gap:2px 8px; }
+.carrier-offer-heading p > span { font-size:11px; }
+.carrier-availability-refresh { display:grid; place-items:center; flex:0 0 44px; width:44px; height:44px; border-radius:12px; color:var(--ink); background:#f1f5ee; }
+.carrier-availability-refresh:disabled { opacity:.5; }
+.carrier-availability-refresh:focus-visible { outline:3px solid #b88440; outline-offset:2px; }
+.carrier-offer-list { display:grid; gap:8px; padding:2px 2px 8px; }
+.carrier-offer { position:relative; min-width:0; cursor:pointer; }
 .carrier-offer input { position:absolute; width:1px; height:1px; opacity:0; }
-.carrier-offer-body { display:flex; flex-direction:column; gap:7px; min-height:190px; border:2px solid var(--line); border-radius:18px; padding:17px; background:var(--paper); }
+.carrier-offer-body { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:10px; min-height:82px; border:1.5px solid var(--line); border-radius:15px; padding:12px; background:white; }
 .carrier-offer input:checked + span { border-color:var(--ink); background:#edf4e9; }
 .carrier-offer input:focus-visible + span { outline:3px solid #b88440; outline-offset:2px; }
 .carrier-offer input:disabled + span { opacity:.55; cursor:default; }
-.carrier-offer-body small { font-size:11px; color:var(--muted); }
-.carrier-offer-name { font-size:18px; line-height:1.25; overflow-wrap:anywhere; }
-.carrier-offer-body > span { font-size:12px; color:var(--muted); }
-.carrier-offer-price { font-size:28px; letter-spacing:-.6px; margin-top:auto; }
-.carrier-offer-body .carrier-offer-choice { display:flex; gap:7px; align-items:center; font-weight:600; color:var(--ink); }
-.carrier-offer-summary { text-align:center; font-size:12px; color:var(--muted); }
+.carrier-offer-check { width:18px; height:18px; border:1.5px solid #9daaa0; border-radius:50%; }
+.carrier-offer input:checked + span .carrier-offer-check { border:5px solid var(--ink); background:white; }
+.carrier-offer-info { display:grid; gap:3px; min-width:0; }
+.carrier-offer-info > span { font-size:11px; color:var(--muted); }
+.carrier-offer-info small { font-size:10px; font-weight:600; color:#426543; }
+.carrier-offer-name { font-size:15px; line-height:1.25; overflow-wrap:anywhere; }
+.carrier-offer-price { font-size:20px; letter-spacing:-.5px; white-space:nowrap; }
+.carrier-offer-footer { display:grid; gap:7px; flex-shrink:0; padding-top:6px; border-top:1px solid var(--line); background:white; }
+.carrier-offer-summary { font-size:12px; color:var(--muted); text-align:center; overflow-wrap:anywhere; }
+.carrier-offer-summary strong { color:var(--ink); }
+@media(min-width:768px) { .customer-experience[data-offers=true] { --sheet-height:min(570px, calc(100dvh - 140px)); } }
+@media(max-height:480px) { .customer-experience[data-offers=true] { --sheet-height:calc(100dvh - 90px); } }
 @media(max-width:370px) { .booking-steps button { width:30px; } .booking-heading h1 { font-size:20px; } }
+@media(max-width:370px) { .customer-experience[data-offers=true] .booking-steps button { width:25px; } .customer-experience[data-offers=true] .booking-heading h1 { font-size:20px; } }

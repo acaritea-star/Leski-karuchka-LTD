@@ -46,7 +46,7 @@ export default function BookingCard(props: BookingCardProps) {
   const { t } = useTranslation();
   return <div className="booking-confirm booking-enter">
     <div className="booking-scroll">
-      {props.marketplace && <p className="booking-hint">Избери категория. В следващата стъпка сравняваш фирмите и точните им цени.</p>}
+      {props.marketplace && <p className="booking-hint">Избери автомобил, после сравни фирмите и цените.</p>}
       {props.companies && <label className="block text-sm font-semibold px-1 py-2">Фирма за тази поръчка<select aria-label="Фирма за тази поръчка" value={props.companyId || ''} disabled={props.creating || props.companies.length < 2} onChange={e => props.onCompanyChange?.(e.target.value)} className="block mt-2 w-full rounded-xl border border-background-200 p-3 text-base font-normal">{props.companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
 
       <div className="booking-route">
@@ -91,7 +91,7 @@ export default function BookingCard(props: BookingCardProps) {
     <button type="button" className="booking-primary" disabled={!props.canRequest || props.creating}
       onClick={props.onRequest} aria-busy={props.creating}>
       {props.creating ? <><span className="booking-spinner" />{t('booking_sending')}</>
-        : <><span>{props.chooseCarrier ? 'Виж офертите' : t('booking_order')}</span><span>{props.chooseCarrier ? 'Избери фирма' : props.fare && !props.priceExpired && !props.calculating
+        : <><span>{props.chooseCarrier ? 'Виж офертите' : t('booking_order')}</span><span>{props.chooseCarrier ? '' : props.fare && !props.priceExpired && !props.calculating
           ? `${props.priceRange ? displayPriceRange(props.priceRange) : props.fare.total.toFixed(2)} ${t('lv')}` : '—'} <i className="ri-arrow-right-line" aria-hidden="true" /></span></>}
     </button>
   </div>;

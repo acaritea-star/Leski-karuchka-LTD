@@ -200,7 +200,7 @@ export default function CustomerHome() {
   const availabilityMessage = availability.isPending ? 'Проверяваме свободните автомобили около началния адрес…'
     : !availabilityConfirmed ? 'Наличността не е потвърдена. Провери връзката и обнови.'
     : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
-    : `Свободни шофьори от партньорските фирми около началния адрес: ${readyCategory.drivers}. Наличността може да се промени до приемането.`;
+    : '';
   useEffect(() => {
     if (!availabilityConfirmed || !availability.data || requestStatus === 'creating' || carrierKey) return;
     const current = availability.data.categories.find(c => c.id === vehicleType);
@@ -501,6 +501,7 @@ export default function CustomerHome() {
 
   return <CustomerLayout
     expanded={(step === 'confirm' || step === 'offers') && !activeRequest}
+    offers={step === 'offers' && !activeRequest}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">

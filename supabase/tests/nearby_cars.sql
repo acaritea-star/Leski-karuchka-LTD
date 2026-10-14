@@ -33,7 +33,7 @@ DO $$ BEGIN IF jsonb_array_length(public.nearby_cars(43.2,25.6)->'cars')<>0 THEN
 RESET ROLE; DELETE FROM private.nearby_read_limits WHERE user_id=(SELECT customer FROM test_ids);
 UPDATE public.drivers SET is_online=true WHERE id=(SELECT driver FROM test_ids);
 DELETE FROM public.driver_locations WHERE driver_id=(SELECT driver FROM test_ids);
-INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at) SELECT driver,company,43.2,25.6,10,clock_timestamp()-interval '46 seconds' FROM test_ids;
+INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,speed,position_at) SELECT driver,company,43.2,25.6,10,5,clock_timestamp()-interval '46 seconds' FROM test_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN IF jsonb_array_length(public.nearby_cars(43.2,25.6)->'cars')<>0 THEN RAISE EXCEPTION 'FAIL stale car'; END IF; END $$;
 RESET ROLE; DELETE FROM private.nearby_read_limits WHERE user_id=(SELECT customer FROM test_ids);

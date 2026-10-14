@@ -62,8 +62,8 @@ DO $$ BEGIN
 RESET ROLE;
 -- Server receipt can be fresh while the underlying measurement is old.
 DELETE FROM public.driver_locations WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids));
-INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
- SELECT id,company_id,43.2,25.6,10,clock_timestamp()-interval '50 seconds' FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids);
+INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,speed,position_at)
+ SELECT id,company_id,43.2,25.6,10,5,clock_timestamp()-interval '50 seconds' FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
@@ -72,7 +72,13 @@ DO $$ BEGIN
  EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE 'GPS_STALE:%' THEN RETURN; END IF; RAISE; END;
  RAISE EXCEPTION 'FAIL no GPS diagnostic'; END $$;
 RESET ROLE;
-UPDATE public.driver_locations SET position_at=clock_timestamp() WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids));
+-- A stationary device's same 50s measurement is valid without inventing a new time.
+UPDATE public.driver_locations SET speed=0 WHERE driver_id=(SELECT id FROM public.drivers WHERE user_id=(SELECT a_user FROM market_ids));
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM private.eligible_drivers((SELECT company_a FROM market_ids),(SELECT type_a FROM market_ids),43.2,25.6))
+ OR NOT EXISTS(SELECT 1 FROM private.marketplace_drivers(43.2,25.6) WHERE user_id=(SELECT a_user FROM market_ids))
+ THEN RAISE EXCEPTION 'FAIL idle provider excluded from dispatch'; END IF;
+END $$;
 SELECT set_config('request.jwt.claims',json_build_object('sub',a_user,'role','authenticated')::text,true) FROM market_ids;
 SET LOCAL ROLE authenticated;
 SELECT public.accept_taxi_request(ride) IS NOT NULL FROM market_ids;

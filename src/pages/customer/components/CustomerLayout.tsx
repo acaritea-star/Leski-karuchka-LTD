@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 import { useCustomerViewport } from '@/hooks/useCustomerViewport';
 import './customer.css';
 
-export default function CustomerLayout({ map, header, notice, children, expanded = false }: {
-  map: ReactNode; header: ReactNode; notice?: ReactNode; children: ReactNode; expanded?: boolean;
+export default function CustomerLayout({ map, header, notice, children, expanded = false, offers = false }: {
+  map: ReactNode; header: ReactNode; notice?: ReactNode; children: ReactNode; expanded?: boolean; offers?: boolean;
 }) {
   const viewportRef = useCustomerViewport();
-  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded}>
+  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers}>
     <div className="customer-map">{map}</div>
     <header className="customer-header">{header}</header>
     {notice && <div className="customer-notice" role="status">{notice}</div>}
