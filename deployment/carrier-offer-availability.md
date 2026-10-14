@@ -38,3 +38,5 @@ publish the website. The response is backward compatible with the prior frontend
 For rollback, restore the previous frontend first, then apply
 `carrier-offer-availability.rollback.sql`. New clients fail closed if the carrier
 list is missing; never fabricate availability from category totals.
+
+Production database migration: 20261014130621_carrier_offer_availability. The installed function body matches the reviewed SQL and its grants are unchanged. Security and performance advisor findings are unchanged from the pre-release snapshot.
