@@ -9,7 +9,7 @@ export default {
   booking_destination: "Накъде отиваш?",
   booking_confirm: "Готови за път.",
   booking_offers: "Избери фирма.",
-  booking_step: "Стъпка {{step}} от 4",
+  booking_step: "Стъпка {{step}} от 3",
   booking_steps: "Стъпки на поръчката",
   booking_tagline: "Твоят град. Твоят път.",
   booking_search_hint: "Адрес или познато място",

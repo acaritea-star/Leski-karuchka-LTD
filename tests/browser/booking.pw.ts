@@ -23,7 +23,7 @@ test('mobile booking keeps the price action visible and reuses the category rout
   else if(u.pathname.endsWith('/vehicle_types')) data=[{id:'standard',company_id:company,name:'Economy',capacity:4,is_active:true},{id:'comfort',company_id:company,name:'Comfort',capacity:4,is_active:true}];
   else if(u.pathname.endsWith('/legal_acceptances')) data={id:'accepted'};
   else if(u.pathname.endsWith('/taxi_requests')) data=null;
-  else if(u.pathname.endsWith('/marketplace_availability')) data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:['standard','comfort'].map(id=>({id,drivers:1,configured:true}))};
+  else if(u.pathname.endsWith('/marketplace_availability')) data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:['standard','comfort'].map(id=>({id,drivers:1,configured:true})),carriers:['standard','comfort'].map(id=>({company_id:company,vehicle_type_id:'type-'+id,service_class:id}))};
   else if(u.pathname.endsWith('/carrier_identity')) data={id:company,name:'Тестова фирма',verified:false};
   else if(u.pathname.endsWith('/google-routes')) {
    routes++;
@@ -36,11 +36,9 @@ test('mobile booking keeps the price action visible and reuses the category rout
  await expect(page.getByRole('heading',{name:'Откъде тръгваш?'})).toBeVisible();
  await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();
  await page.getByRole('button',{name:/Край.*Гара/}).click();
- await page.getByRole('button',{name:'Виж офертите'}).click();
  const order=page.getByRole('button',{name:/Поръчай каручка/});
  await expect(order).toBeEnabled();await expect(order).toContainText('5.00');
- await page.getByRole('button',{name:'Маршрут и категория'}).click();await page.getByRole('radio',{name:/Комфорт/}).check();
- await page.getByRole('button',{name:/Виж офертите/}).click();await expect(order).toContainText('6.00');
+ await page.getByRole('combobox',{name:'Категория автомобил'}).selectOption('comfort');await expect(order).toContainText('6.00');
  expect(routes).toBe(1);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:720,height:390}]) {
   await page.setViewportSize(size);await expect(order).toBeInViewport({ratio:1});

@@ -142,10 +142,10 @@
 .route-pin-label{flex:0 0 20px;width:20px;height:24px;border-radius:10px 10px 10px 2px;background:#bd8129;color:white;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
 .route-pin-label-end{background:#19382b}
 
-.customer-experience[data-offers=true] { --sheet-height: clamp(430px, 65svh, 570px); }
+.customer-experience[data-offers=true] { --sheet-height: clamp(490px, 76svh, 650px); }
 .customer-experience[data-offers=true] .booking-heading h1 { font-size:22px; }
 .customer-experience[data-offers=true] .booking-steps button { width:30px; }
-.carrier-offer-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 2px 6px; font-size:12px; color:var(--muted); }
+.carrier-offer-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 2px; font-size:12px; color:var(--muted); }
 .carrier-offer-heading p { display:flex; flex-wrap:wrap; gap:2px 8px; }
 .carrier-offer-heading p > span { font-size:11px; }
 .carrier-availability-refresh { display:grid; place-items:center; flex:0 0 44px; width:44px; height:44px; border-radius:12px; color:var(--ink); background:#f1f5ee; }
@@ -163,12 +163,25 @@
 .carrier-offer-info { display:grid; gap:3px; min-width:0; }
 .carrier-offer-info > span { font-size:11px; color:var(--muted); }
 .carrier-offer-info small { font-size:10px; font-weight:600; color:#426543; }
+.carrier-offer-info .carrier-unavailable { color:#7c4430; }
+.carrier-selection-unavailable { font-size:12px; line-height:1.4; color:#7c4430; }
+.carrier-route { display:grid; grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr); gap:6px; margin-bottom:6px; }
+.carrier-route button { min-height:44px; min-width:0; display:grid; text-align:left; align-content:center; border-radius:10px; padding:5px 8px; background:#f5f6f2; }
+.carrier-route small { font-size:10px; color:var(--muted); }
+.carrier-route span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.carrier-route .carrier-route-swap { display:grid; place-items:center; }
+.carrier-category { display:flex; align-items:center; gap:8px; font-size:12px; }
+.carrier-category select { min-width:0; flex:1; min-height:44px; padding:8px; border:1px solid var(--line); border-radius:10px; background:white; color:var(--ink); font:inherit; }
+.carrier-search { display:flex; gap:8px; margin-bottom:8px; }
+.carrier-search input { min-width:0; flex:1; min-height:44px; padding:8px 12px; border:1px solid var(--line); border-radius:10px; background:white; font-size:14px; }
+.carrier-search button { min-height:44px; padding:8px; font-size:12px; text-decoration:underline; }
+.carrier-route button:focus-visible, .carrier-category select:focus-visible, .carrier-search :focus-visible { outline:3px solid #b88440; outline-offset:1px; }
 .carrier-offer-name { font-size:15px; line-height:1.25; overflow-wrap:anywhere; }
 .carrier-offer-price { font-size:20px; letter-spacing:-.5px; white-space:nowrap; }
 .carrier-offer-footer { display:grid; gap:7px; flex-shrink:0; padding-top:6px; border-top:1px solid var(--line); background:white; }
 .carrier-offer-summary { font-size:12px; color:var(--muted); text-align:center; overflow-wrap:anywhere; }
 .carrier-offer-summary strong { color:var(--ink); }
-@media(min-width:768px) { .customer-experience[data-offers=true] { --sheet-height:min(570px, calc(100dvh - 140px)); } }
+@media(min-width:768px) { .customer-experience[data-offers=true] { --sheet-height:min(650px, calc(100dvh - 140px)); } }
 @media(max-height:480px) { .customer-experience[data-offers=true] { --sheet-height:calc(100dvh - 90px); } }
 @media(max-width:370px) { .booking-steps button { width:30px; } .booking-heading h1 { font-size:20px; } }
 @media(max-width:370px) { .customer-experience[data-offers=true] .booking-steps button { width:25px; } .customer-experience[data-offers=true] .booking-heading h1 { font-size:20px; } }

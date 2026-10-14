@@ -9,7 +9,7 @@ import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { availabilityFresh, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
+import { availabilityFresh, carrierAvailable, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
 import { SERVICE_CLASSES, marketplaceRange, carrierOffers, carrierOfferKey } from '@/lib/marketplace';
 import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,7 +21,6 @@ import DriverTracking from '@/pages/customer/components/DriverTracking';
 import LocationPicker from '@/pages/customer/components/LocationPicker';
 import AppMenu from '@/pages/customer/components/AppMenu';
 import CarrierOffers from '@/pages/customer/components/CarrierOffers';
-import BookingCard from '@/pages/customer/components/BookingCard';
 import RequestStatusCard from '@/pages/customer/components/RequestStatusCard';
 import BookingMap from '@/pages/customer/components/BookingMap';
 import CustomerLayout, { BookingSkeleton } from '@/pages/customer/components/CustomerLayout';
@@ -143,8 +142,7 @@ export default function CustomerHome() {
   const requestedType = useRef(vehicleType);
   requestedType.current = vehicleType;
   const offers = useMemo(() => carrierOffers(routeInput === quoteInput ? route : null, vehicleType), [routeInput, quoteInput, route, vehicleType]);
-  useEffect(() => { if (!carrierKey && offers.length) setCarrierKey(carrierOfferKey(offers[0])); }, [carrierKey, offers]);
-  const selectedCarrier = offers.find(offer => carrierOfferKey(offer) === carrierKey) ?? (!carrierKey ? offers[0] : undefined);
+  const selectedCarrier = offers.find(offer => carrierOfferKey(offer) === carrierKey);
   const selectedQuote = selectedCarrier;
   const currentRoute = routeInput !== quoteInput ? null : selectedQuote ? { ...route!, ...selectedQuote }
     : null;
@@ -197,6 +195,13 @@ export default function CustomerHome() {
   const availabilityConfirmed = !availability.isError && availabilityFresh(availability.data, now);
   const readyCategory = availabilityConfirmed ? availability.data?.categories.find(c => c.id === vehicleType) : undefined;
   const quoteReady = !!readyCategory?.drivers;
+  const availableOffers = useMemo(() => new Set(offers.filter(offer => availabilityConfirmed
+    && carrierAvailable(availability.data, offer, now)).map(carrierOfferKey)), [offers, availabilityConfirmed, availability.data, now]);
+  useEffect(() => {
+    if (carrierKey) return;
+    const first = offers.find(offer => availableOffers.has(carrierOfferKey(offer)) && offer.quote_id && Date.parse(offer.quote_expires_at) > now);
+    if (first) setCarrierKey(carrierOfferKey(first));
+  }, [carrierKey, offers, availableOffers, now]);
   const availabilityMessage = availability.isPending ? 'Проверяваме свободните автомобили около началния адрес…'
     : !availabilityConfirmed ? 'Наличността не е потвърдена. Провери връзката и обнови.'
     : !readyCategory?.drivers ? 'Сега няма свободен шофьор за тази категория около началния адрес. Избери друга категория или опитай по-късно.'
@@ -213,7 +218,7 @@ export default function CustomerHome() {
   const price = activeRequest?.estimated_price ?? fare?.total ?? null;
   const canRequest = step === 'offers' && !!selectedCarrier && !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
-    && availabilityConfirmed && !!readyCategory?.drivers
+    && availableOffers.has(carrierOfferKey(selectedCarrier))
     && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
@@ -303,7 +308,7 @@ export default function CustomerHome() {
 
   // Handle field click
   const handleFieldClick = (field: BookingStep) => {
-    if (activeRequest || bookingInFlight.current || ((field === 'confirm' || field === 'offers') && (!pickup || !destination))) return;
+    if (activeRequest || bookingInFlight.current || (field === 'offers' && (!pickup || !destination))) return;
     ++gpsRevision.current;
     setLocating(false);
     setLocationError('');
@@ -452,12 +457,16 @@ export default function CustomerHome() {
     setRoute(current => current ? { ...current, quote_id: undefined,
       quotes: current.quotes?.map(quote => ({ ...quote, quote_id: undefined })) } : null);
     setQuoteRefresh(value => value + 1);
+    const retryPickup = pickup ?? (activeRequest ? { address: activeRequest.pickup_address, lat: activeRequest.pickup_latitude, lng: activeRequest.pickup_longitude } : null);
+    const retryDestination = destination ?? (activeRequest ? { address: activeRequest.destination_address, lat: activeRequest.destination_latitude, lng: activeRequest.destination_longitude } : null);
+    setPickup(retryPickup);
+    setDestination(retryDestination);
     setActiveRequest(null);
     setRequestStatus('idle');
     setRequestError('');
     setConfirmCancel(false);
     setCarrierKey('');
-    setStep(pickup && destination ? 'offers' : 'pickup');
+    setStep(retryPickup && retryDestination ? 'offers' : 'pickup');
   };
 
   // Share active trip
@@ -500,7 +509,7 @@ export default function CustomerHome() {
     : destination;
 
   return <CustomerLayout
-    expanded={(step === 'confirm' || step === 'offers') && !activeRequest}
+    expanded={step === 'offers' && !activeRequest}
     offers={step === 'offers' && !activeRequest}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
@@ -527,23 +536,16 @@ export default function CustomerHome() {
         <BookingSteps step={step} canConfirm={!!pickup && !!destination}
           disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
         {step === 'offers' && pickup && destination ? <CarrierOffers
-          offers={offers} selected={selectedCarrier} onSelect={setCarrierKey}
-          onBack={() => handleFieldClick('confirm')} onRequest={createRequest}
+          offers={offers} selected={selectedCarrier} onSelect={key => { setCarrierKey(key); setRequestError(''); }}
+          availableOffers={availableOffers} availabilityConfirmed={availabilityConfirmed}
+          pickup={pickup.address} destination={destination.address} onFieldClick={handleFieldClick} onSwap={swapLocations}
+          vehicleType={vehicleType} onVehicleTypeChange={id => { setVehicleType(id); setCarrierKey(''); setRequestError(''); }}
+          vehicleOptions={vehicleTypes.map(v => ({ ...v, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
+          onRequest={createRequest}
           onRefresh={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }}
           creating={requestStatus === 'creating'} canRequest={canRequest} calculating={calculating}
-          expired={!calculating && !offers.some(q => q.quote_id && Date.parse(q.quote_expires_at) > now)} error={requestError || (carrierKey && !selectedCarrier && !calculating ? 'Избраната фирма вече няма оферта. Избери друга фирма.' : '')}
+          expired={!calculating && offers.length > 0 && !offers.some(q => q.quote_id && Date.parse(q.quote_expires_at) > now)} error={requestError || (carrierKey && !selectedCarrier && !calculating ? 'Избраната фирма вече няма оферта. Избери друга фирма.' : '')}
           availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()} />
-          : step === 'confirm' && pickup && destination
-          ? <BookingCard pickup={pickup} destination={destination}
-            marketplace chooseCarrier
-            onFieldClick={handleFieldClick} onSwap={swapLocations}
-            vehicleType={vehicleType} onVehicleTypeChange={id => { setVehicleType(id); setCarrierKey(''); }}
-            vehicleOptions={vehicleTypes.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
-            fare={null} distance={currentRoute?.distance_km} duration={currentRoute?.duration_min}
-            calculating={calculating} priceExpired={!calculating && !currentRoute?.quote_id}
-            onRefreshPrice={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }} canRequest={offers.some(q => !!q.quote_id && Date.parse(q.quote_expires_at) > now) && quoteReady && !calculating}
-            availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()}
-            creating={requestStatus === 'creating'} onRequest={() => handleFieldClick('offers')} requestError={requestError} />
           : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
             locating={locating} locationError={locationError} recent={recent}
             onUseCurrent={() => void detectLocation()} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
