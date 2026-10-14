@@ -50,13 +50,18 @@ UPDATE public.drivers SET vehicle_id=user_id,is_verified=true,document_verificat
 INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at)
  SELECT d.id,d.company_id,43.2,25.6,10,clock_timestamp() FROM public.drivers d JOIN extra_drivers e ON e.user_id=d.user_id;
 UPDATE public.drivers SET is_online=true WHERE user_id IN (SELECT user_id FROM extra_drivers WHERE kind<>'offline');
-UPDATE public.driver_locations SET position_at=clock_timestamp()-interval '5 minutes'
+-- A delayed moving measurement is writable (<60s) but no longer dispatchable
+-- (>=45s). Insert it afresh because out-of-order updates are correctly ignored.
+DELETE FROM public.driver_locations
  WHERE driver_id IN (SELECT d.id FROM public.drivers d JOIN extra_drivers e ON e.user_id=d.user_id WHERE e.kind='stale');
+INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,speed,position_at)
+ SELECT d.id,d.company_id,43.2,25.6,10,5,clock_timestamp()-interval '50 seconds'
+ FROM public.drivers d JOIN extra_drivers e ON e.user_id=d.user_id WHERE e.kind='stale';
 UPDATE public.drivers SET is_verified=false WHERE user_id=(SELECT user_id FROM extra_drivers WHERE kind='unverified');
 UPDATE public.vehicles SET is_active=false WHERE id=(SELECT user_id FROM extra_drivers WHERE kind='inactive_vehicle');
 UPDATE public.profiles SET is_active=false WHERE id=(SELECT user_id FROM extra_drivers WHERE kind='inactive_profile');
-INSERT INTO public.taxi_requests(company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,status,estimated_price,fare_breakdown)
- SELECT i.company_a,x.busy_customer,d.id,i.type_a,43.2,25.6,'accepted',5,'{"total":5}'::jsonb
+INSERT INTO public.taxi_requests(company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,status,estimated_price,fare_breakdown)
+ SELECT i.company_a,x.busy_customer,d.id,i.type_a,43.2,25.6,43.3,25.7,'accepted',5,'{"total":5}'::jsonb
  FROM market_ids i CROSS JOIN extra_ids x JOIN public.drivers d ON d.user_id=(SELECT user_id FROM extra_drivers WHERE kind='busy');
 
 SELECT set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true) FROM market_ids;
