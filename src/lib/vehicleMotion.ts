@@ -1,6 +1,7 @@
 import { bearing } from './mapProjection';
 import { distanceMetres, matchRoute, measureRoute, pointAlong, routeHeading, routeSection, shortestTurn, validPoint, type MeasuredRoute } from './routeGeometry';
 import type { RoutePoint } from './googleMaps';
+import { confirmedLocationFresh, locationFreshnessMs } from './locationFreshness';
 
 export const TRACKING_STALE_MS = 45_000;
 export type VehicleFix = RoutePoint & { timestamp: number; receivedAt?: number; heading: number | null; speed: number | null; accuracy: number | null };
@@ -12,8 +13,7 @@ export function validFix(fix: VehicleFix): boolean {
     (fix.accuracy == null || Number.isFinite(fix.accuracy) && fix.accuracy >= 0 && fix.accuracy <= 100);
 }
 export function freshFix(fix: VehicleFix | null, now = Date.now()): boolean {
-  return !!fix && validFix(fix) && fix.timestamp <= now + 30_000 && now - fix.timestamp < TRACKING_STALE_MS &&
-    (fix.receivedAt == null || now - fix.receivedAt < TRACKING_STALE_MS);
+  return !!fix && validFix(fix) && confirmedLocationFresh(now - (fix.receivedAt ?? fix.timestamp), now - fix.timestamp, fix.speed);
 }
 
 // Animate towards a received fix. There is no extrapolation beyond that fix:
@@ -89,7 +89,7 @@ export class VehicleMotion {
     const vertices = followsRoad
       ? routeSection(this.route, from!.progress, end.progress) : [current, point];
     const path = measureRoute(vertices);
-    this.transition = { path, start: now, duration: Math.min(this.animationWindowMs, Math.max(300, gap), TRACKING_STALE_MS - (now - fix.timestamp)),
+    this.transition = { path, start: now, duration: Math.min(this.animationWindowMs, Math.max(300, gap), locationFreshnessMs(fix.speed) - (now - fix.timestamp)),
       fromHeading: current.heading, toHeading: heading, followsRoad };
     return true;
   }

@@ -64,7 +64,7 @@ SELECT pg_temp.expect_dispatch(true);
 -- A fresh upload of an old GPS fix must not qualify.
 -- The fixture clears the previous timestamp first to exercise this independent condition.
 ALTER TABLE public.driver_locations DISABLE TRIGGER guard_location;
-UPDATE public.driver_locations SET position_at=now()-interval '46 seconds',updated_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
+UPDATE public.driver_locations SET speed=5,position_at=now()-interval '46 seconds',updated_at=now() WHERE driver_id=(SELECT driver FROM test_ids);
 ALTER TABLE public.driver_locations ENABLE TRIGGER guard_location;
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.driver_locations SET position_at=clock_timestamp() WHERE driver_id=(SELECT driver FROM test_ids);

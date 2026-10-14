@@ -28,3 +28,8 @@ it('uses native bounds fitting until the map has a usable viewport', () => {
   expect(frameMapPoints(map, [{ lat: 1, lng: 1 }], { width: 0, height: 0 }, padding)).toBe('fit');
   expect(fitBounds).toHaveBeenCalledOnce();
 });
+it('zooms back to a local route instead of leaving its pins lost inside a continent', () => {
+ const wideMap = { ...map, getBounds: () => ({ getNorthEast: () => ({lat:()=>55,lng:()=>45}), getSouthWest:()=>({lat:()=>30,lng:()=>10}) }) } as unknown as google.maps.Map;
+ expect(frameMapPoints(wideMap,[{lat:43.07,lng:25.62},{lat:43.12,lng:25.69}],size,padding)).toBe('fit');
+ expect(fitBounds).toHaveBeenCalledOnce();
+});

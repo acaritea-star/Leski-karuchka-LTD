@@ -8,6 +8,7 @@ import type { Tables } from './database.types';
 import { distanceMetres } from './routeGeometry';
 import { bufferGps, readBufferedGps, clearGpsBuffer } from './gpsBuffer';
 import { gpsPermission } from './sharedGps';
+import { confirmedLocationFresh, locationFreshnessMs } from './locationFreshness';
 
 export const GPS_HEARTBEAT_MS = 15_000;
 export const GPS_STALE_MS = 45_000;
@@ -18,6 +19,7 @@ let unsubscribeGps: (() => void) | null = null;
 let heartbeat: ReturnType<typeof setInterval> | null = null;
 let lastFixAt = 0, lastWriteAt = 0, lastConfirmedFixAt = 0;
 let lastError = '';
+let lastConfirmedSpeed: number | null = null;
 let stopListeners: (() => void) | null = null;
 let bufferOwner: string | undefined;
 let trackedDriverId: string | undefined;
@@ -41,7 +43,10 @@ function validatePosition(position: GeolocationPosition) {
 export async function ensureDriverLocation(driver: { id: string; company_id: string; user_id?: string; is_online?: boolean }, force = false) {
   if (getLocationEnabled(driver.user_id) === false) throw new Error('Местоположението е изключено от настройките.');
   if (driver.is_online === false) throw new Error('Включи онлайн режим, за да приемаш заявки.');
-  if (!force && trackedDriverId === driver.id && Date.now() - lastWriteAt < 15_000 && Date.now() - lastConfirmedFixAt < 15_000) return;
+  // Requiring another native measurement on every claim can block an idle
+  // desktop provider for its full one-minute sampling cycle. Use the exact
+  // same bounded validity rule as dispatch, with time left for the RPC.
+  if (!force && trackedDriverId === driver.id && confirmedLocationFresh(Date.now() - lastWriteAt + 10_000, Date.now() - lastConfirmedFixAt + 10_000, lastConfirmedSpeed)) return;
   const startedGeneration = generation;
   const wasTracked = trackedDriverId === driver.id;
   let position: GeolocationPosition;
@@ -126,7 +131,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     // A redundant native read timeout must not hide a still-current server
     // position. Permission revocation stops dispatch immediately.
     if (isGpsPermissionDenied(error)) { lastWriteAt = 0; lastConfirmedFixAt = 0; }
-    else if (isTransientGpsError(error) && Date.now() - lastWriteAt < GPS_STALE_MS && Date.now() - lastConfirmedFixAt < GPS_STALE_MS) return;
+    else if (isTransientGpsError(error) && confirmedLocationFresh(Date.now() - lastWriteAt, Date.now() - lastConfirmedFixAt, lastConfirmedSpeed)) return;
     if (isTransientGpsError(error)) callbacks.onError?.(lastError, true);
     else callbacks.onError?.(lastError);
   };
@@ -166,6 +171,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
   confirmTrackedPosition = (position, savedAt) => {
     if (run !== generation || position.timestamp < lastConfirmedFixAt) return;
     lastWriteAt = Date.parse(savedAt); lastConfirmedFixAt = position.timestamp; confirmedFix = position;
+    lastConfirmedSpeed = position.coords.speed;
     lastError = ''; callbacks.onUpdate?.();
   };
   const push = (position: GeolocationPosition) => {
@@ -233,10 +239,12 @@ export function stopDriverGps(clearBuffer = true, expectedDriverId?: string) {
   if (heartbeat) clearInterval(heartbeat);
   stopListeners?.();
   stopListeners = null; unsubscribeGps = null; heartbeat = null;
-  lastFixAt = 0; lastWriteAt = 0; lastConfirmedFixAt = 0; lastError = '';
+  lastFixAt = 0; lastWriteAt = 0; lastConfirmedFixAt = 0; lastConfirmedSpeed = null; lastError = '';
 }
 export function isDriverGpsRunning() { return unsubscribeGps !== null; }
 export function getGpsStats() {
   return { running: isDriverGpsRunning(), lastFixAgeMs: Date.now() - lastFixAt,
-    lastWriteAgeMs: Date.now() - lastWriteAt, lastConfirmedFixAgeMs: Date.now() - lastConfirmedFixAt, error: lastError };
+    lastWriteAgeMs: Date.now() - lastWriteAt, lastConfirmedFixAgeMs: Date.now() - lastConfirmedFixAt,
+    freshnessMs: locationFreshnessMs(lastConfirmedSpeed),
+    confirmed: confirmedLocationFresh(Date.now() - lastWriteAt, Date.now() - lastConfirmedFixAt, lastConfirmedSpeed), error: lastError };
 }

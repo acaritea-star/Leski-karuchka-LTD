@@ -112,11 +112,14 @@ function BookingMap({ pickup, destination, route, initialCenter, previewOwner, v
       }, { top: 94, bottom: 38, left: window.matchMedia('(min-width: 768px)').matches ? 462 : 38, right: 38 });
     };
     fit();
-    let width = container.current?.clientWidth;
+    let width = container.current?.clientWidth, height = container.current?.clientHeight;
     const resize = new ResizeObserver(() => {
       const nextWidth = container.current?.clientWidth;
-      // Opening the keyboard changes height, not the chosen view.
-      if (nextWidth !== width) { width = nextWidth; fit(); }
+      const nextHeight = container.current?.clientHeight;
+      // A taller offer sheet changes the map viewport. Ignore the keyboard
+      // while typing, but refit when the customer enters the comparison step.
+      const typing = document.activeElement?.matches('input, textarea');
+      if (nextWidth !== width || !typing && nextHeight !== height) { width = nextWidth; height = nextHeight; fit(); }
     });
     if (container.current) resize.observe(container.current);
     return () => resize.disconnect();

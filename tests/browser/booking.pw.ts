@@ -36,7 +36,7 @@ test('mobile booking keeps the price action visible and reuses the category rout
  await expect(page.getByRole('heading',{name:'Откъде тръгваш?'})).toBeVisible();
  await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();
  await page.getByRole('button',{name:/Край.*Гара/}).click();
- await page.getByRole('button',{name:'Виж офертите Избери фирма'}).click();
+ await page.getByRole('button',{name:'Виж офертите'}).click();
  const order=page.getByRole('button',{name:/Поръчай каручка/});
  await expect(order).toBeEnabled();await expect(order).toContainText('5.00');
  await page.getByRole('button',{name:'Маршрут и категория'}).click();await page.getByRole('radio',{name:/Комфорт/}).check();

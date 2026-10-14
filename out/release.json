@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.13-carrier-choice.1",
-  "baseCommit": "fa1d2d8262d9127639f75c760b016ea3d9eaf2cc",
-  "databaseMigration": "carrier_choice_acceptance",
+  "release": "2026.10.14-gps-offers.1",
+  "baseCommit": "4ec3282c4616fb9e0ac913d5119fa910dee59422",
+  "databaseMigration": "idle_location_validity",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261012202035",
+  "databaseMigrationVersion": "20261014051154",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
+  "verifiedSourceCommit": "bb5b15d1d0a5cb3a57d1e7edc46a51eb1e40664f",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -21,7 +21,8 @@
     "20261012105718_booking_dispatch_availability",
     "20261012151552_marketplace_dispatch",
     "20261012184648_marketplace_offer_recovery",
-    "20261012202035_carrier_choice_acceptance"
+    "20261012202035_carrier_choice_acceptance",
+    "20261014051154_idle_location_validity"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -57,6 +58,9 @@
   "carrierChoiceVersion": 1,
   "carrierChoiceMigrationVersion": "20261012202035",
   "carrierChoiceVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
-  "gpsAcquisitionVersion": 1,
-  "gpsAcquisitionVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694"
+  "gpsAcquisitionVersion": 2,
+  "gpsAcquisitionVerifiedSourceCommit": "bb5b15d1d0a5cb3a57d1e7edc46a51eb1e40664f",
+  "idleLocationValidityVersion": 1,
+  "idleLocationValidityMigrationVersion": "20261014051154",
+  "carrierComparisonUxVersion": 2
 }
