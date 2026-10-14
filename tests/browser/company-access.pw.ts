@@ -116,8 +116,7 @@ test('company login does not turn an unassigned customer into a company administ
 });
 
 test('customer login keeps partner entry collapsed behind a discreet link', async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg');
-    localStorage.setItem('leski:auto-location:' + user.id, 'off'); });
+  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg'); });
   await page.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:4100' ? route.continue() : route.abort());
   await page.goto('/auth/login');
   await expect(page.getByRole('button', { name: /Google/ })).toHaveCount(1);
@@ -178,9 +177,17 @@ test('invited company binds after login, finishes setup and keeps its own prices
     ['Основен град на обслужване', 'Левски'], ['Удостоверение / разрешение за таксиметров превоз', 'TEST-1'], ['Валидно до', '2099-01-01'],
     ['Начална такса (EUR)', '2.15'], ['Минимална цена (EUR)', '0'], ['Цена на км (EUR)', '1.23'], ['Цена на минута от маршрута (EUR)', '0.17'],
   ]) await form.getByLabel(label, { exact: true }).fill(value);
+  const initialDashboardReads = Promise.all(['/company_dashboard', '/notifications'].map(path =>
+    page.waitForResponse(response => new URL(response.url()).pathname.endsWith(path) && response.request().method() !== 'OPTIONS')
+      .then(async response => { expect(response.ok()).toBe(true); expect(await response.finished()).toBeNull(); })));
   await form.getByRole('button', { name: 'Запази фирмата и отвори панела' }).click();
+  await initialDashboardReads;
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
-  await page.goto('/admin/pricing');
+  await expect(page.getByLabel('Обобщение на курсовете')).toBeVisible();
+  // Exercise the user's navigation; a forced document replacement here can
+  // cancel WebKit's synthetic cross-origin reads and report a spurious CORS error.
+  await page.getByRole('button', { name: 'Отвори менюто', exact: true }).click();
+  await page.getByRole('button', { name: 'Цени', exact: true }).click();
   await expect(page.getByRole('spinbutton').nth(0)).toHaveValue('2.15');
   await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.23');
   await page.getByRole('spinbutton').nth(1).fill('1.41');
@@ -200,8 +207,12 @@ test('invited company binds after login, finishes setup and keeps its own prices
   await page.getByRole('button', { name: 'Обнови тарифите' }).click();
   await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.7');
   await otherPanel.close();
+  // Closing the second tab triggers focus/visibility reconciliation. Let those
+  // mocked reads finish before the deliberate full-page login/reload check.
+  await page.waitForLoadState('networkidle');
   await page.goto('/company/login'); await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
+  await expect(page.getByLabel('Обобщение на курсовете')).toBeVisible();
   expect(binds).toBe(1); expect(setups).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });
 
