@@ -68,7 +68,9 @@ test('carrier names and prices are visible together above the fixed action on sm
   await page.screenshot({path:testInfo.outputPath(`carrier-layout-${size.width}.png`),fullPage:true});
   if(size.height>=568) {
    await expect(cards.nth(0)).toBeInViewport({ratio:1});await expect(cards.nth(1)).toBeInViewport({ratio:1});
-   for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:1});
+   // WebKit rounds fractional text rectangles (e.g. 0.99977 for a fully visible
+   // price). Whole cards still require 100% visibility above the fixed footer.
+   for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:0.999});
   }
   await cards.nth(1).scrollIntoViewIfNeeded();await cards.nth(1).getByRole('radio').check();
   await expect(order).toContainText('9.00');await expect(order).toBeInViewport({ratio:1});
