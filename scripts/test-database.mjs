@@ -28,6 +28,7 @@ if(acceptance.status!==0) process.exit(acceptance.status||1);
 
 const marketplace = spawnSync(process.execPath,['scripts/test-marketplace-concurrency.mjs'],{stdio:'inherit'});
 if(marketplace.status!==0) process.exit(marketplace.status||1);
+run('deployment/role-notifications.rollback.sql');
 run('deployment/company-driver-isolation.rollback.sql');
 run('deployment/carrier-offer-availability.rollback.sql');
 run('deployment/idle-location-validity.rollback.sql');

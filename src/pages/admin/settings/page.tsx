@@ -6,6 +6,7 @@ import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import { useAuth } from '@/hooks/useAuth';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
+import NotificationSettings from '@/components/feature/NotificationSettings';
 
 interface CompanyProfile {
   name: string;
@@ -120,6 +121,7 @@ function SettingsEditor() {
 
   return (
     <AdminLayout title={t('nav_settings')}>
+      <div className="max-w-2xl"><NotificationSettings /></div>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />

@@ -23,6 +23,7 @@ import type { Tables } from '@/lib/database.types';
 
 import BottomNav from '@/components/feature/BottomNav';
 import EnableNotificationsBanner from '@/components/feature/EnableNotificationsBanner';
+import NotificationBell from '@/components/feature/NotificationBell';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useDriverDeclines } from '@/hooks/useDriverDeclines';
 import { LOGO_URL } from '@/lib/logo';
@@ -327,6 +328,7 @@ export default function DriverHome() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <NotificationBell />
             {pendingRequests > 0 && (
               <button
                 onClick={() => navigate('/driver/requests')}

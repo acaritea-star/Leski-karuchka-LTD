@@ -3,12 +3,13 @@ import { withRequestTimeout } from './requestTimeout';
 import { ADMIN_PAGE_SIZE } from './adminData';
 
 export type OrderFilter = 'all' | 'active' | 'completed' | 'cancelled';
-export async function loadAdminOrders(companyId: string, filter: OrderFilter, page = 0, signal?: AbortSignal) {
+export async function loadAdminOrders(companyId: string, filter: OrderFilter, page = 0, signal?: AbortSignal, requestId?: string) {
   const { data, error, count } = await withRequestTimeout(abort => {
     let query = supabase.from('taxi_requests').select(
       'id,status,created_at,final_price,estimated_price,pickup_address,destination_address,payment_method,profiles!taxi_requests_customer_id_fkey(first_name,last_name),drivers!taxi_requests_driver_id_fkey(profiles!drivers_user_id_fkey(first_name,last_name))',
       { count: 'exact' },
     ).eq('company_id', companyId);
+    if (requestId) query = query.eq('id', requestId);
     // Filter on the server BEFORE paging; older active rides must not disappear
     // behind a busy company's most recent completed requests.
     if (filter === 'active') query = query.in('status', ['pending', 'accepted', 'arrived', 'in_progress']);

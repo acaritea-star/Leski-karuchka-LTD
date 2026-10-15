@@ -1,134 +1,24 @@
 import { useState, useEffect, useLayoutEffect, useId, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '@/contexts/NotificationsContext';
+import { notificationPath, notificationAudience } from '@/lib/notifications';
 import { useAuth } from '@/hooks/useAuth';
-import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { withRequestTimeout } from '@/lib/requestTimeout';
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-}
 
 export default function NotificationBell() {
-  const { user } = useAuth();
   const { t } = useTranslation();
-  const { playCustomerSound, unlockAudio } = useNotificationSound();
-  const { register } = usePushNotifications();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const inbox = useNotifications();
+  const { unread, items: notifications, loading, loadError: fetchError, writeError, marking, markRead: markAllRead, watchHistory } = inbox;
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
-  const [writeError, setWriteError] = useState(false);
-  const [marking, setMarking] = useState(false);
-  const markingRef = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const panelId = useId();
-  const owner = useRef(user?.id); owner.current = user?.id;
   const [position, setPosition] = useState({ left: 12, top: 76, width: 296, maxHeight: 420 });
-  const fetchSequence = useRef(0);
-  const cancelPendingFetch = useCallback(() => { fetchSequence.current++; }, []);
-
-  const unread = notifications.filter((n) => !n.is_read).length;
-
-  // Register for push notifications on mount
-  useEffect(() => {
-    if (user?.id) {
-      register(user.id);
-    }
-  }, [user?.id, register]);
-
-  // Unlock audio on first user interaction (required by browsers)
-  useEffect(() => {
-    const handler = () => {
-      unlockAudio();
-    };
-    document.addEventListener('click', handler, { once: true });
-    document.addEventListener('touchstart', handler, { once: true });
-    return () => {
-      document.removeEventListener('click', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [unlockAudio]);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!user?.id) return;
-    const sequence = ++fetchSequence.current;
-    setLoading(true);
-    try {
-      const { data, error } = await withRequestTimeout(signal => supabase
-        .from('notifications')
-        .select('id, type, title, message, is_read, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .abortSignal(signal).limit(30), 10_000);
-
-      if (error) throw error;
-      if (sequence === fetchSequence.current) { setNotifications((data || []) as Notification[]); setFetchError(false); }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-      if (sequence === fetchSequence.current) setFetchError(true);
-    } finally {
-      if (sequence === fetchSequence.current) setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    setNotifications([]);
-    setFetchError(false); setWriteError(false);
-    void fetchNotifications();
-    const reconcile = () => {
-      if (document.visibilityState !== 'hidden') void fetchNotifications();
-    };
-    const interval = user?.id ? setInterval(reconcile, 30_000) : null;
-    window.addEventListener('online', reconcile);
-    window.addEventListener('focus', reconcile);
-    document.addEventListener('visibilitychange', reconcile);
-    return () => {
-      cancelPendingFetch();
-      if (interval) clearInterval(interval);
-      window.removeEventListener('online', reconcile);
-      window.removeEventListener('focus', reconcile);
-      document.removeEventListener('visibilitychange', reconcile);
-    };
-  }, [fetchNotifications, user?.id, cancelPendingFetch]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newNotif = payload.new as Notification;
-          setNotifications((prev) => [newNotif, ...prev.filter(n => n.id !== newNotif.id)].slice(0, 30));
-          // Play soft customer chime for every new notification
-          playCustomerSound();
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') void fetchNotifications();
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, playCustomerSound, fetchNotifications]);
-
+  useEffect(() => { if (open) return watchHistory(); }, [open, watchHistory]);
   const close = useCallback(() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }, []);
   useLayoutEffect(() => {
     if (!open) return;
@@ -153,25 +43,6 @@ export default function NotificationBell() {
       window.visualViewport?.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('scroll', measure);
     };
   }, [open, close]);
-
-  const markAllRead = async () => {
-    if (!user?.id || markingRef.current) return;
-    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    const account = user.id;
-    markingRef.current = true; setMarking(true); setWriteError(false);
-    try {
-      const { data, error } = await withRequestTimeout(signal => supabase.from('notifications').update({ is_read: true })
-        .eq('user_id', account).in('id', unreadIds).select('id').abortSignal(signal), 10_000);
-      if (error || !data?.length) throw error || new Error('Unconfirmed update');
-      if (owner.current !== account) return;
-      cancelPendingFetch(); setLoading(false);
-      const confirmed = new Set(data.map(row => row.id));
-      setNotifications(prev => prev.map(n => confirmed.has(n.id) ? { ...n, is_read: true } : n));
-    } catch {
-      if (owner.current === account) setWriteError(true);
-    } finally { markingRef.current = false; if (owner.current === account) setMarking(false); }
-  };
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr).getTime();
@@ -207,7 +78,7 @@ export default function NotificationBell() {
         <div id={panelId} ref={panel} role="dialog" aria-label={t('notifications_title')} tabIndex={-1} style={position}
           className="fixed flex flex-col bg-white rounded-2xl border border-background-200 shadow-xl overflow-hidden z-[65]">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-background-100">
-            <h3 className="text-sm font-semibold text-foreground-950 font-heading">{t('notifications_title')}</h3>
+            <div><h3 className="text-sm font-semibold text-foreground-950 font-heading">{t('notifications_title')}</h3><p className="text-xs text-foreground-500">{t('notifications_for_' + notificationAudience(user?.role))}</p></div>
             <button type="button" aria-label={t('notifications_close')} onClick={close} className="w-11 h-11 ml-auto shrink-0 flex items-center justify-center rounded-xl hover:bg-background-100">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
             </button>
@@ -225,7 +96,7 @@ export default function NotificationBell() {
           <div className="min-h-0 overflow-y-auto overscroll-contain">
             {(fetchError || writeError) && <div role="alert" className="p-4 text-sm text-red-600 break-words">
               <p>{t(fetchError ? 'notifications_load_error' : 'notifications_read_error')}</p>
-              {fetchError && <button type="button" disabled={loading} className="min-h-11 underline" onClick={() => void fetchNotifications()}>{t('retry')}</button>}
+              {fetchError && <button type="button" disabled={loading} className="min-h-11 underline" onClick={inbox.retry}>{t('retry')}</button>}
             </div>}
             {loading && notifications.length === 0 ? (
               <div role="status" aria-label={t('loading')} className="flex justify-center py-10">
@@ -241,8 +112,8 @@ export default function NotificationBell() {
                 {notifications.map((n) => (
                   <li
                     key={n.id}
-                    className={`px-4 py-3 flex gap-3 ${!n.is_read ? 'bg-accent-50/50' : ''}`}
-                  >
+                    className={`${!n.is_read ? 'bg-accent-50/50' : ''}`}
+                  ><button type="button" onClick={() => { close(); navigate(notificationPath(n.id)); }} className="w-full px-4 py-3 flex gap-3 text-left hover:bg-background-50">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${!n.is_read ? 'bg-accent-100' : 'bg-background-100'}`}>
                       <i className={`${n.type === 'new_request' ? 'ri-taxi-line' : 'ri-map-pin-2-line'} ${!n.is_read ? 'text-accent-600' : 'text-foreground-400'} text-sm`} />
                     </div>
@@ -256,11 +127,13 @@ export default function NotificationBell() {
                     {!n.is_read && (
                       <div className="w-2 h-2 rounded-full bg-accent-500 flex-shrink-0 mt-1.5" />
                     )}
-                  </li>
+                  </button></li>
                 ))}
               </ul>
             )}
+            {inbox.hasMore && <button type="button" disabled={loading} onClick={inbox.loadMore} className="w-full min-h-11 text-sm text-accent-700 underline">{t('notifications_more')}</button>}
           </div>
+          <button type="button" className="shrink-0 min-h-11 px-4 text-left text-sm text-accent-700 border-t border-background-100" onClick={() => { close(); navigate(user?.role === 'DRIVER' ? '/driver/profile' : user?.role === 'CUSTOMER' ? '/customer/settings' : '/admin/settings'); }}>{t('nav_settings')}</button>
         </div>, document.body
       )}
     </div>

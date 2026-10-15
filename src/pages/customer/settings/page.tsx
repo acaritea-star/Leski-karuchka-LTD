@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
+import NotificationSettings from '@/components/feature/NotificationSettings';
 import { supabase } from '@/lib/supabase';
 import AppMenu from '@/pages/customer/components/AppMenu';
 import { withRequestTimeout } from '@/lib/requestTimeout';
@@ -15,21 +15,12 @@ export default function CustomerSettings() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { enabled: notifications, enable, unregister, enabling } = usePushNotifications();
-  const [notificationError, setNotificationError] = useState(false);
   const languageLatch = useRef(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
   const [languageSyncError, setLanguageSyncError] = useState(false);
   const [lang, setLang] = useState<'bg' | 'en'>(() =>
     i18n.language?.startsWith('en') ? 'en' : 'bg',
   );
-
-  const toggleNotifications = async () => {
-    if (!user) return;
-    setNotificationError(false);
-    const ok = notifications ? await unregister(user.id) : await enable(user.id);
-    setNotificationError(!ok);
-  };
 
   const changeLang = async (lng: 'bg' | 'en') => {
     if (languageLatch.current) return;
@@ -139,40 +130,7 @@ export default function CustomerSettings() {
 
           <LocationSettings />
 
-          {/* Notifications */}
-          <div className="bg-white rounded-2xl p-4 mt-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-start gap-2 min-w-0">
-                <i className="ri-notification-3-line text-foreground-500 text-lg mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground-800">
-                    {t('settings_notifications')}
-                  </p>
-                  <p className="text-xs text-foreground-400 mt-0.5">
-                    {t('settings_notifications_desc')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={notifications}
-                aria-label={t('settings_notifications')}
-                disabled={enabling}
-                onClick={toggleNotifications}
-                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 ${
-                  notifications ? 'bg-primary-500' : 'bg-background-300'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-200 ${
-                    notifications ? 'translate-x-5' : ''
-                  }`}
-                />
-              </button>
-            </div>
-            {notificationError && <p role="alert" className="text-sm text-red-600 mt-2">{t('enable_notifications_error')}</p>}
-          </div>
+          <NotificationSettings />
 
           {/* Default payment */}
           <div className="bg-white rounded-2xl p-4 mt-3">

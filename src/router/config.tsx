@@ -34,6 +34,7 @@ const CustomerHome = lazy(() => import('@/pages/customer/home/page'));
 const CustomerOrders = lazy(() => import('@/pages/customer/orders/page'));
 const CustomerProfile = lazy(() => import('@/pages/customer/profile/page'));
 const CustomerSettings = lazy(() => import('@/pages/customer/settings/page'));
+const NotificationOpen = lazy(() => import('@/pages/notifications/open/page'));
 
 // Driver pages
 const DriverHome = lazy(() => import('@/pages/driver/home/page'));
@@ -95,6 +96,7 @@ const routes: RouteObject[] = [
 
   // ─── App redirect (for logged-in users) ──────────────────────────────────
   { path: '/app', element: <AppRedirect /> },
+  { path: '/notifications/open', element: <NotificationOpen /> },
 
   // ─── Customer ─────────────────────────────────────────────────────────────
   { path: '/customer/home', element: <AuthGuard allowedRoles={['CUSTOMER']}><CustomerHome /></AuthGuard> },

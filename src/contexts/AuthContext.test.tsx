@@ -4,21 +4,22 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Session } from '@supabase/supabase-js';
 import { AuthProvider, useAuthContext } from './AuthContext';
 import { stopDriverGps } from '@/lib/driverLocation';
+import { detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
 
-const api = vi.hoisted(() => ({ getSession: vi.fn(), profile: vi.fn(), changed: null as null | ((event: string, session: Session | null) => void), clear: vi.fn() }));
+const api = vi.hoisted(() => ({ getSession: vi.fn(), signOut: vi.fn(), profile: vi.fn(), changed: null as null | ((event: string, session: Session | null) => void), clear: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  auth: { getSession: api.getSession, onAuthStateChange: (callback: typeof api.changed) => { api.changed = callback; return { data: { subscription: { unsubscribe: vi.fn() } } }; } },
+  auth: { getSession: api.getSession, signOut: api.signOut, onAuthStateChange: (callback: typeof api.changed) => { api.changed = callback; return { data: { subscription: { unsubscribe: vi.fn() } } }; } },
   from: () => ({ select: () => ({ eq: () => ({ abortSignal: () => ({ maybeSingle: api.profile }) }) }) }),
 } }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: { clear: api.clear } }));
 vi.mock('@/lib/driverLocation', () => ({ stopDriverGps: vi.fn() }));
-vi.mock('@/lib/pushSubscription', () => ({ unregisterPush: vi.fn() }));
+vi.mock('@/lib/pushSubscription', () => ({ detachPush: vi.fn(), startPushSession: vi.fn(), registerPush: vi.fn().mockResolvedValue(true) }));
 vi.mock('@/lib/socialAuth', () => ({ startSocialSignIn: vi.fn() }));
 const session = { user: { id: 'a', email: 'a@example.test' }, access_token: 'test' } as Session;
 const profile = { id: 'a', is_active: true, role: 'CUSTOMER', company_id: null, first_name: 'А', avatar_url: null };
 function Consumer() {
-  const { user, loading, profileError, refreshProfile } = useAuthContext();
-  return <><div>{loading ? 'loading' : user ? `ready:${user.id}` : 'signed-out'}</div><div>{user ? `${user.role}:${user.company_id}` : ''}</div>{profileError && <p role="alert">{profileError}</p>}<button onClick={() => void refreshProfile()}>retry</button></>;
+  const { user, loading, profileError, refreshProfile, signOut } = useAuthContext();
+  return <><div>{loading ? 'loading' : user ? `ready:${user.id}` : 'signed-out'}</div><div>{user ? `${user.role}:${user.company_id}` : ''}</div>{profileError && <p role="alert">{profileError}</p>}<button onClick={() => void refreshProfile()}>retry</button><button onClick={() => void signOut().catch(() => {})}>logout</button></>;
 }
 beforeEach(() => { vi.clearAllMocks(); api.getSession.mockResolvedValue({ data: { session } }); api.profile.mockResolvedValue({ data: profile, error: null }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -34,6 +35,21 @@ it('restores an existing session and keeps the app ready during token refresh', 
   expect(screen.getByText('ready:a')).toBeTruthy();
   await act(async () => resolve({ data: profile, error: null }));
   expect(api.clear).toHaveBeenCalledTimes(1);
+});
+it('detaches only this device on logout and resumes the saved choice on a new login', async () => {
+  api.signOut.mockResolvedValueOnce({ error: null });
+  render(<AuthProvider><Consumer /></AuthProvider>); await screen.findByText('ready:a');
+  fireEvent.click(screen.getByText('logout')); await screen.findByText('signed-out');
+  expect(detachPush).toHaveBeenCalledWith('a');
+  act(() => api.changed?.('SIGNED_IN', session)); await screen.findByText('ready:a');
+  expect(startPushSession).toHaveBeenCalledTimes(2);
+});
+it('resumes silent push registration if logout fails and the account remains signed in', async () => {
+  api.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
+  render(<AuthProvider><Consumer /></AuthProvider>); await screen.findByText('ready:a');
+  fireEvent.click(screen.getByText('logout'));
+  await waitFor(() => expect(registerPush).toHaveBeenCalledWith('a'));
+  expect(screen.getByText('ready:a')).toBeTruthy(); expect(startPushSession).toHaveBeenCalledTimes(2);
 });
 
 it('ignores a delayed profile response after sign-out', async () => {

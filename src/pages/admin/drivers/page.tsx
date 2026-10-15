@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import Modal from '@/components/feature/Modal';
 import DriverVerificationStatus from '@/components/feature/DriverVerificationStatus';
 import { verificationKey } from '@/lib/driverVerification';
@@ -50,6 +51,8 @@ function CompanyDrivers() {
     return () => clearTimeout(timer);
   }, [search, searchTerm]);
   const [selected, setSelected] = useState<DriverWithName | null>(null);
+  const [notificationParams] = useSearchParams();
+  const openedNotification = useRef('');
   const [documentDates,setDocumentDates] = useState<Record<string,string>>({});
 
   const [showAdd, setShowAdd] = useState(false);
@@ -58,6 +61,27 @@ function CompanyDrivers() {
   const verifyLatch = useRef(false);
   const documentLatch = useRef(false);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+  const requestedApplication = notificationParams.get('application');
+  const requestedDriver = notificationParams.get('driver');
+  useEffect(() => {
+    if (!companyId) return;
+    const key = companyId + ':' + (requestedApplication ?? requestedDriver ?? '');
+    if (openedNotification.current === key) return;
+    if (requestedApplication && /^[0-9a-f-]{36}$/i.test(requestedApplication)) {
+      openedNotification.current = key; setShowAdd(true); return;
+    }
+    if (!requestedDriver || !/^[0-9a-f-]{36}$/i.test(requestedDriver)) return;
+    let active = true;
+    void withRequestTimeout(signal => supabase.from('drivers').select('*').eq('company_id', companyId).eq('id', requestedDriver).abortSignal(signal).maybeSingle())
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data) { setDocumentError('Шофьорът не е достъпен за тази фирма.'); return; }
+        openedNotification.current = key;
+        setSelected({ ...data, first_name: '', last_name: '', online_now: false, gps_received_at: null, gps_position_at: null });
+      }).catch(() => { if (active) setDocumentError('Шофьорът не се зареди. Опитай отново.'); });
+    return () => { active = false; };
+  }, [companyId, requestedApplication, requestedDriver]);
 
   const driversQuery = useQuery({
     queryKey: [...queryKeys.adminDrivers(companyId ?? 'none'), searchTerm, page],

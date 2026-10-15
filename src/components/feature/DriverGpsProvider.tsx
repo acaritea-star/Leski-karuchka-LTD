@@ -27,13 +27,20 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
   const publishState = useCallback((next: GpsState) => setState(current => current.status === next.status
     && current.error === next.error && current.message === next.message ? current : next), []);
   const [retrying, setRetrying] = useState(false);
+  const [permission, setPermission] = useState<Awaited<ReturnType<typeof gpsPermission>> | 'checking'>('checking');
+  useEffect(() => {
+    let active = true;
+    const read = () => { void gpsPermission().then(value => { if (active) setPermission(value); }); };
+    read(); window.addEventListener('focus', read);
+    return () => { active = false; window.removeEventListener('focus', read); };
+  }, [user?.id]);
   useEffect(() => setRetrying(false), [user?.id]);
   // Offline drivers can center their map without sharing a working location.
   useEffect(() => {
     if (!isDriver || !user?.id || !driver?.id || driver.is_online || !allowLocation) return;
     let active = true;
     void gpsPermission().then(async permission => {
-      if (!active || permission === 'denied' || (permission !== 'granted' && getLocationEnabled(user.id) !== true)) return;
+      if (!active || permission !== 'granted') return;
       const cached = getGpsPosition();
       const position = cached && Date.now() - cached.timestamp < 30_000 ? cached : await requestGps();
       if (!active || getLocationEnabled(user.id) === false) return;
@@ -44,6 +51,12 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (!isDriver || !driver?.is_online || !allowLocation) { stopDriverGps(); setState({ status: 'idle', error: !allowLocation && driver?.is_online ? 'Местоположението е изключено.' : '' }); return; }
+    if (permission !== 'granted') {
+      stopDriverGps();
+      if (permission === 'checking') { setState({ status: 'acquiring', error: '', message: 'Проверяваме разрешението за GPS…' }); return; }
+      setState({ status: 'error', error: permission === 'denied' ? 'Разреши местоположението от настройките на браузъра.' : 'Натисни „Обнови GPS“, за да разрешиш местоположението.' });
+      return;
+    }
     let alive = true;
     let acquisitionDeadline = Date.now() + 24_000;
     const acquiringState = { status: 'acquiring', error: '', message: 'Уточняваме GPS. Новите заявки се отключват след потвърдена точна позиция.' } as const;
@@ -103,12 +116,12 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility);
       document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
-  }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation, publishState]);
+  }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation, permission, publishState]);
   const retryLocation = useCallback(() => {
     if (!isDriver || !driver?.is_online || !allowLocation || retrying) return;
     const startedOwner = user?.id;
     setRetrying(true);
-    void ensureDriverLocation(driver, true).catch(error => {
+    void ensureDriverLocation(driver, true).then(() => { if (owner.current === startedOwner) setPermission('granted'); }).catch(error => {
       if (owner.current === startedOwner) setState({status: 'error', error: error instanceof Error ? error.message : 'GPS още не е потвърден.'});
     }).finally(() => { if (owner.current === startedOwner) setRetrying(false); });
   }, [isDriver, driver, allowLocation, retrying, user?.id]);

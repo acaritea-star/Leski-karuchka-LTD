@@ -1,6 +1,6 @@
 import ErrorBoundary from '@/components/feature/ErrorBoundary';
-import { Suspense } from "react";
-import { BrowserRouter } from "react-router-dom";
+import { lazy, Suspense, type ReactNode } from "react";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import { AppRoutes } from "./router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
@@ -13,6 +13,15 @@ import DriverGpsProvider from '@/components/feature/DriverGpsProvider';
 import DriverOffersProvider from '@/components/feature/DriverOffersProvider';
 import CookieConsent from '@/components/feature/CookieConsent';
 import OperationTelemetry from '@/components/feature/OperationTelemetry';
+import { useAuth } from '@/hooks/useAuth';
+
+const NotificationsProvider = lazy(() => import('@/components/feature/NotificationsProvider'));
+function NotificationScope({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  if (!user || !/^\/(customer|driver|admin|notifications)\//.test(pathname)) return children;
+  return <Suspense fallback={<RouteFallback />}><NotificationsProvider>{children}</NotificationsProvider></Suspense>;
+}
 
 function RouteFallback() {
   return (
@@ -29,11 +38,11 @@ function App() {
         <AuthProvider>
           <OperationTelemetry />
           <BrowserRouter basename={__BASE_PATH__}>
-            <DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
+            <NotificationScope><DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
               <Suspense fallback={<RouteFallback />}>
                 <AppRoutes />
               </Suspense>
-            </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider>
+            </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider></NotificationScope>
             <CookieConsent />
           </BrowserRouter>
         </AuthProvider>

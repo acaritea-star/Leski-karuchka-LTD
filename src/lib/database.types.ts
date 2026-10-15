@@ -753,6 +753,10 @@ export type Database = {
       }
       notifications: {
         Row: {
+          audience: string
+          event_key: string | null
+          priority: string
+          expires_at: string | null
           company_id: string | null
           created_at: string
           data: Json | null
@@ -764,6 +768,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          audience?: string
+          event_key?: string | null
+          priority?: string
+          expires_at?: string | null
           company_id?: string | null
           created_at?: string
           data?: Json | null
@@ -775,6 +783,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          audience?: string
+          event_key?: string | null
+          priority?: string
+          expires_at?: string | null
           company_id?: string | null
           created_at?: string
           data?: Json | null
@@ -1675,6 +1687,11 @@ export type Database = {
       }
     }
     Functions: {
+      notification_inbox_state: { Args: Record<string, never>; Returns: Json }
+      notification_inbox_page: { Args: { p_before?: string; p_before_id?: string }; Returns: Json }
+      mark_notifications_read: { Args: { p_ids?: string[] }; Returns: number }
+      open_notification: { Args: { p_id: string }; Returns: string }
+
       marketplace_availability: { Args: { p_lat: number; p_lng: number }; Returns: Json }
       driver_incoming_requests: { Args: { p_limit?: number }; Returns: Database["public"]["Tables"]["taxi_requests"]["Row"][] }
       save_vehicle_category: { Args: { p_id: string; p_company: string; p_expected_at: string; p_details: Json }; Returns: Database["public"]["Tables"]["vehicle_types"]["Row"] }

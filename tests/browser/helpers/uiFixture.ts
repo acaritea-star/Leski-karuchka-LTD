@@ -20,11 +20,11 @@ export async function setupUi(page: Page, role: UiRole) {
     notices: [] as Record<string, unknown>[], rides: [] as Record<string, unknown>[], ratings: [] as Record<string, unknown>[], cars: [] as Record<string, unknown>[],
     articles: [] as Record<string, unknown>[], articleDeletes: 0, failArticleDelete: false,
     failProfile: false, failPreferences: false, failNotificationReads: false, failNotificationWrites: false, failRating: false, loseRatingResponse: false, failContact: false,
-    writeDelay: 0, notificationWrites: 0, external: [] as string[], errors: [] as string[],
+    writeDelay: 0, notificationWrites: 0, notificationStateReads: 0, notificationPageReads: 0, notificationOpens: [] as string[], pushRegistrations: 0, pushDeletes: 0, external: [] as string[], errors: [] as string[],
   };
   page.on('pageerror', error => state.errors.push(error.message));
   await page.addInitScript(({ user, role }) => {
-    localStorage.setItem('i18nextLng', 'bg'); localStorage.setItem('leski:auto-location:' + user.id, 'off');
+    localStorage.setItem('i18nextLng', 'bg'); if (!localStorage.getItem('leski:auto-location:' + user.id)) localStorage.setItem('leski:auto-location:' + user.id, 'off');
     const savedAt = Date.now(); localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt, expiresAt: savedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
     if (role !== 'visitor') {
       const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
@@ -68,6 +68,33 @@ export async function setupUi(page: Page, role: UiRole) {
       }
       const requestId = url.searchParams.get('request_id');
       data = state.ratings.filter(row => !requestId || requestId === 'eq.' + row.request_id);
+    } else if (url.pathname.endsWith('/functions/v1/generate-vapid-keys')) {
+      data = { publicKey: Buffer.from('synthetic-web-push-key').toString('base64') };
+    } else if (url.pathname.endsWith('/rpc/register_push_subscription')) {
+      state.pushRegistrations++; data = null;
+    } else if (url.pathname.endsWith('/push_subscriptions')) {
+      if (request.method() === 'DELETE') state.pushDeletes++;
+      data = [];
+    } else if (url.pathname.endsWith('/rpc/notification_inbox_state')) {
+      state.notificationStateReads++;
+      if (state.failNotificationReads) return reply({ message: 'offline' }, 503);
+      data = { unread: state.notices.filter(row => !row.is_read).length, latest_id: state.notices[0]?.id ?? null };
+    } else if (url.pathname.endsWith('/rpc/notification_inbox_page')) {
+      state.notificationPageReads++;
+      if (state.failNotificationReads) return reply({ message: 'offline' }, 503);
+      const body = request.postDataJSON(); const before = state.notices.findIndex(row => row.id === body.p_before_id);
+      const offset = before < 0 ? 0 : before + 1;
+      data = { items: state.notices.slice(offset, offset + 20), has_more: state.notices.length > offset + 20 };
+    } else if (url.pathname.endsWith('/rpc/mark_notifications_read')) {
+      state.notificationWrites++; await delay();
+      if (state.failNotificationWrites) return reply({ message: 'offline' }, 503);
+      const changed = state.notices.filter(row => !row.is_read); changed.forEach(row => { row.is_read = true; }); data = changed.length;
+    } else if (url.pathname.endsWith('/rpc/open_notification')) {
+      const id = request.postDataJSON().p_id; state.notificationOpens.push(id);
+      const row = state.notices.find(row => row.id === id);
+      if (!row) return reply({ message: 'Forbidden' }, 403);
+      row.is_read = true;
+      data = row.target ?? (role === 'DRIVER' ? '/driver/profile' : role === 'COMPANY_ADMIN' ? '/admin/drivers' : '/customer/orders');
     } else if (url.pathname.endsWith('/notifications')) {
       if (request.method() === 'PATCH') {
         state.notificationWrites++; await delay();

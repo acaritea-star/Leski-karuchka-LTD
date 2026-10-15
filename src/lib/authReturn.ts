@@ -19,9 +19,14 @@ export function consumeAuthReturn(): string {
     if (Number.isFinite(value?.expires) && value.expires > Date.now() && value.expires <= Date.now() + 30 * 60_000) {
       if (value.path === '/company' || value.path === '/driver/access') return partnerEntryPath(value.path === '/company' ? 'company' : 'driver', value.invite);
       if (value.path === '/driver-join') return typeof value.company === 'string' && companyPattern.test(value.company) ? '/driver-join?company=' + value.company : '/driver-join';
+      if (value.path === '/notifications/open' && typeof value.id === 'string' && companyPattern.test(value.id)) return '/notifications/open?id=' + value.id;
     }
   } catch { /* Unavailable or invalid storage is not an authentication failure. */ }
   return '/app';
+}
+export function beginNotificationLogin(id: string): void {
+  if (!companyPattern.test(id)) return;
+  try { sessionStorage.setItem(key, JSON.stringify({ path: '/notifications/open', id, expires: Date.now() + 30 * 60_000 })); } catch { /* The inbox stays available after login. */ }
 }
 export function invitationId(search: string): string | undefined {
   const value = new URLSearchParams(search).get('invite');

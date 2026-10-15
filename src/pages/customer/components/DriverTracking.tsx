@@ -40,32 +40,6 @@ const CAR_COLORS: Record<string, string> = {
   standard: '#0d9488',
 };
 
-function playChime() {
-  try {
-    const Ctx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
-    const tone = (freq: number, start: number, dur: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
-      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + dur + 0.05);
-    };
-    tone(880, 0, 0.4);
-    tone(1318.51, 0.2, 0.55);
-  } catch {
-    /* audio not available */
-  }
-}
-
 export default function DriverTracking({
   request,
   onCancel,
@@ -312,14 +286,6 @@ export default function DriverTracking({
       }
     }
   }, [mapReady, location, positionStale, request.pickup_latitude, request.pickup_longitude, request.destination_latitude, request.destination_longitude]);
-
-  // ── Driver-found notification ──
-  useEffect(() => {
-    if (request.status === 'accepted' || request.status === 'arrived') {
-      const timer = setTimeout(playChime, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [request.status]);
 
   // ── Map controls ──
   const changeZoom = useCallback((delta: number) => {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -24,13 +25,15 @@ export default function AdminOrders() {
 function OrderList() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
-
+  const [search, setSearch] = useSearchParams();
+  const requested = search.get('request');
+  const requestId = requested && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requested) ? requested : undefined;
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
   const [page, setPage] = useState(0);
   const ordersQuery = useQuery({
-    queryKey: [...queryKeys.adminOrders(companyId ?? 'none'), 'list', filter, page],
-    queryFn: ({ signal }) => loadAdminOrders(companyId!, filter, page, signal),
+    queryKey: [...queryKeys.adminOrders(companyId ?? 'none'), 'list', filter, page, requestId],
+    queryFn: ({ signal }) => loadAdminOrders(companyId!, filter, page, signal, requestId),
     enabled: !!companyId, refetchInterval: filter === 'active' ? 10_000 : false,
   });
   const filtered = ordersQuery.data?.rows ?? [];
@@ -47,6 +50,10 @@ function OrderList() {
 
   return (
     <AdminLayout title={t('nav_orders')}>
+      {requestId && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-primary-50 p-3 text-sm">
+        <span>Поръчка от известие</span>
+        <button className="min-h-11 font-semibold text-primary-600" onClick={() => { setSearch({}); setFilter('all'); setPage(0); }}>Всички поръчки</button>
+      </div>}
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -62,7 +69,7 @@ function OrderList() {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => { setFilter(tab.key); setPage(0); }}
+            onClick={() => { setSearch({}); setFilter(tab.key); setPage(0); }}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer ${
               filter === tab.key
                 ? 'bg-primary-500 text-white'

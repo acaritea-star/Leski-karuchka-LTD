@@ -14,7 +14,7 @@ import { SERVICE_CLASSES, marketplaceRange, carrierOffers, carrierOfferKey } fro
 import { useFleetClock } from '@/hooks/useFleetClock';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import NotificationBell from '@/components/feature/NotificationBell';
 import DriverTracking from '@/pages/customer/components/DriverTracking';
@@ -26,7 +26,6 @@ import BookingMap from '@/pages/customer/components/BookingMap';
 import CustomerLayout, { BookingSkeleton, type CarrierPanelView } from '@/pages/customer/components/CustomerLayout';
 import BookingSteps from '@/pages/customer/components/BookingSteps';
 import { recentLocations, stepAfterSelection, type BookingStep } from '@/pages/customer/components/bookingFlow';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import type { LocationPreset } from '@/lib/geo';
 import { computeRoute, reverseGeocode, type RouteResult } from '@/lib/googleMaps';
 import { LOGO_URL } from '@/lib/logo';
@@ -85,9 +84,9 @@ export default function CustomerHome() {
   const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [notificationParams, setNotificationParams] = useSearchParams();
   const locationEnabled = useLocationPreference(user?.id);
   const autoAttempted = useRef<string | null>(null);
-  const { register: registerPush } = usePushNotifications();
 
   // Location state
   const [pickup, setPickup] = useState<Location | null>(null);
@@ -169,12 +168,6 @@ export default function CustomerHome() {
   // Realtime subscription ref
   useEffect(() => () => { ++gpsRevision.current; }, []);
 
-  // Register for push notifications
-  useEffect(() => {
-    if (user?.id) {
-      registerPush(user.id);
-    }
-  }, [user?.id, registerPush]);
 
   // Track online/offline connectivity
   useEffect(() => {
@@ -259,6 +252,27 @@ export default function CustomerHome() {
     [step, pickup, destination, addRecent],
   );
 
+  // Retry links load only a closed request owned by the current customer.
+  const notificationRetry = notificationParams.get('retry');
+  useEffect(() => {
+    if (!notificationRetry || !user?.id || recovering || activeRequest) return;
+    if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(notificationRetry)) return;
+    let active = true;
+    const controller = new AbortController();
+    void withRequestTimeout(signal => supabase.from('taxi_requests').select('*').eq('id', notificationRetry)
+      .eq('customer_id', user.id).eq('status', 'cancelled').abortSignal(signal).maybeSingle(), 10_000, controller.signal)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data || data.destination_latitude == null || data.destination_longitude == null) throw new Error('Unavailable route');
+        ++gpsRevision.current;
+        setPickup({ address: data.pickup_address ?? 'Начален адрес', lat: data.pickup_latitude, lng: data.pickup_longitude });
+        setDestination({ address: data.destination_address ?? '', lat: data.destination_latitude, lng: data.destination_longitude });
+        setCarrierKey(''); setStep('offers'); setRoute(null); setRequestError('');
+        setNotificationParams({}, { replace: true });
+      }).catch(() => { if (active) setLocationError('Предишният маршрут не се зареди. Избери началния и крайния адрес.'); });
+    return () => { active = false; controller.abort(); };
+  }, [notificationRetry, user?.id, recovering, activeRequest, setNotificationParams]);
+
   // Apply GPS to pickup once. Subsequent fixes never move chosen addresses.
   const detectLocation = useCallback(async (automatic = false) => {
     if (automatic && getLocationEnabled(user?.id) === false) return;
@@ -282,25 +296,25 @@ export default function CustomerHome() {
   }, [t, destination, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || recovering || activeRequest || pickup || locationEnabled === false || autoAttempted.current === user.id || gpsRevision.current !== 0) return;
+    if (notificationRetry || !user?.id || recovering || activeRequest || pickup || locationEnabled === false || autoAttempted.current === user.id || gpsRevision.current !== 0) return;
     let active = true;
     const revision = gpsRevision.current;
     void gpsPermission().then(permission => {
       if (!active || revision !== gpsRevision.current || getLocationEnabled(user.id) === false) return;
-      if (permission === 'denied' || (permission !== 'granted' && getLocationEnabled(user.id) !== true)) return;
+      if (permission !== 'granted') return;
       autoAttempted.current = user.id;
       if (permission === 'granted' && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
       void detectLocation(true);
     });
     return () => { active = false; };
-  }, [user?.id, recovering, activeRequest, pickup, locationEnabled, detectLocation]);
+  }, [user?.id, recovering, activeRequest, pickup, locationEnabled, detectLocation, notificationRetry]);
 
   useEffect(() => {
     if (locationEnabled !== true || !user?.id) return;
     let active = true;
     let unsubscribe = () => {};
     void gpsPermission().then(permission => {
-      if (active && permission !== 'denied') unsubscribe = subscribeGps(() => {});
+      if (active && permission === 'granted') unsubscribe = subscribeGps(() => {});
     });
     return () => { active = false; unsubscribe(); };
   }, [locationEnabled, user?.id]);
