@@ -216,6 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Keep the last verified identity through a transient network failure.
           // Missing, disabled and permission-denied profiles still fail closed.
           if (!result.retryable || currentUser.current?.id !== next.user.id) {
+            const previous = currentUser.current;
+            const verified = result.user;
+            // A role, firm or activation change also changes the permission
+            // boundary even when the OAuth account itself stays the same.
+            if (previous && (!verified || previous.role !== verified.role || previous.company_id !== verified.company_id)) {
+              queryClient.clear(); stopDriverGps(); stopSharedGps();
+            }
             currentUser.current = result.user;
             setUser(result.user);
           }
