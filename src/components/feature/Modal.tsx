@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 let locks = 0;
@@ -8,9 +8,10 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
   label?: string; labelledBy?: string; onClose: () => void; busy?: boolean; className?: string; children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (locks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
     if (typeof element.showModal === 'function') element.showModal();
     else element.setAttribute('open', '');
@@ -28,6 +29,9 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
       window.removeEventListener('resize', measure);
       viewport?.removeEventListener('resize', measure); viewport?.removeEventListener('scroll', measure);
       if (typeof element.close === 'function') element.close();
+      if (previousFocus && previousFocus !== document.body && previousFocus.isConnected && !previousFocus.matches(':disabled') && previousFocus.getClientRects().length) {
+        previousFocus.focus({ preventScroll: true });
+      }
       if (--locks === 0) document.body.style.overflow = previousOverflow;
     };
   }, []);

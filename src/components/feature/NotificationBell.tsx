@@ -165,6 +165,7 @@ export default function NotificationBell() {
         .eq('user_id', account).in('id', unreadIds).select('id').abortSignal(signal), 10_000);
       if (error || !data?.length) throw error || new Error('Unconfirmed update');
       if (owner.current !== account) return;
+      cancelPendingFetch(); setLoading(false);
       const confirmed = new Set(data.map(row => row.id));
       setNotifications(prev => prev.map(n => confirmed.has(n.id) ? { ...n, is_read: true } : n));
     } catch {

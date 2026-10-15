@@ -94,4 +94,15 @@ describe('notification recovery', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Известия' }));
   });
+  it('does not restore unread status when an older inbox read finishes after a confirmed write', async () => {
+    fake.rows = [notice()]; await mount();
+    let finish!: (value: unknown) => void;
+    fake.fetch.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /прочетени/i })); });
+    expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
+    await act(async () => { finish({ data: [notice()], error: null }); });
+    expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
+    expect(screen.getByText('Шофьорът пристигна')).toBeTruthy();
+  });
 });
