@@ -14,8 +14,9 @@ UPDATE public.notifications n SET audience=CASE
  WHEN p.role IN ('COMPANY_ADMIN','SUPER_ADMIN') THEN 'company' ELSE 'customer' END
  FROM public.profiles p WHERE p.id=n.user_id;
 -- Only incoming offers expire from the inbox; completed-trip history remains.
-UPDATE public.notifications SET expires_at=(data->>'expires_at')::timestamptz
- WHERE type='new_request' AND data->>'expires_at' ~ '^20[0-9]{2}-[0-9]{2}-[0-9]{2}';
+UPDATE public.notifications SET expires_at=now() WHERE type='new_request';
+UPDATE public.notifications n SET expires_at=coalesce(r.expires_at,r.created_at+interval '2 minutes')
+ FROM public.taxi_requests r WHERE n.type='new_request' AND n.data->>'request_id'=r.id::text;
 CREATE UNIQUE INDEX notifications_event_once ON public.notifications(user_id,event_key) WHERE event_key IS NOT NULL;
 CREATE INDEX notifications_audience_page ON public.notifications(user_id,audience,created_at DESC,id DESC);
 CREATE INDEX notifications_audience_unread ON public.notifications(user_id,audience) WHERE NOT is_read;
@@ -102,7 +103,7 @@ BEGIN
  THEN 'Има заявка близо до теб. Отвори приложението за подробности.' ELSE p_message END,
  'icon','/icon-192.png','badge','/badge-72.png','tag',CASE WHEN p_request IS NULL THEN 'notice-'||nid ELSE 'request-'||p_request END,
  'renotify',false,'requireInteraction',false,'data',p_data||jsonb_build_object('notification_id',nid,'recipient_id',p_user,
- 'type',CASE WHEN p_kind='new_request' THEN 'new_request' ELSE 'inbox' END,'role',CASE p_audience WHEN 'company' THEN 'COMPANY_ADMIN' ELSE upper(p_audience) END,
+ 'type',CASE WHEN p_kind='new_request' THEN 'new_request' ELSE 'trip_status' END,'role',CASE p_audience WHEN 'company' THEN 'COMPANY_ADMIN' ELSE upper(p_audience) END,
  'expires_at',delivery_until));
  INSERT INTO private.push_outbox(request_id,recipient_id,event_type,notification_id,payload,expires_at)
  VALUES(p_request,p_user,p_kind,nid,body,delivery_until) ON CONFLICT DO NOTHING;
@@ -226,6 +227,9 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $f$
 DECLARE kind text; recipient uuid; audience text; details jsonb; title text;
 BEGIN
  IF TG_TABLE_NAME='driver_applications' THEN
+  -- Legacy intake is deferred: begin_driver_onboarding marks its new row as a
+  -- draft later in the same transaction, so that draft must not notify a firm.
+  IF TG_OP='INSERT' AND NOT EXISTS(SELECT 1 FROM public.driver_applications a WHERE a.id=NEW.id AND a.status='pending' AND NOT a.onboarding_required) THEN RETURN NEW; END IF;
   details:=jsonb_build_object('application_id',NEW.id);
   IF NEW.status='pending' AND ((TG_OP='INSERT' AND NOT NEW.onboarding_required) OR
    (TG_OP='UPDATE' AND NEW.submitted_at IS NOT NULL AND NEW.submitted_at IS DISTINCT FROM OLD.submitted_at)) THEN
@@ -254,7 +258,8 @@ BEGIN
  PERFORM private.dispatch_push_outbox(); RETURN NEW;
 END $f$;
 REVOKE ALL ON FUNCTION private.notify_driver_workflow() FROM PUBLIC,anon,authenticated,service_role;
-CREATE TRIGGER notify_application AFTER INSERT OR UPDATE OF status,submitted_at ON public.driver_applications FOR EACH ROW EXECUTE FUNCTION private.notify_driver_workflow();
+CREATE TRIGGER notify_application AFTER UPDATE OF status,submitted_at ON public.driver_applications FOR EACH ROW EXECUTE FUNCTION private.notify_driver_workflow();
+CREATE CONSTRAINT TRIGGER notify_legacy_application AFTER INSERT ON public.driver_applications DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.notify_driver_workflow();
 CREATE TRIGGER notify_driver_document AFTER INSERT OR UPDATE OF status,file_url,expires_at ON public.driver_documents FOR EACH ROW EXECUTE FUNCTION private.notify_driver_workflow();
 
 -- Daily reminders are bounded, deduplicated and use the existing delivery queue.

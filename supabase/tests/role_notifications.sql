@@ -43,7 +43,8 @@ BEGIN
  PERFORM pg_temp.notice_denied(format('UPDATE public.notifications SET user_id=%L WHERE id=%L',ab,na));
  PERFORM pg_temp.notice_denied('SELECT * FROM private.push_outbox');
  PERFORM pg_temp.notice_denied('SELECT public.claim_push_job(gen_random_uuid(),gen_random_uuid())');
- IF public.mark_notifications_read()<>1 OR (public.notification_inbox_state()->>'unread')::int<>0 THEN RAISE EXCEPTION 'FAIL scoped mark-read'; END IF;
+ i:=public.mark_notifications_read(); state:=public.notification_inbox_state();
+ IF i<>1 OR (state->>'unread')::int<>0 THEN RAISE EXCEPTION 'FAIL scoped mark-read: updated %, state %',i,state; END IF;
  RESET ROLE;
  IF (SELECT is_read FROM public.notifications WHERE id=nb) THEN RAISE EXCEPTION 'FAIL mark-read affected another firm'; END IF;
  PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',da_user,'role','authenticated')::text,true);
@@ -52,9 +53,11 @@ BEGIN
  RESET ROLE;
  -- Role and firm revocation affect the read API and already queued deliveries.
  SELECT id INTO job FROM private.push_outbox WHERE notification_id=nd;
+ PERFORM set_config('request.jwt.claims','{}',true);
  UPDATE private.push_outbox SET status='processing',lease_token=token,lease_until=clock_timestamp()+interval '30 seconds',attempts=1 WHERE id=job;
  UPDATE public.profiles SET company_id=cb WHERE id=da_user;
  IF public.claim_push_job(job,token) IS NOT NULL THEN RAISE EXCEPTION 'FAIL delivery after company revocation'; END IF;
+ PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',da_user,'role','authenticated')::text,true);
  SET LOCAL ROLE authenticated;
  IF EXISTS(SELECT 1 FROM public.notifications WHERE id=nd) THEN RAISE EXCEPTION 'FAIL read after firm revocation'; END IF;
  RESET ROLE;

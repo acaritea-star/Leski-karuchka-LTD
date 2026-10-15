@@ -2,6 +2,7 @@ BEGIN;
 SET LOCAL lock_timeout='3s';
 SET LOCAL statement_timeout='30s';
 DROP TRIGGER IF EXISTS notify_application ON public.driver_applications;
+DROP TRIGGER IF EXISTS notify_legacy_application ON public.driver_applications;
 DROP TRIGGER IF EXISTS notify_driver_document ON public.driver_documents;
 DROP TRIGGER IF EXISTS broadcast_notification_hint ON public.notifications;
 DROP POLICY IF EXISTS personal_notification_broadcast ON realtime.messages;
