@@ -135,7 +135,7 @@ describe('customer booking integration', () => {
   });
   it('allows address editing without losing the destination', async () => {
     await mount(); await chooseRoute();
-    fireEvent.click(screen.getByRole('button', { name: '1. Откъде тръгваш?' }));
+    fireEvent.click(screen.getByRole('button', { name: /Промени началния адрес:/ }));
     fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
     expect(screen.getByRole('heading', { name: 'Избери фирма.' })).toBeTruthy();
   });
@@ -351,4 +351,39 @@ it('names the selected firm during search and preserves a recovered route when i
  expect(screen.getByRole('heading',{name:'Избери фирма.'})).toBeTruthy();
  expect(fake.route).toHaveBeenCalledWith(expect.objectContaining({address:pickup.address}),expect.objectContaining({address:destination.address}),expect.anything());
  expect(fake.rpc).not.toHaveBeenCalled();
+});
+
+it('expands many firms on demand, collapses the explicit choice and keeps its quote through details',async()=>{
+ const firms=['company','Б','В','Г','Д','Е','Ж','Орион'];fake.companies=firms;
+ fake.route.mockResolvedValue({...quote(),quotes:firms.map((company,i)=>offer('standard','q-'+i,5+i,company))});
+ await mount();await chooseRoute();
+ expect(screen.getAllByRole('radio')).toHaveLength(2);
+ expect(screen.queryByRole('searchbox',{name:'Търси фирма'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Всички 8'}));
+ fireEvent.change(screen.getByRole('searchbox',{name:'Търси фирма'}),{target:{value:'орион'}});
+ fireEvent.click(screen.getByRole('radio',{name:/Орион/}));
+ expect(screen.queryByRole('radio')).toBeNull();
+ const order=screen.getByRole('button',{name:/Поръчай каручка/});
+ expect(order.textContent).toContain('Орион');expect(order.textContent).toContain('12.00');
+ expect(document.activeElement).toBe(screen.getByRole('button',{name:'Смени'}));
+ fireEvent.click(screen.getByRole('button',{name:'Цена, условия и превозвач'}));
+ expect(screen.getByRole('link',{name:'Общи условия'}).getAttribute('href')).toBe('/terms');
+ fireEvent.click(screen.getByRole('button',{name:'Назад'}));
+ expect(screen.getByRole('button',{name:'Смени'})).toBeTruthy();
+ fireEvent.click(order);await act(async()=>{});
+ expect(fake.rpc).toHaveBeenCalledWith('create_taxi_request',expect.objectContaining({p_quote_id:'q-7'}));
+ expect(fake.route).toHaveBeenCalledOnce();
+});
+
+it('reopens the compact comparison when the category changes after selecting a firm',async()=>{
+ fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
+ fake.route.mockResolvedValue({...quote(),quotes:[offer(),offer('comfort','comfort',9)]});
+ await mount();await chooseRoute();fireEvent.click(screen.getByRole('radio'));
+ fireEvent.click(screen.getByRole('button',{name:'Смени'}));
+ fireEvent.change(screen.getByRole('combobox',{name:'Категория автомобил'}),{target:{value:'comfort'}});
+ await act(async()=>{});
+ expect(screen.getByRole('button',{name:'Всички 1'})).toBeTruthy();
+ expect(screen.getByRole('radio',{name:/9.00/})).toBeTruthy();
+ expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('9.00');
+ expect(fake.route).toHaveBeenCalledOnce();expect(fake.rpc).not.toHaveBeenCalled();
 });

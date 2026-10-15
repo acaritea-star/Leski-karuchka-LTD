@@ -20,10 +20,10 @@ import NotificationBell from '@/components/feature/NotificationBell';
 import DriverTracking from '@/pages/customer/components/DriverTracking';
 import LocationPicker from '@/pages/customer/components/LocationPicker';
 import AppMenu from '@/pages/customer/components/AppMenu';
-import CarrierOffers from '@/pages/customer/components/CarrierOffers';
+import CarrierOffers, { CarrierRoute } from '@/pages/customer/components/CarrierOffers';
 import RequestStatusCard from '@/pages/customer/components/RequestStatusCard';
 import BookingMap from '@/pages/customer/components/BookingMap';
-import CustomerLayout, { BookingSkeleton } from '@/pages/customer/components/CustomerLayout';
+import CustomerLayout, { BookingSkeleton, type CarrierPanelView } from '@/pages/customer/components/CustomerLayout';
 import BookingSteps from '@/pages/customer/components/BookingSteps';
 import { recentLocations, stepAfterSelection, type BookingStep } from '@/pages/customer/components/bookingFlow';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -125,6 +125,7 @@ export default function CustomerHome() {
   // Booking options
   const [vehicleType, setVehicleType] = useState('standard');
   const [carrierKey, setCarrierKey] = useState('');
+  const [offerPanel, setOfferPanel] = useState<{ context: string; view: CarrierPanelView }>({ context: '', view: 'preview' });
   const vehicleTypes = SERVICE_CLASSES;
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const bookingId = useRef(crypto.randomUUID());
@@ -143,6 +144,8 @@ export default function CustomerHome() {
   requestedType.current = vehicleType;
   const offers = useMemo(() => carrierOffers(routeInput === quoteInput ? route : null, vehicleType), [routeInput, quoteInput, route, vehicleType]);
   const selectedCarrier = offers.find(offer => carrierOfferKey(offer) === carrierKey);
+  const offerContext = JSON.stringify([quoteInput, vehicleType]);
+  const offerView = offerPanel.context === offerContext && (offerPanel.view !== 'selected' || selectedCarrier) ? offerPanel.view : 'preview';
   const selectedQuote = selectedCarrier;
   const currentRoute = routeInput !== quoteInput ? null : selectedQuote ? { ...route!, ...selectedQuote }
     : null;
@@ -511,6 +514,11 @@ export default function CustomerHome() {
   return <CustomerLayout
     expanded={step === 'offers' && !activeRequest}
     offers={step === 'offers' && !activeRequest}
+    offerView={offerView}
+    mapControls={step === 'offers' && pickup && destination && !activeRequest && !authLoading && !recovering && !recoveryError ? <CarrierRoute
+      pickup={pickup.address} destination={destination.address} onFieldClick={handleFieldClick} onSwap={swapLocations}
+      creating={requestStatus === 'creating'} refreshing={calculating}
+      onRefresh={!availabilityMessage ? () => void availability.refetch() : undefined} /> : undefined}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">
@@ -533,12 +541,12 @@ export default function CustomerHome() {
         onCancel={cancelRequest} onReset={() => navigate('/customer/orders')}
         onShare={shareTrip} onNewOrder={resetRequest} requestError={requestError} />
       : <>
-        <BookingSteps step={step} canConfirm={!!pickup && !!destination}
-          disabled={requestStatus === 'creating'} onChange={handleFieldClick} />
-        {step === 'offers' && pickup && destination ? <CarrierOffers
+        {step !== 'offers' && <BookingSteps step={step} canConfirm={!!pickup && !!destination}
+          disabled={requestStatus === 'creating'} onChange={handleFieldClick} />}
+        {step === 'offers' && pickup && destination ? <CarrierOffers key={offerContext}
           offers={offers} selected={selectedCarrier} onSelect={key => { setCarrierKey(key); setRequestError(''); }}
           availableOffers={availableOffers} availabilityConfirmed={availabilityConfirmed}
-          pickup={pickup.address} destination={destination.address} onFieldClick={handleFieldClick} onSwap={swapLocations}
+          view={offerView} onViewChange={view => setOfferPanel({ context: offerContext, view })}
           vehicleType={vehicleType} onVehicleTypeChange={id => { setVehicleType(id); setCarrierKey(''); setRequestError(''); }}
           vehicleOptions={vehicleTypes.map(v => ({ ...v, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
           onRequest={createRequest}

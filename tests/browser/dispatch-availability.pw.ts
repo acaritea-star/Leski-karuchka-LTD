@@ -49,7 +49,9 @@ test('customer sees exact sorted carrier offers and books only the chosen firm',
  await expect(page.getByRole('combobox',{name:'Категория автомобил'})).toHaveValue('standard');
  await expect(order).toContainText('5.00');await expect(order).not.toContainText('–');
  const cards=page.getByRole('radio');await expect(cards.first()).toBeChecked();await expect(cards.first().locator('..')).toContainText('Първа фирма');
- await cards.nth(1).check();await expect(order).toContainText('9.00');await expect(order).toBeEnabled();
+ await cards.nth(1).click();await expect(order).toContainText('9.00');await expect(order).toBeEnabled();
+ await expect(page.locator('.customer-experience')).toHaveAttribute('data-offer-view','selected');
+ await expect(page.getByRole('button',{name:'Смени',exact:true})).toBeFocused();
  await page.screenshot({path:testInfo.outputPath('booking-operator-availability.png'),fullPage:true});
  await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
  expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');expect(state.errors).toEqual([]);expect(state.google).toBe(0);
@@ -63,6 +65,7 @@ test('carrier names and prices are visible together above the fixed action on sm
  const state=await setup(page);await chooseRoute(page);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:430,height:820},{width:720,height:390}]) {
   await page.setViewportSize(size);
+  const change=page.getByRole('button',{name:'Смени',exact:true});if(await change.isVisible())await change.click();
   const cards=page.locator('.carrier-offer');const order=page.getByRole('button',{name:/Поръчай каручка/});
   await cards.first().scrollIntoViewIfNeeded();
   await page.screenshot({path:testInfo.outputPath(`carrier-layout-${size.width}.png`),fullPage:true});
@@ -72,11 +75,16 @@ test('carrier names and prices are visible together above the fixed action on sm
    // price). Whole cards still require 100% visibility above the fixed footer.
    for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:0.999});
   }
-  await cards.nth(1).scrollIntoViewIfNeeded();await cards.nth(1).getByRole('radio').check();
+  const cardBox=await cards.nth(1).boundingBox(),footerBox=await page.locator('.carrier-offer-footer').boundingBox();
+  if(size.height>=568)expect(cardBox!.y+cardBox!.height).toBeLessThanOrEqual(footerBox!.y+1);
+  const sheet=await page.locator('.customer-sheet').boundingBox(),map=await page.locator('.customer-map').boundingBox();
+  if(size.height>=568){expect(sheet!.height).toBeLessThanOrEqual(size.height*.47);expect(map!.height).toBeGreaterThan(size.height*.5);}
+  await cards.nth(1).scrollIntoViewIfNeeded();await cards.nth(1).getByRole('radio').click();
   await expect(order).toContainText('9.00');await expect(order).toBeInViewport({ratio:1});
   await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: Втора фирма');
-  const cardBox=await cards.nth(1).boundingBox(),footerBox=await page.locator('.carrier-offer-footer').boundingBox();
-  expect(cardBox!.y+cardBox!.height).toBeLessThanOrEqual(footerBox!.y+1);
+  await expect(page.locator('.customer-experience')).toHaveAttribute('data-offer-view','selected');
+  const compact=await page.locator('.customer-sheet').boundingBox();
+  if(size.height>=568)expect(compact!.height).toBeLessThan(size.height*.26);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:testInfo.outputPath(`carrier-list-${size.width}.png`),fullPage:true});
  }
@@ -90,7 +98,7 @@ test('another company cannot keep a vanished selected offer bookable',async({pag
  await expect(order).toBeDisabled();await expect(order).toContainText('5.00');
  const cards=page.getByRole('radio');await expect(cards.first()).toBeChecked();await expect(cards.first()).toBeDisabled();
  await expect(cards.nth(1)).toBeEnabled();expect(state.bookings).toHaveLength(0);
- await cards.nth(1).check();await expect(order).toBeEnabled();await expect(order).toContainText('9.00');
+ await cards.nth(1).click();await expect(order).toBeEnabled();await expect(order).toContainText('9.00');
  await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
  expect(state.bookings[0].p_quote_id).toBe('quote-b');expect(state.routes).toBe(1);expect(state.errors).toEqual([]);
 });
@@ -98,9 +106,14 @@ test('another company cannot keep a vanished selected offer bookable',async({pag
 test('many firms can be searched without replacing the selection or requesting another route',async({page},testInfo)=>{
  const state=await setup(page);state.extra=12;await chooseRoute(page);
  const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ await expect(page.getByRole('radio')).toHaveCount(2);
+ await expect(page.getByRole('searchbox',{name:'Търси фирма'})).toHaveCount(0);
+ await page.getByRole('button',{name:'Всички 14',exact:true}).click();
  const search=page.getByRole('searchbox',{name:'Търси фирма'});
  await search.fill('орион');await expect(page.getByRole('radio')).toHaveCount(1);
- await page.getByRole('radio',{name:/ОРИОН/}).check();await expect(order).toContainText('10.00');
+ await page.getByRole('radio',{name:/ОРИОН/}).click();await expect(order).toContainText('10.00');
+ await expect(page.getByRole('button',{name:'Смени',exact:true})).toBeFocused();
+ await page.getByRole('button',{name:'Смени',exact:true}).click();
  await search.fill('липсваща фирма');await expect(page.getByRole('radio')).toHaveCount(0);
  await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: ОРИОН');
  await expect(order).toBeEnabled();await expect(order).toContainText('10.00');
@@ -114,10 +127,12 @@ test('many firms can be searched without replacing the selection or requesting a
 test('lost availability connection blocks booking and recovers the same chosen firm and quote',async({page})=>{
  const state=await setup(page);await chooseRoute(page);
  const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
- const chosen=page.getByRole('radio',{name:/Втора фирма/});await chosen.check();
+ const chosen=page.getByRole('radio',{name:/Втора фирма/});await chosen.click();
  await expect(order).toContainText('9.00');
  state.connectionLost=true;await page.getByRole('button',{name:'Обнови наличността'}).click();
- await expect(order).toBeDisabled();await expect(chosen).toBeChecked();await expect(chosen).toBeDisabled();
+ await expect(order).toBeDisabled();
+ await page.getByRole('button',{name:'Смени',exact:true}).click();
+ await expect(chosen).toBeChecked();await expect(chosen).toBeDisabled();
  await expect(page.getByText('Наличността не е потвърдена. Провери връзката и обнови.')).toBeVisible();
  await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: Втора фирма');
  expect(state.bookings).toHaveLength(0);
@@ -127,4 +142,30 @@ test('lost availability connection blocks booking and recovers the same chosen f
  await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
  expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');
  expect(state.google).toBe(0);expect(state.errors).toEqual([]);
+});
+
+test('search remains usable above a short visual viewport and details keep the selected carrier',async({page},testInfo)=>{
+ const state=await setup(page);state.extra=12;await chooseRoute(page);
+ await page.getByRole('button',{name:'Всички 14',exact:true}).click();
+ await page.evaluate(()=>{
+  Object.defineProperty(window.visualViewport!,'height',{configurable:true,value:340});
+  window.visualViewport!.dispatchEvent(new Event('resize'));
+ });
+ const search=page.getByRole('searchbox',{name:'Търси фирма'});await search.fill('орион');
+ const root=await page.locator('.customer-experience').boundingBox(),input=await search.boundingBox();
+ const order=page.getByRole('button',{name:/Поръчай каручка/}),button=await order.boundingBox();
+ expect(input!.y).toBeGreaterThanOrEqual(root!.y);expect(input!.y+input!.height).toBeLessThanOrEqual(button!.y);
+ expect(button!.y+button!.height).toBeLessThanOrEqual(root!.y+root!.height);
+ await expect(page.locator('.customer-header')).toBeHidden();
+ await page.getByRole('radio',{name:/ОРИОН/}).click();await expect(order).toContainText('10.00');
+ await page.evaluate(()=>{delete (window.visualViewport as unknown as {height?:number}).height;window.visualViewport!.dispatchEvent(new Event('resize'));});
+ await expect(page.locator('.customer-header')).toBeVisible();
+ await page.getByRole('button',{name:'Цена, условия и превозвач'}).click();
+ await expect(page.getByRole('link',{name:'Общи условия'})).toBeVisible();
+ await expect(page.getByLabel('Превозвач')).toBeVisible();
+ await expect(order).toContainText('ОРИОН');await expect(order).toContainText('10.00');
+ await page.getByRole('button',{name:'Назад',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Смени',exact:true})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('compact-offer-selected.png'),fullPage:true});
+ expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);expect(state.google).toBe(0);expect(state.errors).toEqual([]);
 });

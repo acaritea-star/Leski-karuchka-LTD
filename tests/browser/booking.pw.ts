@@ -40,6 +40,7 @@ test('mobile booking keeps the price action visible and reuses the category rout
  await expect(order).toBeEnabled();await expect(order).toContainText('5.00');
  await page.getByRole('combobox',{name:'Категория автомобил'}).selectOption('comfort');await expect(order).toContainText('6.00');
  expect(routes).toBe(1);
+ await page.getByRole('button',{name:'Цена, условия и превозвач'}).click();
  for(const size of [{width:320,height:568},{width:390,height:650},{width:720,height:390}]) {
   await page.setViewportSize(size);await expect(order).toBeInViewport({ratio:1});
   const priceNotice=page.getByText('Заявката е само към избраната фирма.',{exact:false});

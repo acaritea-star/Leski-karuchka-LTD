@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.15-company-isolation.1",
-  "baseCommit": "c130c83c60cb391e283c7dc31eed7f0c3cce7b87",
+  "release": "2026.10.15-compact-offers.1",
+  "baseCommit": "0300986d9e7478e73dab6b29a3e778de6dbfd77b",
   "databaseMigration": "company_driver_isolation_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261015080550",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50",
+  "verifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -64,11 +64,13 @@
   "gpsAcquisitionVerifiedSourceCommit": "bb5b15d1d0a5cb3a57d1e7edc46a51eb1e40664f",
   "idleLocationValidityVersion": 1,
   "idleLocationValidityMigrationVersion": "20261014051154",
-  "carrierComparisonUxVersion": 3,
+  "carrierComparisonUxVersion": 4,
   "carrierOfferAvailabilityVersion": 1,
   "carrierOfferAvailabilityMigrationVersion": "20261014130621",
   "carrierDispatchFlowVerifiedSourceCommit": "eef9c0c22e1b1a609f2cbc3d21a5b5a16fecbc41",
   "companyDriverIsolationVersion": 1,
   "companyDriverIsolationMigrationVersion": "20261015080550",
-  "companyDriverIsolationVerifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50"
+  "companyDriverIsolationVerifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50",
+  "compactCarrierPanelVersion": 1,
+  "compactCarrierPanelVerifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230"
 }
