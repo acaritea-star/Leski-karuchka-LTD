@@ -13,6 +13,16 @@ const corsHeaders = {
 const company = (id: string, name: string) => ({ id, name, is_active: true, currency: 'EUR',
   base_fare: 2, price_per_km: 1, price_per_minute: 0.2, dispatch_radius_km: 5,
   updated_at: '2026-10-11T09:00:00Z', created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
+const dashboard = {
+  stats: { totalDrivers: 0, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 },
+  days: Array.from({ length: 7 }, (_, i) => ({ day: '2026-10-' + String(i + 1).padStart(2, '0'), orders: 0, revenue: 0 })),
+};
+
+async function expectDashboardReady(page: Page) {
+  await expect(page.getByLabel('Обобщение на курсовете')).toContainText('Общо шофьори: 0');
+  await expect(page.getByLabel('Надеждност на услугата')).toContainText('Няма активни сигнали по тези показатели.');
+  await expect(page.getByRole('button', { name: 'Опитай отново', exact: true })).toHaveCount(0);
+}
 
 async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOMER' | 'DRIVER') {
   const user = { id: account, email: 'synthetic-admin@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
@@ -55,10 +65,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
     else if (url.pathname.endsWith('/taxi_requests')) data = url.searchParams.get('driver_id') ? null : [];
     else if (url.pathname.endsWith('/driver_day_summary')) data = { trips: 3, earnings: 12.50 };
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: account };
-    else if (url.pathname.endsWith('/company_dashboard')) data = {
-      stats: { totalDrivers: 0, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 },
-      days: Array.from({ length: 7 }, (_, i) => ({ day: '2026-10-' + String(i + 1).padStart(2, '0'), orders: 0, revenue: 0 })),
-    };
+    else if (url.pathname.endsWith('/company_dashboard')) data = dashboard;
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: corsHeaders });
   });
@@ -78,6 +85,7 @@ test('super admin invites by email only and keeps global rights and the selected
   await expect(dialog.getByText(/Очаква вход · Имейлът е изпратен/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Затвори' }).click();
   await page.goto('/admin/dashboard'); await expect(page.getByLabel('Управлявана фирма')).toHaveValue(ownCompany);
+  await expectDashboardReady(page);
   await expect(page.getByRole('heading', { name: 'Супер администратор' })).toHaveCount(1);
   expect(state.invitations).toHaveLength(1); expect(state.companyWrites).toBe(0); expect(state.profileWrites).toBe(0);
   expect(state.errors).toEqual([]); expect(state.google).toBe(0);
@@ -91,13 +99,16 @@ test('company entry uses the assigned firm and shows only company navigation', a
   await expect(page.getByLabel('Управлявана фирма')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Фирми', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Новини', exact: true })).toHaveCount(0);
+  await expectDashboardReady(page);
   await page.goto('/admin/companies');
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expectDashboardReady(page);
   await page.goto('/');
   // Signed-in visitors are redirected immediately; the landing link can
   // disappear before WebKit observes it. Assert the stable destination.
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
+  await expectDashboardReady(page);
   expect(state.companyFilters.length).toBeGreaterThan(0);
   expect(state.companyFilters.every(filter => filter === 'eq.' + ownCompany)).toBe(true);
   expect(state.profileWrites).toBe(0); expect(state.companyWrites).toBe(0);
@@ -116,8 +127,7 @@ test('company login does not turn an unassigned customer into a company administ
 });
 
 test('customer login keeps partner entry collapsed behind a discreet link', async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg');
-    localStorage.setItem('leski:auto-location:' + user.id, 'off'); });
+  await page.addInitScript(() => { localStorage.setItem('i18nextLng', 'bg'); });
   await page.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:4100' ? route.continue() : route.abort());
   await page.goto('/auth/login');
   await expect(page.getByRole('button', { name: /Google/ })).toHaveCount(1);
@@ -166,7 +176,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
       const body = request.postDataJSON(); expect(body.p_company).toBe(ownCompany); setups++;
       setupAt = new Date().toISOString(); Object.assign(values, body.p_data, { setup_completed_at: setupAt }); data = values;
     } else if (url.pathname.endsWith('/legal_acceptances')) data = { id: account };
-    else if (url.pathname.endsWith('/company_dashboard')) data = { stats: { totalDrivers: 0, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 }, days: [] };
+    else if (url.pathname.endsWith('/company_dashboard')) data = dashboard;
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: corsHeaders });
   });
@@ -178,9 +188,17 @@ test('invited company binds after login, finishes setup and keeps its own prices
     ['Основен град на обслужване', 'Левски'], ['Удостоверение / разрешение за таксиметров превоз', 'TEST-1'], ['Валидно до', '2099-01-01'],
     ['Начална такса (EUR)', '2.15'], ['Минимална цена (EUR)', '0'], ['Цена на км (EUR)', '1.23'], ['Цена на минута от маршрута (EUR)', '0.17'],
   ]) await form.getByLabel(label, { exact: true }).fill(value);
+  const initialDashboardReads = Promise.all(['/company_dashboard', '/notifications'].map(path =>
+    page.waitForResponse(response => new URL(response.url()).pathname.endsWith(path) && response.request().method() !== 'OPTIONS')
+      .then(async response => { expect(response.ok()).toBe(true); expect(await response.finished()).toBeNull(); })));
   await form.getByRole('button', { name: 'Запази фирмата и отвори панела' }).click();
+  await initialDashboardReads;
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
-  await page.goto('/admin/pricing');
+  await expectDashboardReady(page);
+  // Exercise the user's navigation; a forced document replacement here can
+  // cancel WebKit's synthetic cross-origin reads and report a spurious CORS error.
+  await page.getByRole('button', { name: 'Отвори менюто', exact: true }).click();
+  await page.getByRole('button', { name: 'Цени', exact: true }).click();
   await expect(page.getByRole('spinbutton').nth(0)).toHaveValue('2.15');
   await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.23');
   await page.getByRole('spinbutton').nth(1).fill('1.41');
@@ -200,8 +218,12 @@ test('invited company binds after login, finishes setup and keeps its own prices
   await page.getByRole('button', { name: 'Обнови тарифите' }).click();
   await expect(page.getByRole('spinbutton').nth(1)).toHaveValue('1.7');
   await otherPanel.close();
+  // Closing the second tab triggers focus/visibility reconciliation. Let those
+  // mocked reads finish before the deliberate full-page login/reload check.
+  await page.waitForLoadState('networkidle');
   await page.goto('/company/login'); await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
+  await expectDashboardReady(page);
   expect(binds).toBe(1); expect(setups).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });
 
@@ -209,6 +231,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
 test('company dashboard shortcuts and mobile menu preserve navigation without loading Google', async ({ page }, testInfo) => {
   const state = await setup(page, 'COMPANY_ADMIN');
   await page.goto('/admin/dashboard');
+  await expectDashboardReady(page);
   await expect(page.getByRole('link', { name: 'Отчети и каса', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Шофьори', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Автомобили', exact: true })).toBeVisible();

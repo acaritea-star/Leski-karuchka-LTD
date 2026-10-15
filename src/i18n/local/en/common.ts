@@ -9,7 +9,7 @@ export default {
   booking_destination: "Where to?",
   booking_confirm: "Ready to go.",
   booking_offers: "Choose your carrier.",
-  booking_step: "Step {{step}} of 4",
+  booking_step: "Step {{step}} of 3",
   booking_steps: "Booking steps",
   booking_tagline: "Your town. Your way.",
   booking_search_hint: "Address or a familiar place",

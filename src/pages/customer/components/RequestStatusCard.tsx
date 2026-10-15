@@ -1,10 +1,11 @@
 import CarrierIdentity from '@/components/feature/CarrierIdentity';
 import { useTranslation } from 'react-i18next';
-import { displayPriceRange, type PriceRange } from '@/lib/marketplace';
+import { carrierChoiceName, displayPriceRange, type PriceRange } from '@/lib/marketplace';
 
 export interface RequestData {
   id: string; company_id?: string; status: string; pickup_address: string; destination_address: string;
   estimated_price: number | null; cancelled_by?: string | null;
+  fare_breakdown?: import('@/lib/database.types').Json | null;
 }
 interface RequestStatusCardProps {
   priceRange?: PriceRange;
@@ -20,8 +21,10 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
   const completed = request.status === 'completed';
   const cancelled = request.status === 'cancelled';
   const noDriver = cancelled && request.cancelled_by === 'system';
-  const title = pending ? t('booking_searching') : noDriver ? t('no_driver_available') : t(`status_${request.status}`);
-  const hint = pending ? t('booking_searching_hint') : noDriver ? t('no_driver_available_desc')
+  const carrierName = carrierChoiceName(request.fare_breakdown);
+  const title = pending ? carrierName ? `Търсим шофьор от ${carrierName}` : t('booking_searching') : noDriver ? t('no_driver_available') : t(`status_${request.status}`);
+  const hint = pending ? carrierName ? 'Заявката е само към свободните шофьори на избраната фирма.' : t('booking_searching_hint')
+    : noDriver ? carrierName ? `${carrierName} не прие заявката навреме. Можеш да избереш друга оферта за същия маршрут.` : t('no_driver_available_desc')
     : completed ? t('trip_completed') : cancelled ? t('cancelled') : t('booking_driver_connecting');
 
   return <section className="booking-status booking-enter" aria-label={title}>
@@ -51,7 +54,7 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
         {!props.confirmCancel && <button type="button" className="booking-secondary" onClick={props.onShowCancel}>{t('cancel_request')}</button>}
       </> : (completed || cancelled) && <>
         <button type="button" className="booking-secondary" onClick={props.onReset}>{t('nav_orders')}</button>
-        {props.onNewOrder && <button type="button" className="booking-primary" onClick={props.onNewOrder}>{t('order_new_taxi')}</button>}
+        {props.onNewOrder && <button type="button" className="booking-primary" onClick={props.onNewOrder}>{noDriver ? 'Виж други оферти' : t('order_new_taxi')}</button>}
       </>}
     </div>
   </section>;

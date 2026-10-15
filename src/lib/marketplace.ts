@@ -18,6 +18,12 @@ export function marketplaceRange(value: Json | undefined | null): PriceRange | n
 export function displayPriceRange(range: PriceRange): string {
   return range.min === range.max ? range.min.toFixed(2) : `${range.min.toFixed(2)}–${range.max.toFixed(2)}`;
 }
+export function carrierChoiceName(value: Json | undefined | null): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const choice = value.carrier_choice;
+  if (!choice || typeof choice !== 'object' || Array.isArray(choice)) return null;
+  return typeof choice.company_name === 'string' && choice.company_name.trim() ? choice.company_name.trim() : null;
+}
 
 /** Only complete exact server quotes can be shown as selectable carriers. */
 export function carrierOffers(route: import('./googleMaps').RouteResult | null, serviceClass: string): import('./googleMaps').CarrierOffer[] {

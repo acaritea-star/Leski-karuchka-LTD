@@ -13,6 +13,8 @@ import { defaultConsent, saveConsent } from '@/lib/cookieConsent';
 
 const fake = vi.hoisted(() => ({
   counts: null as Record<string, number> | null,
+  companies: ['company'],
+  carriers: null as null | { company_id: string; vehicle_type_id: string; service_class: string }[],
   readById: vi.fn(), notify: null as null | ((payload: { new: Record<string, unknown> }) => void),
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
@@ -28,7 +30,7 @@ vi.mock('@/components/feature/NotificationBell', () => ({ default: () => null })
 vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
 vi.mock('@/lib/places', () => ({ hasPlacesApi: () => false }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
-  rpc: (...args: unknown[]) => ({ abortSignal: () => args[0] === 'marketplace_availability' ? Promise.resolve({data:{company_id:'marketplace',sampled_at:new Date().toISOString(),categories:fake.vehicleTypes.map(v=>({id:v.id,drivers:fake.counts?.[v.id] ?? 1,configured:true}))},error:null}) : args[0] === 'carrier_identity' ? Promise.resolve({data:null,error:null}) : fake.rpc(...args) }), removeChannel: vi.fn(),
+  rpc: (...args: unknown[]) => ({ abortSignal: () => args[0] === 'marketplace_availability' ? Promise.resolve({data:{company_id:'marketplace',sampled_at:new Date().toISOString(),categories:fake.vehicleTypes.map(v=>({id:v.id,drivers:fake.counts?.[v.id] ?? 1,configured:true})),carriers:fake.carriers ?? fake.companies.flatMap(company_id=>fake.vehicleTypes.filter(v=>(fake.counts?.[v.id] ?? 1)>0).map(v=>({company_id,vehicle_type_id:'type-'+v.id,service_class:v.id})))},error:null}) : args[0] === 'carrier_identity' ? Promise.resolve({data:null,error:null}) : fake.rpc(...args) }), removeChannel: vi.fn(),
   channel: () => { const channel = { on: (_event: string, _filter: unknown, callback: typeof fake.notify) => { fake.notify = callback; return channel; }, subscribe: () => channel }; return channel; },
   from: (table: string) => {
     const result = () => ({ data: table === 'taxi_requests' ? fake.active : table === 'companies' ? [{ id: 'company', name:'Тестова фирма' }]
@@ -48,15 +50,14 @@ const offer = (cls='standard', id='quote', price=5, company='company') => ({vehi
   quote_expires_at:new Date(Date.now()+60000).toISOString(),price,breakdown:{...calculateFare({distanceKm:1.7,durationMin:5}),total:price}});
 const quote = (): RouteResult => ({ success:true,...offer(),quotes:[offer()], distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0 });
 const mount = async () => { const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});render(<QueryClientProvider client={client}><MemoryRouter><CustomerHome /></MemoryRouter></QueryClientProvider>); await act(async () => {}); };
-const chooseRoute = async (advance=true) => {
+const chooseRoute = async () => {
   fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
   fireEvent.click(screen.getByRole('button', { name: /Край/ }));
   await act(async () => { await vi.advanceTimersByTimeAsync(351); });
-  if(advance) fireEvent.click(screen.getByRole('button',{name:'4. Избери фирма.'}));
 };
 
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); fake.counts=null; fake.active = null; fake.recoveryError = false;
+  vi.useFakeTimers(); vi.clearAllMocks(); fake.counts=null; fake.carriers=null; fake.companies=['company']; fake.active = null; fake.recoveryError = false;
   fake.vehicleTypes = [{ id: 'standard', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }];
   fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
   fake.notify = null;
@@ -95,9 +96,8 @@ describe('customer booking integration', () => {
     const result = quote();
     result.quotes = ['standard','comfort'].map((id,i) => offer(id,`quote-${id}`,5+i));
     fake.route.mockResolvedValue(result);
-    await mount(); await chooseRoute(false);
-    fireEvent.click(screen.getByRole('radio',{name:/Комфорт/}));
-    fireEvent.click(screen.getByRole('button',{name:'4. Избери фирма.'}));
+    await mount(); await chooseRoute();
+    fireEvent.change(screen.getByRole('combobox',{name:'Категория автомобил'}),{target:{value:'comfort'}});
     await act(async () => { await vi.advanceTimersByTimeAsync(400); });
     expect(fake.route).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('6.00');
@@ -108,14 +108,13 @@ describe('customer booking integration', () => {
   it('expires all category offers together without silently buying another route', async () => {
     fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
     const result=quote();result.quotes=[offer('comfort','comfort-quote',6)];
-    fake.route.mockResolvedValue(result); await mount(); await chooseRoute(false);
-    fireEvent.click(screen.getByRole('radio',{name:/Комфорт/}));
-    fireEvent.click(screen.getByRole('button',{name:'4. Избери фирма.'}));
+    fake.route.mockResolvedValue(result); await mount(); await chooseRoute();
+    fireEvent.change(screen.getByRole('combobox',{name:'Категория автомобил'}),{target:{value:'comfort'}});
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
     expect(fake.route).toHaveBeenCalledTimes(1);
   });
-  it('moves through four steps and sends one cash-only RPC on a double click', async () => {
+  it('moves straight from the two addresses to offers and sends one cash-only RPC on a double click', async () => {
     await mount();
     expect(screen.getByRole('heading', { name: 'Откъде тръгваш?' })).toBeTruthy();
     await chooseRoute();
@@ -130,9 +129,7 @@ describe('customer booking integration', () => {
   it('invalidates the old price immediately when addresses are swapped', async () => {
     await mount(); await chooseRoute();
     fake.route.mockReturnValue(new Promise(() => {}));
-    fireEvent.click(screen.getByRole('button', { name: 'Маршрут и категория' }));
     fireEvent.click(screen.getByRole('button', { name: 'Размени адресите' }));
-    fireEvent.click(screen.getByRole('button', { name: '4. Избери фирма.' }));
     expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(fake.rpc).not.toHaveBeenCalled();
   });
@@ -140,7 +137,7 @@ describe('customer booking integration', () => {
     await mount(); await chooseRoute();
     fireEvent.click(screen.getByRole('button', { name: '1. Откъде тръгваш?' }));
     fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
-    expect(screen.getByRole('heading', { name: 'Готови за път.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Избери фирма.' })).toBeTruthy();
   });
   it('treats browser offline as a hint, but disables ordering after quote expiry', async () => {
     await mount(); await chooseRoute();
@@ -257,9 +254,8 @@ it('releases a stuck booking button and retries with the same request ID without
 
 it('does not offer Comfort without an eligible driver or create an empty booking', async () => {
   fake.vehicleTypes.push({id:'comfort',name:'Comfort',capacity:4,is_active:true,company_id:'company'});
-  fake.counts={standard:1,comfort:0};await mount();await chooseRoute(false);
-  expect((screen.getByRole('radio',{name:/Комфорт/}) as HTMLInputElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole('button',{name:'4. Избери фирма.'}));
+  fake.counts={standard:1,comfort:0};await mount();await chooseRoute();
+  expect((screen.getByRole('option',{name:/Комфорт/}) as HTMLOptionElement).disabled).toBe(true);
   expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
   expect(fake.route).toHaveBeenCalledOnce();
 });
@@ -296,7 +292,7 @@ it('requires an explicit price refresh when a newly available carrier was not qu
 
 it('sorts exact named carrier offers cheapest first and books the explicitly selected carrier',async()=>{
  const result=quote();result.quotes=[offer('standard','expensive',51.76,'Такси Генади'),offer('standard','cheap',12.08,'Евро Такси')];
- fake.route.mockResolvedValue(result);await mount();await chooseRoute();
+ fake.companies=['Такси Генади','Евро Такси'];fake.route.mockResolvedValue(result);await mount();await chooseRoute();
  const cards=screen.getAllByRole('radio');expect(cards[0].closest('label')!.textContent).toContain('Евро Такси');
  expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('12.08');
  fireEvent.click(cards[1]);expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('51.76');
@@ -305,6 +301,7 @@ it('sorts exact named carrier offers cheapest first and books the explicitly sel
  expect(fake.rpc).toHaveBeenCalledWith('create_taxi_request',expect.objectContaining({p_quote_id:'expensive'}));expect(fake.route).toHaveBeenCalledOnce();
 });
 it('never substitutes a different carrier when a selected carrier disappears from refreshed quotes',async()=>{
+ fake.companies=['company','Друга фирма'];
  const result=quote();result.quotes=[offer(),offer('standard','other',8,'Друга фирма')];fake.route.mockResolvedValue(result);
  await mount();await chooseRoute();fireEvent.click(screen.getAllByRole('radio')[0]);
  fake.route.mockImplementation(async()=>({...quote(),quotes:[offer('standard','other-new',8,'Друга фирма')]}));
@@ -322,4 +319,36 @@ it('keeps the selected category when its drivers disappear instead of switching 
  expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('5.00');
  expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(true);
  expect(fake.route).toHaveBeenCalledOnce();expect(fake.rpc).not.toHaveBeenCalled();
+});
+
+it('disables only the selected unavailable firm even while another firm in the same category has a car',async()=>{
+ fake.companies=['company','Друга фирма'];
+ fake.route.mockResolvedValue({...quote(),quotes:[offer(),offer('standard','other',8,'Друга фирма')]});
+ await mount();await chooseRoute();
+ fake.carriers=[{company_id:'Друга фирма',vehicle_type_id:'type-standard',service_class:'standard'}];
+ fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>vi.advanceTimersByTimeAsync(1));
+ const order=screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement;
+ expect(order.disabled).toBe(true);expect(order.textContent).toContain('5.00');
+ expect((screen.getAllByRole('radio')[0] as HTMLInputElement).checked).toBe(true);
+ expect((screen.getAllByRole('radio')[0] as HTMLInputElement).disabled).toBe(true);
+ expect(screen.getByText(/Тази фирма вече няма свободна кола/)).toBeTruthy();
+ expect(fake.rpc).not.toHaveBeenCalled();
+ fireEvent.click(screen.getAllByRole('radio')[1]);expect(order.disabled).toBe(false);expect(order.textContent).toContain('8.00');
+ fireEvent.click(order);await act(async()=>{});
+ expect(fake.rpc).toHaveBeenCalledWith('create_taxi_request',expect.objectContaining({p_quote_id:'other'}));
+ expect(fake.route).toHaveBeenCalledOnce();
+});
+
+it('names the selected firm during search and preserves a recovered route when it times out',async()=>{
+ await fake.rpc();fake.rpc.mockClear();
+ fake.active={...fake.active,fare_breakdown:{total:5,carrier_choice:{company_name:'ОРИОН'}}};
+ await mount();expect(screen.getByRole('heading',{name:'Търсим шофьор от ОРИОН'})).toBeTruthy();
+ fake.active={...fake.active,status:'cancelled',cancelled_by:'system'};
+ act(()=>fake.notify?.({new:fake.active!}));
+ expect(screen.getByText(/ОРИОН не прие заявката навреме/)).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'Виж други оферти'}));
+ await act(async()=>vi.advanceTimersByTimeAsync(351));
+ expect(screen.getByRole('heading',{name:'Избери фирма.'})).toBeTruthy();
+ expect(fake.route).toHaveBeenCalledWith(expect.objectContaining({address:pickup.address}),expect.objectContaining({address:destination.address}),expect.anything());
+ expect(fake.rpc).not.toHaveBeenCalled();
 });

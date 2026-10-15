@@ -69,3 +69,5 @@ ROLLBACK;
 \ir carrier_choice.sql
 
 \ir idle_location_validity.sql
+
+\ir carrier_offer_availability.sql

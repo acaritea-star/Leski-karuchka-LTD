@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 const actor='11111111-1111-4111-8111-111111111111',a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333';
 async function setup(page:Page) {
- const state={google:0,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
+ const state={google:0,routes:0,unavailable:[] as string[],extra:0,connectionLost:false,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
  page.on('pageerror',e=>state.errors.push(e.message));
  page.on('requestfinished',r=>{if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(new URL(r.url()).hostname))state.google++;});
  const user={id:actor,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
@@ -17,6 +17,7 @@ async function setup(page:Page) {
   if(u.origin!=='http://127.0.0.1:54329')return route.abort();
   const headers={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,PATCH,OPTIONS','access-control-allow-headers':'authorization,apikey,content-type,x-client-info,x-supabase-api-version,prefer,accept-profile,content-profile,range,range-unit'};
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(state.connectionLost && u.pathname.endsWith('/marketplace_availability'))return route.abort('failed');
   let data:unknown=[];
   if(u.pathname.endsWith('/auth/v1/user'))data=user;
   else if(u.pathname.endsWith('/profiles'))data={id:actor,role:'CUSTOMER',company_id:null,is_active:true,email:user.email};
@@ -25,9 +26,10 @@ async function setup(page:Page) {
   else if(u.pathname.endsWith('/legal_acceptances'))data={id:'accepted'};
   else if(u.pathname.endsWith('/taxi_requests'))data=null;
   else if(u.pathname.endsWith('/carrier_identity')){const c=request.postDataJSON().p_company;data={id:c,name:c===b?'Втора фирма':'Първа фирма',verified:false};}
-  else if(u.pathname.endsWith('/marketplace_availability'))data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:[{id:'standard',drivers:state.vanished?0:2,configured:true},{id:'comfort',drivers:0,configured:false},{id:'van',drivers:0,configured:false}]};
+  else if(u.pathname.endsWith('/marketplace_availability'))data={company_id:'marketplace',sampled_at:new Date().toISOString(),categories:[{id:'standard',drivers:state.vanished?0:2+state.extra-state.unavailable.length,configured:true},{id:'comfort',drivers:0,configured:false},{id:'van',drivers:0,configured:false}],carriers:state.vanished?[]:[a,b,...Array.from({length:state.extra},(_,i)=>'extra-'+i)].filter(id=>!state.unavailable.includes(id)).map(id=>({company_id:id,vehicle_type_id:'type-'+id,service_class:'standard'}))};
   else if(u.pathname.endsWith('/google-routes')){
-   const quotes=[{company_id:b,company_name:'Втора фирма',price:9,quote_id:'quote-b'},{company_id:a,company_name:'Първа фирма',price:5,quote_id:'quote-a'}]
+   state.routes++;
+   const quotes=[{company_id:b,company_name:'Втора фирма',price:9,quote_id:'quote-b'},{company_id:a,company_name:'Първа фирма',price:5,quote_id:'quote-a'},...Array.from({length:state.extra},(_,i)=>({company_id:'extra-'+i,company_name:i===0?'ОРИОН':'Фирма '+i,price:10+i,quote_id:'quote-extra-'+i}))]
     .map(c=>({...c,vehicle_type_id:'type-'+c.company_id,type_name:'Стандарт',capacity:4,service_class:'standard',quote_expires_at:new Date(Date.now()+120000).toISOString(),breakdown:{total:c.price}}));
    data={success:true,...quotes[1],quotes,distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};
   }
@@ -42,10 +44,9 @@ async function setup(page:Page) {
 async function chooseRoute(page:Page){await page.goto('/customer/home');await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();await page.getByRole('button',{name:/Край.*Гара/}).click();}
 test('customer sees exact sorted carrier offers and books only the chosen firm',async({page},testInfo)=>{
  const state=await setup(page);await chooseRoute(page);const order=page.getByRole('button',{name:/Поръчай каручка/});
- await expect(page.getByRole('radio',{name:/Комфорт/})).toBeDisabled();
+ await expect(page.getByRole('option',{name:/Комфорт/})).toHaveAttribute('disabled','');
  await expect(page.getByLabel('Фирма за тази поръчка')).toHaveCount(0);
- await expect(page.getByRole('radio',{name:/Стандарт/})).toBeChecked();
- await page.getByRole('button',{name:/Виж офертите/}).click();
+ await expect(page.getByRole('combobox',{name:'Категория автомобил'})).toHaveValue('standard');
  await expect(order).toContainText('5.00');await expect(order).not.toContainText('–');
  const cards=page.getByRole('radio');await expect(cards.first()).toBeChecked();await expect(cards.first().locator('..')).toContainText('Първа фирма');
  await cards.nth(1).check();await expect(order).toContainText('9.00');await expect(order).toBeEnabled();
@@ -54,12 +55,12 @@ test('customer sees exact sorted carrier offers and books only the chosen firm',
  expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');expect(state.errors).toEqual([]);expect(state.google).toBe(0);
 });
 test('a driver disappearing at submission keeps the customer out of a false searching state',async({page})=>{
- const state=await setup(page);await chooseRoute(page);await page.getByRole('button',{name:/Виж офертите/}).click();const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ const state=await setup(page);await chooseRoute(page);const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
  state.vanished=true;await order.click();await expect(page.getByRole('alert')).toContainText('няма свободен шофьор');await expect(order).toBeDisabled();
  await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toHaveCount(0);expect(state.bookings).toHaveLength(1);expect(state.errors).toEqual([]);expect(state.google).toBe(0);
 });
 test('carrier names and prices are visible together above the fixed action on small phones',async({page},testInfo)=>{
- const state=await setup(page);await chooseRoute(page);await page.getByRole('button',{name:/Виж офертите/}).click();
+ const state=await setup(page);await chooseRoute(page);
  for(const size of [{width:320,height:568},{width:390,height:650},{width:430,height:820},{width:720,height:390}]) {
   await page.setViewportSize(size);
   const cards=page.locator('.carrier-offer');const order=page.getByRole('button',{name:/Поръчай каручка/});
@@ -67,7 +68,9 @@ test('carrier names and prices are visible together above the fixed action on sm
   await page.screenshot({path:testInfo.outputPath(`carrier-layout-${size.width}.png`),fullPage:true});
   if(size.height>=568) {
    await expect(cards.nth(0)).toBeInViewport({ratio:1});await expect(cards.nth(1)).toBeInViewport({ratio:1});
-   for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:1});
+   // WebKit rounds fractional text rectangles (e.g. 0.99977 for a fully visible
+   // price). Whole cards still require 100% visibility above the fixed footer.
+   for(const price of await page.locator('.carrier-offer-price').all()) await expect(price).toBeInViewport({ratio:0.999});
   }
   await cards.nth(1).scrollIntoViewIfNeeded();await cards.nth(1).getByRole('radio').check();
   await expect(order).toContainText('9.00');await expect(order).toBeInViewport({ratio:1});
@@ -78,4 +81,50 @@ test('carrier names and prices are visible together above the fixed action on sm
   await page.screenshot({path:testInfo.outputPath(`carrier-list-${size.width}.png`),fullPage:true});
  }
  expect(state.google).toBe(0);expect(state.bookings).toHaveLength(0);expect(state.errors).toEqual([]);
+});
+
+test('another company cannot keep a vanished selected offer bookable',async({page})=>{
+ const state=await setup(page);await chooseRoute(page);
+ const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ state.unavailable=[a];await page.getByRole('button',{name:'Обнови наличността'}).click();
+ await expect(order).toBeDisabled();await expect(order).toContainText('5.00');
+ const cards=page.getByRole('radio');await expect(cards.first()).toBeChecked();await expect(cards.first()).toBeDisabled();
+ await expect(cards.nth(1)).toBeEnabled();expect(state.bookings).toHaveLength(0);
+ await cards.nth(1).check();await expect(order).toBeEnabled();await expect(order).toContainText('9.00');
+ await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
+ expect(state.bookings[0].p_quote_id).toBe('quote-b');expect(state.routes).toBe(1);expect(state.errors).toEqual([]);
+});
+
+test('many firms can be searched without replacing the selection or requesting another route',async({page},testInfo)=>{
+ const state=await setup(page);state.extra=12;await chooseRoute(page);
+ const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ const search=page.getByRole('searchbox',{name:'Търси фирма'});
+ await search.fill('орион');await expect(page.getByRole('radio')).toHaveCount(1);
+ await page.getByRole('radio',{name:/ОРИОН/}).check();await expect(order).toContainText('10.00');
+ await search.fill('липсваща фирма');await expect(page.getByRole('radio')).toHaveCount(0);
+ await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: ОРИОН');
+ await expect(order).toBeEnabled();await expect(order).toContainText('10.00');
+ await page.getByRole('button',{name:'Изчисти'}).click();await expect(page.getByRole('radio')).toHaveCount(14);
+ await page.getByRole('radio',{name:/ОРИОН/}).scrollIntoViewIfNeeded();
+ await expect(page.getByRole('radio',{name:/ОРИОН/})).toBeChecked();await expect(order).toBeInViewport({ratio:1});
+ await page.screenshot({path:testInfo.outputPath('many-carrier-offers.png'),fullPage:true});
+ expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);expect(state.google).toBe(0);expect(state.errors).toEqual([]);
+});
+
+test('lost availability connection blocks booking and recovers the same chosen firm and quote',async({page})=>{
+ const state=await setup(page);await chooseRoute(page);
+ const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ const chosen=page.getByRole('radio',{name:/Втора фирма/});await chosen.check();
+ await expect(order).toContainText('9.00');
+ state.connectionLost=true;await page.getByRole('button',{name:'Обнови наличността'}).click();
+ await expect(order).toBeDisabled();await expect(chosen).toBeChecked();await expect(chosen).toBeDisabled();
+ await expect(page.getByText('Наличността не е потвърдена. Провери връзката и обнови.')).toBeVisible();
+ await expect(page.locator('.carrier-offer-summary')).toHaveText('Избрано: Втора фирма');
+ expect(state.bookings).toHaveLength(0);
+ state.connectionLost=false;await page.getByRole('button',{name:'Обнови наличността'}).click();
+ await expect(order).toBeEnabled();await expect(chosen).toBeChecked();await expect(order).toContainText('9.00');
+ expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);
+ await order.click();await expect(page.getByRole('heading',{name:'Търсим твоя шофьор'})).toBeVisible();
+ expect(state.bookings).toHaveLength(1);expect(state.bookings[0].p_quote_id).toBe('quote-b');
+ expect(state.google).toBe(0);expect(state.errors).toEqual([]);
 });

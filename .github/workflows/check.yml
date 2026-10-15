@@ -24,6 +24,9 @@ jobs:
         if: always()
         with:
           name: partner-ux-previews
-          path: test-results/**/*.png
+          path: |
+            test-results/**/*.png
+            test-results/**/trace.zip
+            test-results/**/error-context.md
           if-no-files-found: ignore
           retention-days: 3
