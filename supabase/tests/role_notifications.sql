@@ -65,7 +65,10 @@ BEGIN
  PERFORM set_config('request.jwt.claims','{}',true);
  -- Empty drafts do not notify the firm. Submission is exactly once per revision.
  INSERT INTO public.driver_applications(id,user_id,company_id,full_name,phone,experience,has_vehicle,status,onboarding_required)
- VALUES(application,candidate,ca,'Synthetic candidate','0888123456','1–3',false,'pending',true);
+ VALUES(application,candidate,ca,'Synthetic candidate','0888123456','1–3',false,'pending',false);
+ UPDATE public.driver_applications SET onboarding_required=true WHERE id=application;
+ SET CONSTRAINTS public.notify_legacy_application IMMEDIATE;
+ SET CONSTRAINTS public.notify_legacy_application DEFERRED;
  IF EXISTS(SELECT 1 FROM public.notifications WHERE data->>'application_id'=application::text) THEN RAISE EXCEPTION 'FAIL draft sent as application'; END IF;
  UPDATE public.driver_applications SET submitted_at=clock_timestamp(),onboarding_revision=1 WHERE id=application;
  UPDATE public.driver_applications SET submitted_at=submitted_at WHERE id=application;
