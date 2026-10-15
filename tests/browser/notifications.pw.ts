@@ -91,8 +91,12 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBe('1');
   await page.goto('/customer/home');
   await page.getByRole('button', { name: /меню/i }).click();
+  const landingRead = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/news_articles') && response.request().method() === 'GET')
+    .then(async response => { expect(response.ok()).toBe(true); expect(await response.finished()).toBeNull(); });
   await page.getByRole('button', { name: 'Изход', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
+  // Finish WebKit's synthetic cross-origin response before replacing the document.
+  await landingRead;
   expect(await page.evaluate(() => localStorage.getItem('sb-127-auth-token'))).toBeNull();
   expect(await page.evaluate(id => localStorage.getItem('leski_push_enabled:' + id), uiAccount)).toBe('true');
   // The fixture restores a fresh authenticated session on the next navigation.
