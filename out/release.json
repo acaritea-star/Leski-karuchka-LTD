@@ -6,7 +6,7 @@
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261015080550",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "8a976f9ee0c816b2d609e0bc5d946ddbf365f88a",
+  "verifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -74,5 +74,5 @@
   "compactCarrierPanelVersion": 1,
   "compactCarrierPanelVerifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230",
   "uiButtonAuditVersion": 1,
-  "uiButtonAuditVerifiedSourceCommit": "8a976f9ee0c816b2d609e0bc5d946ddbf365f88a"
+  "uiButtonAuditVerifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3"
 }
