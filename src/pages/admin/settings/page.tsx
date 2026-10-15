@@ -125,9 +125,7 @@ function SettingsEditor() {
           <i className="ri-error-warning-line" />
           {error}
           {!loaded && <button className="underline" onClick={() => void fetchProfile()}>Опитай отново</button>}
-          <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
-            <i className="ri-close-line text-red-400 text-xs" />
-          </button>
+          {loaded && <button type="button" aria-label="Затвори съобщението" onClick={() => setError('')} className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>}
         </div>
       )}
 
@@ -149,8 +147,8 @@ function SettingsEditor() {
 
           <div className="space-y-5">
             <div>
-              <label className="text-sm font-medium text-foreground-700 block mb-1.5">Име на компанията</label>
-              <input
+              <label htmlFor="admin-settings-name" className="text-sm font-medium text-foreground-700 block mb-1.5">Име на компанията</label>
+              <input id="admin-settings-name"
                 type="text"
                 value={profile.name}
                 onChange={(e) => setField('name', e.target.value)}
@@ -158,8 +156,8 @@ function SettingsEditor() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground-700 block mb-1.5">Телефон</label>
-              <input
+              <label htmlFor="admin-settings-phone" className="text-sm font-medium text-foreground-700 block mb-1.5">Телефон</label>
+              <input id="admin-settings-phone"
                 type="text"
                 value={profile.phone}
                 onChange={(e) => setField('phone', e.target.value)}
@@ -167,8 +165,8 @@ function SettingsEditor() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground-700 block mb-1.5">Имейл</label>
-              <input
+              <label htmlFor="admin-settings-email" className="text-sm font-medium text-foreground-700 block mb-1.5">Имейл</label>
+              <input id="admin-settings-email"
                 type="email"
                 value={profile.email}
                 onChange={(e) => setField('email', e.target.value)}
@@ -176,8 +174,8 @@ function SettingsEditor() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground-700 block mb-1.5">Адрес</label>
-              <input
+              <label htmlFor="admin-settings-address" className="text-sm font-medium text-foreground-700 block mb-1.5">Адрес</label>
+              <input id="admin-settings-address"
                 type="text"
                 value={profile.address}
                 onChange={(e) => setField('address', e.target.value)}

@@ -4,6 +4,7 @@ import PageHero from '@/pages/landing/components/PageHero';
 import Reveal from '@/pages/landing/components/Reveal';
 import { useFormSubmit } from '@/pages/landing/components/useFormSubmit';
 import { dataController, legalOperator } from '@/config/legal';
+import { useEffect, useRef } from 'react';
 
 const CONTACT_FORM_URL = 'https://readdy.ai/api/form/d9urfm1kngcel2k3j9e0';
 
@@ -12,6 +13,13 @@ export default function ContactPage() {
   const [searchParams] = useSearchParams();
   const partnerInquiry = searchParams.get('subject') === 'partner';
   const { status, errorMsg, submit } = useFormSubmit(CONTACT_FORM_URL, 'company_alt');
+  const feedback = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (status === 'success' || status === 'error') {
+      feedback.current?.scrollIntoView({ block: 'nearest' });
+      feedback.current?.focus({ preventScroll: true });
+    }
+  }, [status]);
 
   const infoCards = [
     { icon: 'ri-phone-line', label: t('landing.contact_phone_label'), value: t('landing.footer_phone'), href: 'tel:+359890005900' },
@@ -78,13 +86,13 @@ export default function ContactPage() {
                 </h3>
 
                 {status === 'success' && (
-                  <div className="flex items-start gap-3 bg-primary-50 text-primary-800 px-4 py-3.5 rounded-lg text-sm mb-5">
+                  <div ref={feedback} tabIndex={-1} role="status" className="flex items-start gap-3 bg-primary-50 text-primary-800 px-4 py-3.5 rounded-lg text-sm mb-5">
                     <i className="ri-checkbox-circle-line text-lg mt-0.5" aria-hidden="true" />
                     <span>{t('landing.contact_form_success')}</span>
                   </div>
                 )}
                 {status === 'error' && (
-                  <div className="flex items-start gap-3 bg-red-50 text-red-600 px-4 py-3.5 rounded-lg text-sm mb-5">
+                  <div ref={feedback} tabIndex={-1} role="alert" className="flex items-start gap-3 bg-red-50 text-red-600 px-4 py-3.5 rounded-lg text-sm mb-5 break-words">
                     <i className="ri-error-warning-line text-lg mt-0.5" aria-hidden="true" />
                     <span>{errorMsg}</span>
                   </div>
@@ -92,15 +100,17 @@ export default function ContactPage() {
 
                 <form
                   data-readdy-form="contact-form"
+                  aria-label={t('landing.contact_form_title')} aria-busy={status === 'submitting'}
                   onSubmit={handleSubmit}
                   className="space-y-4"
                 >
+                  <fieldset disabled={status === 'submitting'} className="space-y-4 min-w-0">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
+                      <label htmlFor="landing-contact-name" className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
                         {t('landing.contact_form_name')}
                       </label>
-                      <input
+                      <input id="landing-contact-name"
                         type="text"
                         name="name"
                         required
@@ -108,10 +118,10 @@ export default function ContactPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
+                      <label htmlFor="landing-contact-email" className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
                         {t('landing.contact_form_email')}
                       </label>
-                      <input
+                      <input id="landing-contact-email"
                         type="email"
                         name="email"
                         required
@@ -121,20 +131,20 @@ export default function ContactPage() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
+                      <label htmlFor="landing-contact-phone" className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
                         {t('landing.contact_form_phone')}
                       </label>
-                      <input
+                      <input id="landing-contact-phone"
                         type="tel"
                         name="phone"
                         className="w-full px-4 py-3 rounded-lg border border-background-200 bg-background-50 text-foreground-950 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/15 transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
+                      <label htmlFor="landing-contact-subject" className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
                         {t('landing.contact_form_subject')}
                       </label>
-                      <select
+                      <select id="landing-contact-subject"
                         aria-label={t('landing.contact_form_subject')}
                         key={partnerInquiry ? 'partner' : 'general'}
                         name="subject"
@@ -154,10 +164,10 @@ export default function ContactPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
+                    <label htmlFor="landing-contact-message" className="block text-xs font-semibold text-foreground-700 mb-1.5 uppercase tracking-wider">
                       {t('landing.contact_form_message')}
                     </label>
-                    <textarea
+                    <textarea id="landing-contact-message"
                       name="message"
                       rows={5}
                       required
@@ -192,6 +202,7 @@ export default function ContactPage() {
                       </>
                     )}
                   </button>
+                  </fieldset>
                 </form>
               </div>
             </Reveal>

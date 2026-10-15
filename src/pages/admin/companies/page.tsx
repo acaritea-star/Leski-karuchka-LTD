@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
@@ -75,9 +76,6 @@ export default function AdminCompanies() {
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
           {error}
-          <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
-            <i className="ri-close-line text-red-400 text-xs" />
-          </button>
         </div>
       )}
 
@@ -185,13 +183,12 @@ export default function AdminCompanies() {
         </div>
       )}
 
-      {(showForm || representative) && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/40" onClick={() => { setShowForm(false); setRepresentative(null); }} />
-        <div role="dialog" aria-modal="true" aria-label="Покана за фирма" className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-5 space-y-4">
+      {(showForm || representative) && <Modal label="Покана за фирма" onClose={() => { setShowForm(false); setRepresentative(null); }} className="max-w-lg">
+          <div className="relative bg-white rounded-2xl w-full max-w-lg p-5 space-y-4">
           <div className="flex justify-between items-center"><h3 className="font-semibold font-heading">{representative ? 'Представител на ' + representative.name : 'Покани нова фирма'}</h3><button aria-label="Затвори" onClick={() => { setShowForm(false); setRepresentative(null); void fetchCompanies(); void queryClient.invalidateQueries({ queryKey: ['admin-companies'] }); }} className="p-2">×</button></div>
           <PartnerInvitations key={representative?.id ?? 'new'} kind="company" companyId={representative?.id} />
         </div>
-      </div>}
+        </Modal>}
     </AdminLayout>
   );
 }

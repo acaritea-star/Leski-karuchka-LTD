@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import { toArticleStatus } from '@/lib/news';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -6,6 +7,7 @@ import type { Tables } from '@/lib/database.types';
 import { slugify, type ArticleStatus } from '@/lib/news';
 import MarkdownRenderer from '@/components/feature/MarkdownRenderer';
 import AdminLayout from '@/pages/admin/components/AdminLayout';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 
 type Article = Tables<'news_articles'>;
 
@@ -64,6 +66,8 @@ export default function AdminNewsEdit() {
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'ok' | 'taken'>('idle');
   const [toast, setToast] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteLatch = useRef(false);
   const [dirty, setDirty] = useState(false);
   const slugTouchedRef = useRef(!isNew);
 
@@ -250,17 +254,14 @@ export default function AdminNewsEdit() {
   }
 
   async function handleDelete() {
-    if (isNew) return;
-    setSaving(true);
-    const { error } = await supabase.from('news_articles').delete().eq('id', id!);
-    setSaving(false);
-    setConfirmDelete(false);
-    if (error) {
-      showToast(`Грешка: ${error.message}`);
-      return;
-    }
-    showToast('Статията е изтрита.');
-    navigate('/admin/news');
+    if (isNew || deleteLatch.current || saving || uploading) return;
+    deleteLatch.current = true; setSaving(true); setDeleteError('');
+    try {
+      const { error } = await withRequestTimeout(signal => supabase.from('news_articles').delete().eq('id', id!).abortSignal(signal));
+      if (error) throw new Error(error.message);
+      setConfirmDelete(false); navigate('/admin/news');
+    } catch (error) { setDeleteError(error instanceof Error ? error.message : 'Изтриването не е потвърдено. Опитай отново.'); }
+    finally { deleteLatch.current = false; setSaving(false); }
   }
 
   const inputCls =
@@ -333,8 +334,8 @@ export default function AdminNewsEdit() {
         {/* Main fields */}
         <div className="bg-white border border-background-100 rounded-xl p-5 md:p-6 space-y-5">
           <div>
-            <label className={labelCls}>Заглавие *</label>
-            <input
+            <label htmlFor="admin-news-edit-title" className={labelCls}>Заглавие *</label>
+            <input id="admin-news-edit-title"
               type="text"
               value={form.title}
               onChange={(e) => handleTitle(e.target.value)}
@@ -344,9 +345,9 @@ export default function AdminNewsEdit() {
           </div>
 
           <div>
-            <label className={labelCls}>Slug *</label>
+            <label htmlFor="admin-news-edit-slug" className={labelCls}>Slug *</label>
             <div className="flex items-center gap-2">
-              <input
+              <input id="admin-news-edit-slug"
                 type="text"
                 value={form.slug}
                 onChange={(e) => handleSlug(e.target.value)}
@@ -368,8 +369,8 @@ export default function AdminNewsEdit() {
           </div>
 
           <div>
-            <label className={labelCls}>Кратко описание *</label>
-            <textarea
+            <label htmlFor="admin-news-edit-excerpt" className={labelCls}>Кратко описание *</label>
+            <textarea id="admin-news-edit-excerpt"
               value={form.excerpt}
               onChange={(e) => update('excerpt', e.target.value)}
               rows={2}
@@ -379,8 +380,8 @@ export default function AdminNewsEdit() {
           </div>
 
           <div>
-            <label className={labelCls}>Категория</label>
-            <input
+            <label htmlFor="admin-news-edit-category" className={labelCls}>Категория</label>
+            <input id="admin-news-edit-category"
               type="text"
               value={form.category}
               onChange={(e) => update('category', e.target.value)}
@@ -391,8 +392,8 @@ export default function AdminNewsEdit() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Автор</label>
-              <input
+              <label htmlFor="admin-news-edit-author-name" className={labelCls}>Автор</label>
+              <input id="admin-news-edit-author-name"
                 type="text"
                 value={form.author_name}
                 onChange={(e) => update('author_name', e.target.value)}
@@ -400,8 +401,8 @@ export default function AdminNewsEdit() {
               />
             </div>
             <div>
-              <label className={labelCls}>Дата на публикуване</label>
-              <input
+              <label htmlFor="admin-news-edit-published-at" className={labelCls}>Дата на публикуване</label>
+              <input id="admin-news-edit-published-at"
                 type="datetime-local"
                 value={form.published_at}
                 onChange={(e) => update('published_at', e.target.value)}
@@ -413,9 +414,9 @@ export default function AdminNewsEdit() {
 
         {/* Content */}
         <div className="bg-white border border-background-100 rounded-xl p-5 md:p-6">
-          <label className={labelCls}>Съдържание (Markdown) *</label>
+          <label htmlFor="admin-news-edit-content" className={labelCls}>Съдържание (Markdown) *</label>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-1">
-            <textarea
+            <textarea id="admin-news-edit-content"
               value={form.content}
               onChange={(e) => update('content', e.target.value)}
               rows={18}
@@ -435,8 +436,8 @@ export default function AdminNewsEdit() {
         {/* Featured image */}
         <div className="bg-white border border-background-100 rounded-xl p-5 md:p-6 space-y-4">
           <div>
-            <label className={labelCls}>Featured изображение</label>
-            <input
+            <label htmlFor="admin-news-edit-1" className={labelCls}>Featured изображение</label>
+            <input id="admin-news-edit-1"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/avif"
               onChange={handleImageUpload}
@@ -460,8 +461,8 @@ export default function AdminNewsEdit() {
             </div>
           )}
           <div>
-            <label className={labelCls}>Alt текст на изображението</label>
-            <input
+            <label htmlFor="admin-news-edit-featured-image-alt" className={labelCls}>Alt текст на изображението</label>
+            <input id="admin-news-edit-featured-image-alt"
               type="text"
               value={form.featured_image_alt}
               onChange={(e) => update('featured_image_alt', e.target.value)}
@@ -475,14 +476,14 @@ export default function AdminNewsEdit() {
         <div className="bg-white border border-background-100 rounded-xl p-5 md:p-6 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-foreground-700 uppercase tracking-wider">
+              <label htmlFor="admin-news-edit-seo-title" className="text-xs font-semibold text-foreground-700 uppercase tracking-wider">
                 SEO заглавие
               </label>
               <span className={`text-xs ${form.seo_title.length > 60 ? 'text-red-500' : 'text-foreground-400'}`}>
                 {form.seo_title.length}/60
               </span>
             </div>
-            <input
+            <input id="admin-news-edit-seo-title"
               type="text"
               value={form.seo_title}
               onChange={(e) => update('seo_title', e.target.value)}
@@ -492,14 +493,14 @@ export default function AdminNewsEdit() {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-foreground-700 uppercase tracking-wider">
+              <label htmlFor="admin-news-edit-seo-description" className="text-xs font-semibold text-foreground-700 uppercase tracking-wider">
                 Meta описание
               </label>
               <span className={`text-xs ${form.seo_description.length > 160 ? 'text-red-500' : 'text-foreground-400'}`}>
                 {form.seo_description.length}/160
               </span>
             </div>
-            <textarea
+            <textarea id="admin-news-edit-seo-description"
               value={form.seo_description}
               onChange={(e) => update('seo_description', e.target.value)}
               rows={2}
@@ -528,7 +529,7 @@ export default function AdminNewsEdit() {
         {!isNew && (
           <div className="flex justify-end">
             <button
-              onClick={() => setConfirmDelete(true)}
+              disabled={saving || uploading} onClick={() => { setDeleteError(''); setConfirmDelete(true); }}
               className="px-4 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer whitespace-nowrap"
             >
               Изтрий статията
@@ -539,7 +540,7 @@ export default function AdminNewsEdit() {
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <Modal label="Изтриване на статия" onClose={() => setConfirmDelete(false)} busy={saving} className="max-w-sm">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
             <h3 className="font-heading font-semibold text-foreground-950 text-lg mb-2">
               Изтриване на статия
@@ -547,6 +548,7 @@ export default function AdminNewsEdit() {
             <p className="text-sm text-foreground-500 mb-6">
               Сигурен ли си, че искаш да изтриеш тази статия? Това действие е необратимо.
             </p>
+            {deleteError && <p role="alert" className="mb-4 text-sm text-red-600">{deleteError}</p>}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDelete(false)}
@@ -563,7 +565,7 @@ export default function AdminNewsEdit() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AdminLayout>
   );

@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.15-compact-offers.1",
-  "baseCommit": "0300986d9e7478e73dab6b29a3e778de6dbfd77b",
+  "release": "2026.10.15-ui-buttons.1",
+  "baseCommit": "ceb1dfc3d04a963693676358ab1dc049f05e6295",
   "databaseMigration": "company_driver_isolation_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261015080550",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230",
+  "verifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -72,5 +72,7 @@
   "companyDriverIsolationMigrationVersion": "20261015080550",
   "companyDriverIsolationVerifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50",
   "compactCarrierPanelVersion": 1,
-  "compactCarrierPanelVerifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230"
+  "compactCarrierPanelVerifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230",
+  "uiButtonAuditVersion": 1,
+  "uiButtonAuditVerifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3"
 }

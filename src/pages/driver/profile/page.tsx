@@ -1,3 +1,4 @@
+import BackButton from '@/components/feature/BackButton';
 import { useSignOut } from '@/hooks/useSignOut';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import LocationSettings from '@/components/feature/LocationSettings';
@@ -8,13 +9,11 @@ import { useQuery } from '@tanstack/react-query';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
 export default function DriverProfile() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const profileQuery = useQuery(driverRecordOptions(user?.id));
   const profile = profileQuery.data;
@@ -43,9 +42,7 @@ export default function DriverProfile() {
   return (
     <div className="min-h-screen bg-background-50">
       <header className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => navigate('/driver/home')} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 transition-colors cursor-pointer">
-          <i className="ri-arrow-left-line text-foreground-600 text-lg" />
-        </button>
+        <BackButton to="/driver/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading">{t('nav_profile')}</h1>
       </header>
 
@@ -68,14 +65,14 @@ export default function DriverProfile() {
                   <i className="ri-user-3-line text-3xl text-foreground-400" />
                 )}
               </div>
-              <h2 className="text-xl font-semibold text-foreground-950 font-heading">
+              <h2 className="text-xl font-semibold text-foreground-950 font-heading break-words">
                 {user?.first_name} {user?.last_name}
               </h2>
-              <p className="text-sm text-foreground-500 mt-0.5">{user?.email}</p>
+              <p className="text-sm text-foreground-500 mt-0.5 break-all">{user?.email}</p>
               <p className="text-sm text-foreground-400 mt-0.5">{user?.phone || '—'}</p>
 
               {/* Status */}
-              <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-background-100">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 mt-4 pt-4 border-t border-background-100">
                 <div className="text-center">
                   <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${profile?.is_online ? 'bg-accent-500 animate-pulse' : 'bg-foreground-300'}`} />
@@ -84,7 +81,7 @@ export default function DriverProfile() {
                     </span>
                   </div>
                 </div>
-                <div className="w-px h-5 bg-background-200" />
+                <div className="hidden sm:block w-px h-5 bg-background-200" />
                 <div className="flex items-center gap-1">
                   <i className="ri-star-fill text-primary-500 text-sm" />
                   <span className="text-sm font-semibold text-foreground-800">{parseFloat(String(profile?.rating || 0)).toFixed(1)}</span>
@@ -92,7 +89,7 @@ export default function DriverProfile() {
                 </div>
                 {profile?.is_verified && (
                   <>
-                    <div className="w-px h-5 bg-background-200" />
+                    <div className="hidden sm:block w-px h-5 bg-background-200" />
                     <span className="flex items-center gap-1 text-xs text-accent-600 font-medium">
                       <i className="ri-verified-badge-fill" />
                       Верифициран

@@ -60,14 +60,14 @@ export default function AdminDashboard() {
         <p className="text-xs font-semibold text-primary-700 mb-1">ТВОЯТА ФИРМА</p>
         <h3 className="text-2xl font-heading font-bold text-foreground-950 break-words">{companyName || 'Фирмен преглед'}</h3>
         <p className="text-sm text-foreground-500 mt-2">{companyId ? 'Екипът, текущите заявки и отчетността — на едно място.' : 'Избери фирма от селектора, за да отвориш нейния преглед.'}</p>
-        {companyId && <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-5" aria-label="Бързи действия">
+        {companyId && <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mt-5" aria-label="Бързи действия">
           {[
             { path: '/admin/analytics', label: 'Отчети и каса', detail: 'Плащания, разходи и сверяване', icon: 'ri-bar-chart-line' },
             { path: '/admin/drivers', label: 'Шофьори', detail: 'Покани, документи и одобрение', icon: 'ri-steering-line' },
             { path: '/admin/vehicles', label: 'Автомобили', detail: 'Назначения и валидност', icon: 'ri-car-line' },
-          ].map(action => <Link key={action.path} to={action.path} aria-label={action.label} className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left rounded-xl border border-background-200 p-3 hover:border-primary-300 hover:bg-primary-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">
+          ].map(action => <Link key={action.path} to={action.path} aria-label={action.label} className="min-w-0 flex items-center gap-2 sm:gap-3 text-left rounded-xl border border-background-200 p-3 hover:border-primary-300 hover:bg-primary-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">
             <span className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center shrink-0"><i className={`${action.icon} text-xl`} aria-hidden="true" /></span>
-            <div className="min-w-0"><p className="font-semibold text-xs sm:text-sm text-foreground-950">{action.label}</p><p className="hidden lg:block text-xs text-foreground-500 mt-0.5">{action.detail}</p></div>
+            <div className="min-w-0 break-words"><p className="font-semibold text-xs sm:text-sm text-foreground-950">{action.label}</p><p className="hidden lg:block text-xs text-foreground-500 mt-0.5">{action.detail}</p></div>
             <i className="hidden lg:block ri-arrow-right-s-line ml-auto text-foreground-400" aria-hidden="true" />
           </Link>)}
         </div>}

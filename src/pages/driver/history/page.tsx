@@ -1,8 +1,8 @@
+import BackButton from '@/components/feature/BackButton';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
@@ -16,7 +16,6 @@ const STATUS_LABELS: Record<string, string> = {
 export default function DriverHistory() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const [filter, setFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
 
@@ -62,20 +61,20 @@ export default function DriverHistory() {
   return (
     <div className="min-h-screen bg-background-50">
       <header className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50">
-        <button onClick={() => navigate('/driver/home')} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 transition-colors cursor-pointer">
-          <i className="ri-arrow-left-line text-foreground-600 text-lg" />
-        </button>
+        <BackButton to="/driver/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading">{t('nav_history')}</h1>
       </header>
 
       <div className="p-4">
         {/* Filter tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="grid grid-cols-3 gap-1.5 mb-4" role="group" aria-label="Филтър по статус">
           {(['all', 'completed', 'cancelled'] as const).map((f) => (
             <button
               key={f}
+              type="button"
+              aria-pressed={filter === f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
+              className={`min-h-11 px-1 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
                 ${filter === f
                   ? 'bg-primary-500 text-white'
                   : 'bg-white text-foreground-500 hover:bg-background-100'

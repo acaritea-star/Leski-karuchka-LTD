@@ -188,6 +188,33 @@ button, a {
   -webkit-tap-highlight-color: transparent;
 }
 
+.app-dialog {
+  position: fixed;
+  inset: var(--modal-top, 0px) 0 var(--modal-bottom, 0px);
+  margin: auto;
+  width: calc(100% - 2rem);
+  height: fit-content;
+  max-height: calc(var(--modal-height, 100dvh) - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  background: white;
+  color: inherit;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 16px;
+  box-shadow: 0 24px 80px #0003;
+}
+.app-dialog::backdrop { background: #0006; }
+.app-dialog input, .app-dialog select, .app-dialog textarea { min-width: 0; max-width: 100%; }
+[role="alert"] { overflow-wrap: anywhere; }
+.app-dialog:focus-visible { outline: 3px solid oklch(var(--primary-400)); outline-offset: 3px; }
+
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 3px solid oklch(var(--primary-400));
+  outline-offset: 3px;
+}
+
 /* Safe-area insets */
 .pt-safe {
   padding-top: env(safe-area-inset-top);

@@ -1,5 +1,7 @@
+import Modal from '@/components/feature/Modal';
 import { toArticleStatus } from '@/lib/news';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/lib/database.types';
@@ -38,6 +40,8 @@ export default function AdminNews() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [deleting, setDeleting] = useState<Article | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteLatch = useRef(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
 
@@ -102,17 +106,14 @@ export default function AdminNews() {
   }
 
   async function confirmDelete() {
-    if (!deleting) return;
-    setBusy(true);
-    const { error: e } = await supabase.from('news_articles').delete().eq('id', deleting.id);
-    setBusy(false);
-    setDeleting(null);
-    if (e) {
-      showToast(`Грешка: ${e.message}`);
-      return;
-    }
-    showToast('Статията е изтрита.');
-    setReload((r) => r + 1);
+    if (!deleting || deleteLatch.current || busy) return;
+    deleteLatch.current = true; setBusy(true); setDeleteError('');
+    try {
+      const { error } = await withRequestTimeout(signal => supabase.from('news_articles').delete().eq('id', deleting.id).abortSignal(signal));
+      if (error) throw new Error(error.message);
+      setDeleting(null); showToast('Статията е изтрита.'); setReload(r => r + 1);
+    } catch (error) { setDeleteError(error instanceof Error ? error.message : 'Изтриването не е потвърдено. Опитай отново.'); }
+    finally { deleteLatch.current = false; setBusy(false); }
   }
 
   return (
@@ -129,6 +130,7 @@ export default function AdminNews() {
           <div className="relative flex-1 max-w-md">
             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
             <input
+              aria-label="Търси статия"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -147,6 +149,7 @@ export default function AdminNews() {
 
         <div className="flex flex-wrap items-center gap-3">
           <select
+            aria-label="Статус на статия"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 rounded-lg bg-white border border-background-200 text-sm text-foreground-800 cursor-pointer"
@@ -158,6 +161,7 @@ export default function AdminNews() {
           </select>
 
           <select
+            aria-label="Категория на статия"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-2 rounded-lg bg-white border border-background-200 text-sm text-foreground-800 cursor-pointer"
@@ -280,7 +284,7 @@ export default function AdminNews() {
                           </button>
                         )}
                         <button
-                          onClick={() => setDeleting(a)}
+                          onClick={() => { setDeleteError(''); setDeleting(a); }}
                           disabled={busy}
                           className="w-8 h-8 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-50"
                           title="Изтрий"
@@ -299,7 +303,7 @@ export default function AdminNews() {
 
       {/* Delete confirmation modal */}
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <Modal label="Изтриване на статия" onClose={() => setDeleting(null)} busy={busy} className="max-w-sm">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
             <h3 className="font-heading font-semibold text-foreground-950 text-lg mb-2">
               Изтриване на статия
@@ -307,6 +311,7 @@ export default function AdminNews() {
             <p className="text-sm text-foreground-500 mb-6">
               Сигурен ли си, че искаш да изтриеш „{deleting.title}“? Това действие е необратимо.
             </p>
+            {deleteError && <p role="alert" className="mb-4 text-sm text-red-600">{deleteError}</p>}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleting(null)}
@@ -323,7 +328,7 @@ export default function AdminNews() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AdminLayout>
   );

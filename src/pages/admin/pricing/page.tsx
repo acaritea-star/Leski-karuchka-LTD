@@ -149,9 +149,7 @@ function PricingEditor() {
           <i className="ri-error-warning-line" />
           {error}
           {(!loaded || needsReload) && <button className="underline" disabled={saving} onClick={() => void fetchConfig()}>{needsReload ? 'Обнови тарифите' : 'Опитай отново'}</button>}
-          <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
-            <i className="ri-close-line text-red-400 text-xs" />
-          </button>
+          {loaded && !needsReload && <button type="button" aria-label="Затвори съобщението" onClick={() => setError('')} className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>}
         </div>
       )}
 
@@ -176,8 +174,8 @@ function PricingEditor() {
 
             <fieldset disabled={saving} className="space-y-5">
               <div>
-                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Начална такса ({config.currency})</label>
-                <input
+                <label htmlFor="admin-pricing-base-fare" className="text-sm font-medium text-foreground-700 block mb-1.5">Начална такса ({config.currency})</label>
+                <input id="admin-pricing-base-fare"
                   type="number"
                   step="0.01"
                   value={blankFields.has('base_fare') ? '' : config.base_fare}
@@ -186,8 +184,8 @@ function PricingEditor() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на км ({config.currency})</label>
-                <input
+                <label htmlFor="admin-pricing-price-per-km" className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на км ({config.currency})</label>
+                <input id="admin-pricing-price-per-km"
                   type="number"
                   step="0.01"
                   value={blankFields.has('price_per_km') ? '' : config.price_per_km}
@@ -196,8 +194,8 @@ function PricingEditor() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на минута от маршрута ({config.currency})</label>
-                <input
+                <label htmlFor="admin-pricing-price-per-minute" className="text-sm font-medium text-foreground-700 block mb-1.5">Цена на минута от маршрута ({config.currency})</label>
+                <input id="admin-pricing-price-per-minute"
                   type="number"
                   step="0.01"
                   value={blankFields.has('price_per_minute') ? '' : config.price_per_minute}
@@ -211,8 +209,8 @@ function PricingEditor() {
                   className="w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950 focus:outline-none focus:ring-2 focus:ring-primary-200" />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground-700 block mb-1.5">Радиус за диспечиране (км)</label>
-                <input
+                <label htmlFor="admin-pricing-dispatch-radius-km" className="text-sm font-medium text-foreground-700 block mb-1.5">Радиус за диспечиране (км)</label>
+                <input id="admin-pricing-dispatch-radius-km"
                   type="number"
                   step="0.5"
                   value={blankFields.has('dispatch_radius_km') ? '' : config.dispatch_radius_km}
