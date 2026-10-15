@@ -51,7 +51,7 @@ REVOKE INSERT,UPDATE,DELETE ON public.payment_transactions,public.ledger FROM an
 CREATE UNIQUE INDEX vehicle_types_id_company_uidx ON public.vehicle_types(id,company_id);
 CREATE UNIQUE INDEX vehicles_id_company_uidx ON public.vehicles(id,company_id);
 CREATE INDEX vehicles_category_company_idx ON public.vehicles(vehicle_type_id,company_id);
-CREATE UNIQUE INDEX drivers_one_assigned_vehicle_idx ON public.drivers(vehicle_id) WHERE vehicle_id IS NOT NULL;
+CREATE UNIQUE INDEX drivers_one_assigned_vehicle_idx ON public.drivers(vehicle_id,company_id);
 ALTER TABLE public.vehicles ADD CONSTRAINT vehicles_category_company_fkey
  FOREIGN KEY(vehicle_type_id,company_id) REFERENCES public.vehicle_types(id,company_id) ON DELETE RESTRICT NOT VALID;
 ALTER TABLE public.drivers ADD CONSTRAINT drivers_vehicle_company_fkey

@@ -18,7 +18,7 @@ AS $function$
  SELECT EXISTS(SELECT 1 FROM public.drivers d JOIN public.profiles p ON p.id=d.user_id
  WHERE d.user_id::text=split_part(p_name,'/',1)
  AND ((d.user_id=auth.uid() AND p.is_active AND p.role='DRIVER') OR public.is_company_admin(d.company_id) OR public.is_super_admin()));
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION private.current_driver_id()
  RETURNS uuid
@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION private.current_driver_id()
 AS $function$
  SELECT d.id FROM public.drivers d JOIN public.profiles p ON p.id=d.user_id
  WHERE p.id=(SELECT auth.uid()) AND p.role='DRIVER' AND p.is_active;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.is_driver(target_driver uuid)
  RETURNS boolean
@@ -41,7 +41,7 @@ AS $function$
     JOIN public.profiles p ON p.id = d.user_id
     WHERE d.id = target_driver AND p.id = auth.uid() AND p.role = 'DRIVER' AND p.is_active = true
   );
-$function$
+$function$;
 
 REVOKE UPDATE(is_read) ON public.notifications FROM authenticated;
 GRANT INSERT,UPDATE,DELETE ON public.notifications,public.payment_transactions,public.ledger TO authenticated;

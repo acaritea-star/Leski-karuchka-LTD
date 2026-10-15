@@ -86,10 +86,11 @@ UPDATE public.vehicle_types SET is_active=false WHERE id=(SELECT vehicle_type FR
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.vehicle_types SET is_active=true WHERE id=(SELECT vehicle_type FROM test_ids);
 INSERT INTO public.companies(id,name,slug) VALUES(gen_random_uuid(),'Other test company','other-test-'||gen_random_uuid());
-UPDATE public.drivers SET company_id=(SELECT id FROM public.companies WHERE name='Other test company' ORDER BY created_at DESC LIMIT 1)
+-- The driver cannot retain a vehicle owned by the previous firm.
+UPDATE public.drivers SET vehicle_id=NULL,company_id=(SELECT id FROM public.companies WHERE name='Other test company' ORDER BY created_at DESC LIMIT 1)
  WHERE id=(SELECT driver FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
-UPDATE public.drivers SET company_id=(SELECT company FROM test_ids) WHERE id=(SELECT driver FROM test_ids);
+UPDATE public.drivers SET company_id=(SELECT company FROM test_ids),vehicle_id=(SELECT vehicle FROM test_ids) WHERE id=(SELECT driver FROM test_ids);
 UPDATE public.profiles SET is_active=false WHERE id=(SELECT driver_user FROM test_ids);
 SELECT pg_temp.expect_dispatch(false);
 UPDATE public.profiles SET is_active=true WHERE id=(SELECT driver_user FROM test_ids);
