@@ -105,23 +105,36 @@ function BookingMap({ pickup, destination, route, initialCenter, previewOwner, v
     if (pickupLat != null && pickupLng != null) points.push({ lat: pickupLat, lng: pickupLng });
     if (destinationLat != null && destinationLng != null) points.push({ lat: destinationLat, lng: destinationLng });
     points.push(...path);
+    const frame = container.current;
+    const experience = frame?.closest('.customer-experience');
+    const chrome = [...(experience?.querySelectorAll<HTMLElement>('.customer-header, .customer-route-controls, .customer-notice') ?? [])];
     const fit = () => {
       if (!points.length) return;
-      frameMapPoints(currentMap, points, {
-        width: container.current?.clientWidth ?? 0, height: container.current?.clientHeight ?? 0,
-      }, { top: 94, bottom: 38, left: window.matchMedia('(min-width: 768px)').matches ? 462 : 38, right: 38 });
+      const bounds = frame?.getBoundingClientRect();
+      const sheet = experience?.querySelector('.customer-sheet')?.getBoundingClientRect();
+      const sidebar = bounds && sheet && bounds.width >= 600 && sheet.right < bounds.right - 100;
+      const padding = sidebar
+        ? { top: 32, bottom: 32, left: Math.max(32, sheet.right - bounds.left + 24), right: 32 }
+        : { top: Math.max(94, ...chrome.map(element => element.getBoundingClientRect().bottom - (bounds?.top ?? 0) + 12)),
+          bottom: 26, left: 26, right: 26 };
+      const size = { width: container.current?.clientWidth ?? 0, height: container.current?.clientHeight ?? 0 };
+      // Keep the last useful camera while a keyboard leaves no usable map area.
+      if (size.width > 0 && size.height > 0 && (size.width - padding.left - padding.right < 80 || size.height - padding.top - padding.bottom < 64)) return;
+      frameMapPoints(currentMap, points, size, padding);
     };
     fit();
     let width = container.current?.clientWidth, height = container.current?.clientHeight;
-    const resize = new ResizeObserver(() => {
+    const resize = new ResizeObserver(entries => {
       const nextWidth = container.current?.clientWidth;
       const nextHeight = container.current?.clientHeight;
       // A taller offer sheet changes the map viewport. Ignore the keyboard
       // while typing, but refit when the customer enters the comparison step.
       const typing = document.activeElement?.matches('input, textarea');
-      if (nextWidth !== width || !typing && nextHeight !== height) { width = nextWidth; height = nextHeight; fit(); }
+      const chromeResized = entries.some(entry => entry.target !== frame);
+      if (nextWidth !== width || !typing && (nextHeight !== height || chromeResized)) { width = nextWidth; height = nextHeight; fit(); }
     });
     if (container.current) resize.observe(container.current);
+    chrome.forEach(element => resize.observe(element));
     return () => resize.disconnect();
   }, [pickupLat, pickupLng, destinationLat, destinationLng, path, state]);
 

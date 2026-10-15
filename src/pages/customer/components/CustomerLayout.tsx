@@ -2,14 +2,17 @@ import type { ReactNode } from 'react';
 import { useCustomerViewport } from '@/hooks/useCustomerViewport';
 import './customer.css';
 
-export default function CustomerLayout({ map, header, notice, children, expanded = false, offers = false }: {
-  map: ReactNode; header: ReactNode; notice?: ReactNode; children: ReactNode; expanded?: boolean; offers?: boolean;
+export type CarrierPanelView = 'preview' | 'all' | 'selected' | 'details';
+
+export default function CustomerLayout({ map, header, notice, mapControls, children, expanded = false, offers = false, offerView = 'preview' }: {
+  map: ReactNode; header: ReactNode; notice?: ReactNode; mapControls?: ReactNode; children: ReactNode; expanded?: boolean; offers?: boolean; offerView?: CarrierPanelView;
 }) {
   const viewportRef = useCustomerViewport();
-  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers}>
+  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers} data-offer-view={offerView}>
     <div className="customer-map">{map}</div>
     <header className="customer-header">{header}</header>
     {notice && <div className="customer-notice" role="status">{notice}</div>}
+    {mapControls && <div className="customer-route-controls">{mapControls}</div>}
     <main className="customer-sheet">{children}</main>
   </div>;
 }

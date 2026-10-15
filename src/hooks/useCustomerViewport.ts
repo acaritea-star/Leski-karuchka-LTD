@@ -9,6 +9,7 @@ export function useCustomerViewport() {
       if (viewport && viewport.scale !== 1) return; // Preserve accessible pinch-to-zoom.
       ref.current?.style.setProperty('--customer-height', `${viewport?.height ?? window.innerHeight}px`);
       ref.current?.style.setProperty('--customer-top', `${viewport?.offsetTop ?? 0}px`);
+      if (ref.current) ref.current.dataset.shortViewport = String((viewport?.height ?? window.innerHeight) < 480);
     };
     update();
     viewport?.addEventListener('resize', update);
