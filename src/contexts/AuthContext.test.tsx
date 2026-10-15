@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, waitFor, fireEvent } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Session } from '@supabase/supabase-js';
 import { AuthProvider, useAuthContext } from './AuthContext';
+import { stopDriverGps } from '@/lib/driverLocation';
 
 const api = vi.hoisted(() => ({ getSession: vi.fn(), profile: vi.fn(), changed: null as null | ((event: string, session: Session | null) => void), clear: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
@@ -17,7 +18,7 @@ const session = { user: { id: 'a', email: 'a@example.test' }, access_token: 'tes
 const profile = { id: 'a', is_active: true, role: 'CUSTOMER', company_id: null, first_name: 'А', avatar_url: null };
 function Consumer() {
   const { user, loading, profileError, refreshProfile } = useAuthContext();
-  return <><div>{loading ? 'loading' : user ? `ready:${user.id}` : 'signed-out'}</div>{profileError && <p role="alert">{profileError}</p>}<button onClick={() => void refreshProfile()}>retry</button></>;
+  return <><div>{loading ? 'loading' : user ? `ready:${user.id}` : 'signed-out'}</div><div>{user ? `${user.role}:${user.company_id}` : ''}</div>{profileError && <p role="alert">{profileError}</p>}<button onClick={() => void refreshProfile()}>retry</button></>;
 }
 beforeEach(() => { vi.clearAllMocks(); api.getSession.mockResolvedValue({ data: { session } }); api.profile.mockResolvedValue({ data: profile, error: null }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -53,6 +54,30 @@ it('still rejects a profile disabled during background validation', async () => 
   api.profile.mockResolvedValueOnce({ data: { ...profile, is_active: false }, error: null });
   act(() => api.changed?.('TOKEN_REFRESHED', session));
   await screen.findByText('signed-out');
+  expect(api.clear).toHaveBeenCalledTimes(2);
+  expect(stopDriverGps).toHaveBeenCalledTimes(2);
+});
+
+it('clears cached company data and GPS when the same account moves to another firm', async () => {
+  api.profile.mockResolvedValue({ data: { ...profile, role: 'COMPANY_ADMIN', company_id: 'orion' }, error: null });
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await screen.findByText('COMPANY_ADMIN:orion');
+  api.profile.mockResolvedValueOnce({ data: { ...profile, role: 'COMPANY_ADMIN', company_id: 'duvka' }, error: null });
+  act(() => api.changed?.('TOKEN_REFRESHED', session));
+  await screen.findByText('COMPANY_ADMIN:duvka');
+  expect(screen.queryByText('COMPANY_ADMIN:orion')).toBeNull();
+  expect(api.clear).toHaveBeenCalledTimes(2);
+  expect(stopDriverGps).toHaveBeenCalledTimes(2);
+});
+
+it('clears cached privileged data after a role is revoked on the same account', async () => {
+  api.profile.mockResolvedValue({ data: { ...profile, role: 'SUPER_ADMIN' }, error: null });
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await screen.findByText('SUPER_ADMIN:null');
+  api.profile.mockResolvedValueOnce({ data: profile, error: null });
+  act(() => api.changed?.('TOKEN_REFRESHED', session));
+  await screen.findByText('CUSTOMER:null');
+  expect(api.clear).toHaveBeenCalledTimes(2);
 });
 
 

@@ -71,3 +71,6 @@ ROLLBACK;
 \ir idle_location_validity.sql
 
 \ir carrier_offer_availability.sql
+
+\ir company_driver_isolation.sql
+\ir company_driver_performance.sql
