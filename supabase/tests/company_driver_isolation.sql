@@ -50,7 +50,7 @@ BEGIN
   VALUES(ra,ca,da,ua,'completed','in_progress',now(),10),(rb,cb,db,ub,'completed','in_progress',now(),20);
  INSERT INTO public.payment_transactions(request_id,company_id,amount,method) VALUES(ra,ca,10,'cash'),(rb,cb,20,'cash');
  INSERT INTO public.ledger(company_id,account,entry_type,amount) VALUES(ca,'isolation','debit',10),(cb,'isolation','debit',20);
- INSERT INTO public.notifications(id,user_id,company_id,title) VALUES(na,ua,ca,'Own A'),(nb,ub,cb,'Own B');
+ INSERT INTO public.notifications(id,user_id,company_id,audience,title) VALUES(na,ua,ca,'driver','Own A'),(nb,ub,cb,'driver','Own B');
  own_path:=ua||'/'||doca||'.pdf'; foreign_path:=ub||'/'||docb||'.pdf';
  stray_path:=ua||'/'||stray||'.pdf'; app_path:=ua||'/'||appb||'/'||appdoc||'.pdf';
  INSERT INTO storage.objects(bucket_id,name) VALUES

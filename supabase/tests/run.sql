@@ -74,3 +74,4 @@ ROLLBACK;
 
 \ir company_driver_isolation.sql
 \ir company_driver_performance.sql
+\ir role_notifications.sql
