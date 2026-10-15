@@ -60,7 +60,7 @@ BEGIN
  -- This person previously applied to B before joining A. Its registered B
  -- application file must not become visible to A through a broad user prefix.
  INSERT INTO public.driver_applications(id,user_id,company_id,full_name,phone,experience,has_vehicle,status)
-  VALUES(appb,ua,cb,'Synthetic history','+359000000000','1-3',false,'rejected');
+  VALUES(appb,ua,cb,'Synthetic history','+359000000000','10+',false,'rejected');
  INSERT INTO public.driver_application_documents(id,application_id,user_id,company_id,type,expires_at,file_url)
   VALUES(appdoc,appb,ua,cb,'license',last_day+365,'storage://driver-documents/'||app_path);
 
