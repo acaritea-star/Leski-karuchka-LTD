@@ -5,18 +5,17 @@ Release: `2026.10.15-role-notifications.1`. PR: #19.
 
 ## Състояние на внедряването
 
-Кодът, build пакетът и миграцията са подготвени за преглед. **Миграцията
-не е приложена в работещата база.** Автоматичната проверка за одобрение
-отказа production DDL, защото разрешението за разработка и дебъг не е
-изрично разрешение за промяна на production RLS, функции и cron.
-Нужно е изрично одобрение за миграцията
-`supabase/migrations/20261015185840_role_scoped_notifications.sql` в проекта
-`rzjyvxmfqnnxglmgnvma`. Не публикувайте новия интерфейс преди нея.
+Миграцията е приложена на 15.10.2026 в 19:59 UTC в Supabase проекта
+`rzjyvxmfqnnxglmgnvma`, след изрично одобрение за production и merge в main.
+Действителна версия: `20261015195949_role_scoped_notifications.sql`.
+SQL съдържанието съвпада с проверената в disposable базата миграция;
+файлът е преименуван по действителната версия от Supabase. SHA-256 е
+записан в release manifest. Предстои активиране на интерфейса чрез
+Readdy → Pull from GitHub → Publish след merge на PR #19.
 
-Release manifest пази действащия списък с приложени миграции и отбелязва
-новата като `notificationAudienceMigrationApplied: false`. Предишните
-ценови, правни и фирмени флагове са запазени, включително
-`legalReleaseApproved: false`.
+Release manifest включва действително приложената миграция и
+`notificationAudienceMigrationApplied: true`. Предишните ценови, правни и
+фирмени флагове са запазени, включително `legalReleaseApproved: false`.
 
 ## Получатели и събития
 
@@ -99,11 +98,36 @@ SQL регресиите използват отделна еднократна 
 използват синтетични профили и мрежови отговори. Физически iPhone/Android
 тест за push при заключен екран и полеви GPS остават отделна проверка.
 
-## Последователност след одобрение
+## Проверка в работещата база
 
-1. Прилагане на проверената миграция в посочения Supabase проект.
+След прилагането 13-те тела на функциите съвпадат по checksum с тествания
+SQL. RLS е включен; има само собствени SELECT/UPDATE политики за историята.
+Новите четири публични API функции са SECURITY INVOKER и нямат анонимен
+EXECUTE. Браузърът може да променя `is_read`, но не получател, аудитория,
+създаване на известия, четене на push опашката или claim на delivery job.
+Четирите индекса, четирите тригера, отложената проверка на чернова,
+личната Broadcast политика и единствената cron задача са налични.
+
+Advisors не показва нова опасна публична функция от тази миграция.
+Остават предишни проектни сигнали за PostGIS/pg_net в public,
+`spatial_ref_sys`, стари помощни SECURITY DEFINER функции и защита на
+паролите. Те не са променяни с тази миграция. Насоки:
+[RLS на публични таблици](https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public),
+[публични definer функции](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
+[защита на паролите](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+Производителността отбелязва предишен
+[неиндексиран FK за notifications.company_id](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
+Той засяга проверките при изтриване/промяна на фирма; новите операции за
+личната история използват индексите по получател, аудитория и време.
+Сигналите „unused index“ за новите два индекса са непосредствено след
+инсталирането и преди активиране на новия интерфейс.
+
+## Активиране и връщане
+
+1. Миграцията е приложена в посочения Supabase проект.
 2. Само четяща проверка на функциите, RLS, правата, индекси и cron;
-   актуализиране на manifest с действително приложената версия.
+   manifest е обновен с действително приложената версия.
 3. Зелен CI за крайния commit, merge на PR #19.
 4. Readdy → Pull from GitHub → Publish; проверка на `/release.json`.
 5. Проверка с трите собствени роли: разрешение, настройки, изход/вход,

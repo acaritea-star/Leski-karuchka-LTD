@@ -1,10 +1,10 @@
 {
   "release": "2026.10.15-role-notifications.1",
   "baseCommit": "ab961f79334339b8a54be782df49f2d55f4970cd",
-  "databaseMigration": "company_driver_isolation_hardening",
+  "databaseMigration": "role_scoped_notifications",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261015080550",
+  "databaseMigrationVersion": "20261015195949",
   "googleRoutesVersion": 13,
   "verifiedSourceCommit": "42377ba752e94992f76e8795e078e1179224c145",
   "databaseMigrations": [
@@ -24,7 +24,8 @@
     "20261012202035_carrier_choice_acceptance",
     "20261014051154_idle_location_validity",
     "20261014130621_carrier_offer_availability",
-    "20261015080550_company_driver_isolation_hardening"
+    "20261015080550_company_driver_isolation_hardening",
+    "20261015195949_role_scoped_notifications"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -76,9 +77,10 @@
   "uiButtonAuditVersion": 1,
   "uiButtonAuditVerifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3",
   "notificationInboxVersion": 1,
-  "notificationAudienceMigrationVersion": "20261015185840",
-  "notificationAudienceMigrationApplied": false,
+  "notificationAudienceMigrationVersion": "20261015195949",
+  "notificationAudienceMigrationApplied": true,
   "notificationAudienceVerifiedSourceCommit": "42377ba752e94992f76e8795e078e1179224c145",
   "permissionPreferencesVersion": 1,
-  "notificationDeploymentStatus": "awaiting-production-approval"
+  "notificationDeploymentStatus": "database-ready",
+  "notificationAudienceMigrationSha256": "f79710b19bfdfac0e8d934558a2ed77debae099f400e63ef9ea50a46eb526f2b"
 }
