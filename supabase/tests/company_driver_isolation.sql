@@ -89,7 +89,7 @@ BEGIN
   END LOOP;
   report:=public.accounting_report(first_day,last_day,own_company,NULL,0);
   IF report#>>'{scope,company_id}'<>own_company::text
-   OR (report#>>'{finances,income}')::numeric<>CASE WHEN uid=aa THEN 10 ELSE 20 END
+   OR (report#>>'{finances,income}')::numeric<>(CASE WHEN uid=aa THEN 10 ELSE 20 END)
    OR EXISTS(SELECT 1 FROM jsonb_array_elements(report->'entries') x WHERE x->>'company_id'<>own_company::text)
   THEN RAISE EXCEPTION 'FAIL report includes foreign money'; END IF;
   PERFORM public.company_driver_page(own_company); PERFORM public.company_fleet(own_company); PERFORM public.company_dashboard(own_company);
