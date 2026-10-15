@@ -44,6 +44,11 @@ export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike
   window.addEventListener('pageshow', resume);
   void run();
   return {
+    refresh() {
+      if (!active) return;
+      if (pending) reconcile = true;
+      else void run();
+    },
     setStatus(status: string) {
       if (!active) return;
       const next = status === 'SUBSCRIBED';

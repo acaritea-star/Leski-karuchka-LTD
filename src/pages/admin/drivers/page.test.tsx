@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -31,7 +32,7 @@ beforeEach(() => {
 afterEach(cleanup);
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const element = () => <QueryClientProvider client={client}><AdminDrivers /></QueryClientProvider>;
+  const element = () => <QueryClientProvider client={client}><MemoryRouter><AdminDrivers /></MemoryRouter></QueryClientProvider>;
   return { ...render(element()), element, client };
 }
 it('loads driver pages and debounces search while keeping every request scoped', async () => {

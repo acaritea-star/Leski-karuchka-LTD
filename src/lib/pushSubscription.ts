@@ -4,6 +4,8 @@ import { withRequestTimeout } from './requestTimeout';
 const OWNER_KEY = 'leski_push_owner';
 const preferenceKey = (userId: string) => `leski_push_enabled:${userId}`;
 let owner: string | null = null;
+let revision = 0;
+const suspended = new Set<string>();
 let queue: Promise<unknown> = Promise.resolve();
 const listeners = new Set<() => void>();
 export const getPushOwner = () => owner;
@@ -29,18 +31,25 @@ async function bounded<T>(operation: PromiseLike<T>): Promise<T> {
   } finally { clearTimeout(timer); }
 }
 export const pushSupported = () => 'Notification' in window && 'PushManager' in window && 'serviceWorker' in navigator;
+export function getPushPreference(userId: string): boolean | null {
+  const value = localStorage.getItem(preferenceKey(userId)) ?? localStorage.getItem('leski_notifications_enabled');
+  return value === 'false' ? false : value === 'true' ? true : null;
+}
 const allowed = (userId: string) => pushSupported() && Notification.permission === 'granted'
+  && !suspended.has(userId)
   && (localStorage.getItem(preferenceKey(userId)) ?? localStorage.getItem('leski_notifications_enabled')) !== 'false';
 
 export function registerPush(userId: string): Promise<boolean> {
+  const started = revision;
   return serialized(async () => {
-    if (!allowed(userId)) return false;
+    const stillCurrent = () => started === revision && allowed(userId);
+    if (!stillCurrent()) return false;
     const { data } = await bounded(supabase.auth.getSession());
-    if (data.session?.user.id !== userId || !allowed(userId)) return false;
+    if (data.session?.user.id !== userId || !stillCurrent()) return false;
     if (owner === userId) return true;
     await bounded(navigator.serviceWorker.register('/sw.js'));
     const registration = await bounded(navigator.serviceWorker.ready);
-    if (!allowed(userId)) return false;
+    if (!stillCurrent()) return false;
     let subscription = await bounded(registration.pushManager.getSubscription());
     // A shared browser must not reuse the previous account's delivery endpoint.
     if (subscription && localStorage.getItem(OWNER_KEY) !== userId) {
@@ -50,11 +59,11 @@ export function registerPush(userId: string): Promise<boolean> {
     if (!subscription) {
       const { data: vapid, error } = await bounded(supabase.functions.invoke('generate-vapid-keys'));
       if (error || !vapid?.publicKey) throw new Error('Push key unavailable');
-      if (!allowed(userId)) return false;
+      if (!stillCurrent()) return false;
       const key = Uint8Array.from(atob(vapid.publicKey.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
       subscription = await bounded(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
     }
-    if (!allowed(userId)) return false;
+    if (!stillCurrent()) return false;
     const { data: current } = await bounded(supabase.auth.getSession());
     if (current.session?.user.id !== userId) return false;
     const json = subscription.toJSON();
@@ -66,20 +75,26 @@ export function registerPush(userId: string): Promise<boolean> {
     const { error } = await withRequestTimeout(signal => supabase.rpc('register_push_subscription', body).abortSignal(signal));
     if (error) throw error;
     localStorage.setItem(OWNER_KEY, userId);
-    if (!allowed(userId)) return false;
+    if (!stillCurrent()) return false;
     setOwner(userId);
     return true;
   });
 }
 
-export function unregisterPush(userId: string): Promise<void> {
-  // Set before waiting: an in-flight registration cannot re-enable delivery.
-  localStorage.setItem(preferenceKey(userId), 'false');
-  setOwner(null);
+/** A verified new login resumes delivery without changing the saved choice. */
+export function startPushSession(userId: string) { suspended.delete(userId); }
+
+/** Logout releases this device. Only the settings switch records an opt-out. */
+export function detachPush(userId: string): Promise<void> {
+  revision++;
+  suspended.add(userId);
+  if (owner === userId) setOwner(null);
   return serialized(async () => {
     if (!('serviceWorker' in navigator)) return;
     const registration = await bounded(navigator.serviceWorker.getRegistration('/'));
     if (!registration) return;
+    const registeredOwner = localStorage.getItem(OWNER_KEY);
+    if (registeredOwner && registeredOwner !== userId) return;
     const subscription = await bounded(registration.pushManager.getSubscription());
     if (!subscription) return;
     const unsubscribed = await bounded(subscription.unsubscribe()).catch(() => false);
@@ -90,8 +105,15 @@ export function unregisterPush(userId: string): Promise<void> {
   });
 }
 
+export function unregisterPush(userId: string): Promise<void> {
+  localStorage.setItem(preferenceKey(userId), 'false');
+  return detachPush(userId);
+}
+
 export async function enablePush(userId: string): Promise<boolean> {
-  if (!pushSupported() || await Notification.requestPermission() !== 'granted') return false;
+  if (!pushSupported() || Notification.permission === 'denied') return false;
+  if (Notification.permission !== 'granted' && await Notification.requestPermission() !== 'granted') return false;
   localStorage.setItem(preferenceKey(userId), 'true');
+  startPushSession(userId);
   return registerPush(userId);
 }

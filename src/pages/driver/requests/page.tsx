@@ -17,7 +17,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import type { Tables } from '@/lib/database.types';
 import { calculateDistance, estimateDuration } from '@/lib/geo';
 import DriverRouteMap, { type NavInfo } from '@/pages/driver/components/DriverRouteMap';
@@ -44,7 +43,6 @@ export default function DriverRequests() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { playDriverSound, unlockAudio } = useNotificationSound();
-  const { register: registerPush } = usePushNotifications();
 
   const [toggleError, setGpsError] = useState('');
   const gps = useDriverGps();
@@ -67,12 +65,6 @@ export default function DriverRequests() {
     };
   }, [unlockAudio]);
 
-  // Register push notifications when driver comes online
-  useEffect(() => {
-    if (user?.id && user?.role === 'DRIVER') {
-      registerPush(user.id);
-    }
-  }, [user?.id, user?.role, registerPush]);
 
   // ── Driver record ──
   const driverQuery = useQuery(driverRecordOptions(user?.id));

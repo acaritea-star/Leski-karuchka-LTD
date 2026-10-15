@@ -3,44 +3,61 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import NotificationBell from './NotificationBell';
+import NotificationsProvider from './NotificationsProvider';
+import { MemoryRouter } from 'react-router-dom';
 
 const fake = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[], fetch: vi.fn(), update: vi.fn(), register: vi.fn(),
-  sound: vi.fn(), unlock: vi.fn(), subscribe: undefined as undefined | ((status: string) => void),
+  sound: vi.fn(), unlock: vi.fn(), summary: vi.fn(), more: false, subscribe: undefined as undefined | ((status: string) => void),
 }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'customer' } }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'customer', role: 'CUSTOMER', company_id: null } }) }));
 vi.mock('@/hooks/useNotificationSound', () => ({ useNotificationSound: () => ({ playCustomerSound: fake.sound, unlockAudio: fake.unlock }) }));
-vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register: fake.register }) }));
+vi.mock('@/lib/pushSubscription', () => ({ registerPush: fake.register, getPushPreference: () => true }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
   removeChannel: vi.fn(),
   channel: () => {
     const channel = { on: () => channel, subscribe: (callback: (status: string) => void) => { fake.subscribe = callback; return channel; } };
     return channel;
   },
-  from: () => {
-    const write = { eq: () => write, in: (...args: unknown[]) => { fake.update(...args); return write; }, select: () => write,
-      abortSignal: () => fake.update.mock.results.at(-1)?.value };
-    const query = { select: () => query, eq: () => query, order: () => query, abortSignal: () => query,
-      limit: () => fake.fetch(), update: () => write };
-    return query;
-  },
+  realtime: { setAuth: vi.fn() },
+  rpc: (name: string) => ({ abortSignal: async () => {
+    if (name === 'notification_inbox_state') return fake.summary();
+    if (name === 'notification_inbox_page') return fake.fetch();
+    const result = await fake.update();
+    if (!result.error) fake.rows = fake.rows.map(n => ({ ...n, is_read: true }));
+    return result;
+  } }),
 } }));
 
-const notice = () => ({ id: 'notice', type: 'trip_status', title: 'Шофьорът пристигна', message: 'Очаква те',
+const notice = () => ({ audience: 'customer', priority: 'normal', expires_at: null, id: 'notice', type: 'trip_status', title: 'Шофьорът пристигна', message: 'Очаква те',
   is_read: false, created_at: new Date().toISOString() });
 const mount = async () => {
-  render(<NotificationBell />); await act(async () => {});
+  render(<MemoryRouter><NotificationsProvider><NotificationBell /></NotificationsProvider></MemoryRouter>); await act(async () => {});
   fireEvent.click(screen.getByRole('button', { name: 'Известия' }));
+  await act(async () => {});
 };
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); fake.rows = [];
-  fake.fetch.mockImplementation(async () => ({ data: fake.rows, error: null }));
-  fake.update.mockResolvedValue({ data: [{ id: 'notice' }], error: null });
+  vi.useFakeTimers(); vi.clearAllMocks(); fake.rows = []; fake.more = false;
+  fake.register.mockResolvedValue(false);
+  fake.fetch.mockImplementation(async () => ({ data: { items: fake.rows, has_more: fake.more }, error: null }));
+  fake.summary.mockImplementation(async () => ({ data: { unread: fake.rows.filter(n => !n.is_read).length, latest_id: fake.rows[0]?.id ?? null }, error: null }));
+  fake.update.mockResolvedValue({ data: 1, error: null });
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe('notification recovery', () => {
+  it('keeps history unloaded while closed and uses at most 32 small reads in a healthy hour', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    render(<MemoryRouter><NotificationsProvider><NotificationBell /></NotificationsProvider></MemoryRouter>);
+    await act(async () => {});
+    await act(async () => { fake.subscribe?.('SUBSCRIBED'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_600_000); });
+    expect(fake.fetch).not.toHaveBeenCalled();
+    expect(fake.summary.mock.calls.length).toBeLessThanOrEqual(32);
+    expect(fake.summary.mock.calls.length).toBeGreaterThan(25);
+    vi.restoreAllMocks();
+  });
   it('loads an event missed before the realtime subscription was established', async () => {
     await mount(); expect(screen.queryByText('Шофьорът пристигна')).toBeNull();
     fake.rows = [notice()];
@@ -67,7 +84,7 @@ describe('notification recovery', () => {
     await act(async () => { fireEvent.click(button); });
     expect(screen.getByRole('button', { name: /прочетени/i })).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Прочитането не е потвърдено');
-    fake.update.mockResolvedValue({ data: [{ id: 'notice' }], error: null });
+    fake.update.mockResolvedValue({ data: 1, error: null });
     await act(async () => { fireEvent.click(button); });
     expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
   });
@@ -101,7 +118,7 @@ describe('notification recovery', () => {
     await act(async () => { window.dispatchEvent(new Event('online')); });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /прочетени/i })); });
     expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
-    await act(async () => { finish({ data: [notice()], error: null }); });
+    await act(async () => { finish({ data: { items: [notice()], has_more: false }, error: null }); });
     expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
     expect(screen.getByText('Шофьорът пристигна')).toBeTruthy();
   });

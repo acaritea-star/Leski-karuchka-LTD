@@ -30,7 +30,9 @@ self.addEventListener('push', (event) => {
     
   }
 
-  const title = payload.title || 'Taxi App';
+  const expires = Date.parse(payload.data?.expires_at || '');
+  if (payload.data?.type === 'new_request' && Number.isFinite(expires) && expires <= Date.now()) return;
+  const title = payload.title || 'Лески каручка';
   const options = {
     body: payload.body || '',
     icon: payload.icon || '/icon-192.png',
@@ -46,7 +48,7 @@ self.addEventListener('push', (event) => {
 
   if (payload.data?.type === 'new_request') {
     options.vibrate = [300, 100, 300, 100, 300, 100, 500];
-    options.requireInteraction = true;
+    options.requireInteraction = false;
   } else if (payload.data?.type === 'trip_status') {
     options.vibrate = [150, 50, 150];
   }
@@ -65,28 +67,29 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data || {};
   let url = '/';
 
-  if (data?.type === 'new_request') {
+  const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+  if (typeof data.notification_id === 'string' && uuid.test(data.notification_id)) {
+    url = '/notifications/open?id=' + encodeURIComponent(data.notification_id);
+  } else if (data?.type === 'new_request') {
     url = '/driver/requests';
   } else if (data?.type === 'trip_status') {
     if (data?.role === 'DRIVER') {
       url = '/driver/requests';
     } else {
-      url = '/customer/home';
+      url = data.status === 'completed' && uuid.test(data.request_id || '') ? '/customer/orders?rate=' + data.request_id : '/customer/home';
     }
-  } else if (data?.type === 'chat') {
-    url = data?.url || '/';
+  } else if (data?.type === 'no_driver') {
+    url = uuid.test(data.request_id || '') ? '/customer/home?retry=' + data.request_id : '/customer/home';
   }
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(url)) {
-          client.focus();
-          client.postMessage({ type: 'notification-click', data });
-          return;
-        }
-      }
-      self.clients.openWindow(url);
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
+      const target = new URL(url, self.location.origin);
+      const client = clientList.find(client => new URL(client.url).origin === target.origin);
+      if (client) {
+        if (client.url !== target.href && 'navigate' in client) await client.navigate(target.href);
+        await client.focus();
+      } else await self.clients.openWindow(target.href);
     })
   );
 });

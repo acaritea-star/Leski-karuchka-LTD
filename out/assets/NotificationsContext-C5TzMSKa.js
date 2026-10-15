@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-B0Z9INg1.js";import{n as t}from"./jsx-runtime-DpJIb57s.js";var n=e(t(),1),r=(0,n.createContext)({unread:0,items:[],loading:!1,loadError:!1,writeError:!1,marking:!1,hasMore:!1,scope:``,watchHistory:()=>()=>{},retry:()=>{},loadMore:()=>{},markRead:async()=>{},refresh:()=>{}}),i=()=>(0,n.useContext)(r);export{i as n,r as t};

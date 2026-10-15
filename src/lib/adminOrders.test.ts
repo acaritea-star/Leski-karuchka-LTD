@@ -28,3 +28,8 @@ it('fails visibly instead of interpreting an access error as an empty history', 
   api.response.error = new Error('Denied');
   await expect(loadAdminOrders('company', 'all')).rejects.toThrow('Denied');
 });
+it('opens a notified request through both the company and request filters', async () => {
+  await loadAdminOrders('orion', 'all', 0, undefined, 'request');
+  expect(api.calls).toContainEqual(['eq', 'company_id', 'orion']);
+  expect(api.calls).toContainEqual(['eq', 'id', 'request']);
+});

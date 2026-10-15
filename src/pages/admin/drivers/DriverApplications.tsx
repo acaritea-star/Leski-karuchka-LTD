@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,9 @@ import PartnerInvitations from '@/components/feature/PartnerInvitations';
 
 export default function DriverApplications({ companyId }: { companyId: string }) {
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  const requested = params.get('application');
+  const target = requested && /^[0-9a-f-]{36}$/i.test(requested) ? requested : null;
   const client = useQueryClient();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -18,16 +22,26 @@ export default function DriverApplications({ companyId }: { companyId: string })
   const [busy, setBusy] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const latch = useRef(false);
-  const key = ['admin-driver-applications', user?.id, companyId];
+  const key = ['admin-driver-applications', user?.id, companyId, target];
   const query = useQuery({
     queryKey: key,
     queryFn: async ({ signal }) => {
-      const { data, error } = await withRequestTimeout(abort => supabase.from('driver_applications').select('*')
-        .eq('company_id', companyId).eq('status', 'pending').order('submitted_at', { ascending: true, nullsFirst: false }).order('created_at').limit(100).abortSignal(abort), 10_000, signal);
+      const { data, error } = await withRequestTimeout(abort => {
+        let read = supabase.from('driver_applications').select('*').eq('company_id', companyId).eq('status', 'pending');
+        if (target) read = read.eq('id', target);
+        return read.order('submitted_at', { ascending: true, nullsFirst: false }).order('created_at').limit(100).abortSignal(abort);
+      }, 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
   });
+  const reviewedTarget = useRef('');
+  useEffect(() => {
+    const application = query.data?.find(a => a.id === target);
+    if (application?.onboarding_required && application.submitted_at && reviewedTarget.current !== application.id) {
+      reviewedTarget.current = application.id; setReviewId(application.id);
+    }
+  }, [query.data, target]);
   async function review(application: Tables<'driver_applications'>, decision: 'approved' | 'rejected') {
     if (latch.current) return;
     latch.current = true; setBusy(true); setError(''); setNotice('');

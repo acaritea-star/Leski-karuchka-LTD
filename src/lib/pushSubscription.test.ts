@@ -104,4 +104,47 @@ describe('push account and device isolation', () => {
     expect(await push.registerPush('alice')).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+  it('preserves the enabled choice across logout and restores silently on a verified login', async () => {
+    storage.set('leski_push_enabled:alice', 'true');
+    await push.registerPush('alice');
+    await push.detachPush('alice');
+    expect(storage.get('leski_push_enabled:alice')).toBe('true');
+    expect(await push.registerPush('alice')).toBe(false);
+    push.startPushSession('alice');
+    expect(await push.registerPush('alice')).toBe(true);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+  it('keeps the settings opt-out after a later login', async () => {
+    await push.unregisterPush('alice');
+    push.startPushSession('alice');
+    expect(await push.registerPush('alice')).toBe(false);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+  it('only requests permission on an explicit enable action when the decision is unknown', async () => {
+    Object.assign(Notification, { permission: 'default' });
+    expect(await push.registerPush('alice')).toBe(false);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+    vi.mocked(Notification.requestPermission).mockImplementationOnce(async () => {
+      Object.assign(Notification, { permission: 'granted' }); return 'granted';
+    });
+    expect(await push.enablePush('alice')).toBe(true);
+    expect(Notification.requestPermission).toHaveBeenCalledOnce();
+    expect(await push.enablePush('alice')).toBe(true);
+    expect(Notification.requestPermission).toHaveBeenCalledOnce();
+  });
+  it('does not ask again after the browser has denied permission', async () => {
+    Object.assign(Notification, { permission: 'denied' });
+    expect(await push.enablePush('alice')).toBe(false);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+  it('invalidates a registration in flight without saving a logout as an opt-out', async () => {
+    let finish!: (value: object) => void;
+    mocks.rpc.mockReturnValueOnce({ abortSignal: () => new Promise(resolve => { finish = resolve; }) });
+    const registering = push.registerPush('alice');
+    await vi.waitFor(() => expect(mocks.rpc).toHaveBeenCalledOnce());
+    const leaving = push.detachPush('alice'); finish({ error: null });
+    expect(await registering).toBe(false); await leaving;
+    expect(storage.has('leski_push_enabled:alice')).toBe(false);
+    expect(push.getPushOwner()).toBeNull();
+  });
 });

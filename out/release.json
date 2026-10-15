@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.15-ui-buttons.1",
-  "baseCommit": "ceb1dfc3d04a963693676358ab1dc049f05e6295",
-  "databaseMigration": "company_driver_isolation_hardening",
+  "release": "2026.10.15-role-notifications.1",
+  "baseCommit": "ab961f79334339b8a54be782df49f2d55f4970cd",
+  "databaseMigration": "role_scoped_notifications",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261015080550",
+  "databaseMigrationVersion": "20261015195949",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3",
+  "verifiedSourceCommit": "42377ba752e94992f76e8795e078e1179224c145",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -24,7 +24,8 @@
     "20261012202035_carrier_choice_acceptance",
     "20261014051154_idle_location_validity",
     "20261014130621_carrier_offer_availability",
-    "20261015080550_company_driver_isolation_hardening"
+    "20261015080550_company_driver_isolation_hardening",
+    "20261015195949_role_scoped_notifications"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -74,5 +75,12 @@
   "compactCarrierPanelVersion": 1,
   "compactCarrierPanelVerifiedSourceCommit": "14f6330e336b356ed10dec1daf0a999d1e4c4230",
   "uiButtonAuditVersion": 1,
-  "uiButtonAuditVerifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3"
+  "uiButtonAuditVerifiedSourceCommit": "e70b5d2bcfaddd481bda9e6bbd5e81a6b5c1c7f3",
+  "notificationInboxVersion": 1,
+  "notificationAudienceMigrationVersion": "20261015195949",
+  "notificationAudienceMigrationApplied": true,
+  "notificationAudienceVerifiedSourceCommit": "42377ba752e94992f76e8795e078e1179224c145",
+  "permissionPreferencesVersion": 1,
+  "notificationDeploymentStatus": "database-ready",
+  "notificationAudienceMigrationSha256": "f79710b19bfdfac0e8d934558a2ed77debae099f400e63ef9ea50a46eb526f2b"
 }

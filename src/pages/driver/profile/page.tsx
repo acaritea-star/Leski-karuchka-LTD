@@ -2,6 +2,7 @@ import BackButton from '@/components/feature/BackButton';
 import { useSignOut } from '@/hooks/useSignOut';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import LocationSettings from '@/components/feature/LocationSettings';
+import NotificationSettings from '@/components/feature/NotificationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
 import DriverDocuments from '@/components/feature/DriverDocuments';
 import DriverPreparationCard from '@/components/feature/DriverPreparationCard';
@@ -101,6 +102,7 @@ export default function DriverProfile() {
 
             {profile && <DriverPreparationCard driverId={profile.id} />}
             <LocationSettings driver onOffline={() => void fetchProfile()} />
+            <NotificationSettings />
             <PrivacyRequests />
 
             {/* Vehicle Card */}

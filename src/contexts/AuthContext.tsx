@@ -2,7 +2,7 @@ import { withRequestTimeout } from '@/lib/requestTimeout';
 import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
-import { unregisterPush } from '@/lib/pushSubscription';
+import { detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
 import { clearRecentLocations } from '@/lib/cookieConsent';
 import { startSocialSignIn, type SocialProvider } from '@/lib/socialAuth';
 import {
@@ -223,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (previous && (!verified || previous.role !== verified.role || previous.company_id !== verified.company_id)) {
               queryClient.clear(); stopDriverGps(); stopSharedGps();
             }
+            if (result.user && previous?.id !== result.user.id) startPushSession(result.user.id);
             currentUser.current = result.user;
             setUser(result.user);
           }
@@ -261,12 +262,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (session?.user.id) {
-      try { await withRequestTimeout(() => unregisterPush(session.user.id)); }
+      try { await withRequestTimeout(() => detachPush(session.user.id)); }
       catch { console.warn('Push cleanup failed; notification permission can be revoked in browser settings.'); }
     }
     if (currentSession.current?.user.id !== session?.user.id) return;
-    const { error } = await withRequestTimeout(() => supabase.auth.signOut());
-    if (error) throw error;
+    try {
+      const { error } = await withRequestTimeout(() => supabase.auth.signOut());
+      if (error) throw error;
+    } catch (error) {
+      if (session?.user.id && currentSession.current?.user.id === session.user.id) {
+        startPushSession(session.user.id);
+        void registerPush(session.user.id).catch(() => {});
+      }
+      throw error;
+    }
     stopDriverGps(); stopSharedGps();
     clearRecentLocations();
     queryClient.clear();
