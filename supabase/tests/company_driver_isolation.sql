@@ -13,7 +13,7 @@ END $fn$;
 DO $test$
 DECLARE
  ca uuid:=gen_random_uuid(); cb uuid:=gen_random_uuid(); aa uuid:=gen_random_uuid(); ab uuid:=gen_random_uuid();
- ua uuid:=gen_random_uuid(); ub uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid(); root uuid:=gen_random_uuid(); extra uuid:=gen_random_uuid();
+ ua uuid:=gen_random_uuid(); ub uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid(); root uuid:=gen_random_uuid(); extra uuid:=gen_random_uuid(); candidate uuid:=gen_random_uuid();
  da uuid; db uuid; va uuid:=gen_random_uuid(); vb uuid:=gen_random_uuid(); ta uuid:=gen_random_uuid(); tb uuid:=gen_random_uuid();
  ra uuid:=gen_random_uuid(); rb uuid:=gen_random_uuid(); ea uuid:=gen_random_uuid(); eb uuid:=gen_random_uuid();
  doca uuid:=gen_random_uuid(); docb uuid:=gen_random_uuid(); stray uuid:=gen_random_uuid(); appb uuid:=gen_random_uuid(); appdoc uuid:=gen_random_uuid();
@@ -24,12 +24,13 @@ BEGIN
  INSERT INTO public.companies(id,name,slug,setup_completed_at) VALUES
   (ca,'Synthetic Orion','isolation-'||ca,now()),(cb,'Synthetic Duvka','isolation-'||cb,now());
  INSERT INTO auth.users(id,email,email_confirmed_at) SELECT id,'isolation-'||id||'@example.invalid',now()
-  FROM unnest(ARRAY[aa,ab,ua,ub,customer,root,extra]) x(id);
+  FROM unnest(ARRAY[aa,ab,ua,ub,customer,root,extra,candidate]) x(id);
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=ca WHERE id=aa;
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=cb WHERE id=ab;
  UPDATE public.profiles SET role='SUPER_ADMIN' WHERE id=root;
  UPDATE public.profiles SET role='DRIVER',company_id=ca WHERE id IN(ua,extra);
  UPDATE public.profiles SET role='DRIVER',company_id=cb WHERE id=ub;
+ UPDATE public.profiles SET company_id=ca WHERE id=candidate;
  SELECT id INTO STRICT da FROM public.drivers WHERE user_id=ua;
  SELECT id INTO STRICT db FROM public.drivers WHERE user_id=ub;
  INSERT INTO public.vehicle_types(id,company_id,name) VALUES(ta,ca,'Isolation A'),(tb,cb,'Isolation B');
@@ -129,6 +130,8 @@ BEGIN
 
  PERFORM set_config('request.jwt.claims',json_build_object('sub',ua,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
  IF private.current_driver_id() IS DISTINCT FROM da OR NOT public.is_driver(da)
+  OR NOT public.is_company_member(ca) OR public.is_company_member(cb)
+  OR NOT public.is_driver_of_company(ca) OR public.is_driver_of_company(cb)
   OR public.is_driver(db) OR NOT private.can_read_driver_document(stray_path)
   OR EXISTS(SELECT 1 FROM public.driver_money_entries WHERE driver_user_id<>ua)
   OR EXISTS(SELECT 1 FROM public.ledger)
@@ -153,9 +156,19 @@ BEGIN
  UPDATE public.profiles SET company_id=cb WHERE id=ua;
  SET LOCAL ROLE authenticated;
  IF private.current_driver_id() IS NOT NULL OR public.is_driver(da) OR private.can_read_driver_document(stray_path)
+  OR public.is_company_member(ca) OR public.is_company_member(cb)
+  OR public.is_driver_of_company(ca) OR public.is_driver_of_company(cb)
  THEN RAISE EXCEPTION 'FAIL stale driver membership remains operative'; END IF;
  RESET ROLE;
  UPDATE public.profiles SET company_id=ca WHERE id=ua;
+
+ -- A candidate/customer is not a private fleet member merely because the
+ -- profile retains its onboarding or historical company hint.
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',candidate,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ IF public.is_company_member(ca) OR public.is_driver_of_company(ca)
+  OR EXISTS(SELECT 1 FROM public.vehicles WHERE id IN(va,vb))
+ THEN RAISE EXCEPTION 'FAIL customer company hint grants private fleet membership'; END IF;
+ RESET ROLE;
 
  UPDATE public.profiles SET is_active=false WHERE id=aa;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',aa,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;

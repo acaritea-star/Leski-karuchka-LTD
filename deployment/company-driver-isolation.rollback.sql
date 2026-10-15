@@ -43,6 +43,30 @@ AS $function$
   );
 $function$;
 
+CREATE OR REPLACE FUNCTION public.is_company_member(target_company uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid() AND p.company_id = target_company AND p.is_active = true
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.is_driver_of_company(target_company uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid() AND p.role = 'DRIVER' AND p.company_id = target_company AND p.is_active = true
+  );
+$function$;
+
 REVOKE UPDATE(is_read) ON public.notifications FROM authenticated;
 GRANT INSERT,UPDATE,DELETE ON public.notifications,public.payment_transactions,public.ledger TO authenticated;
 COMMIT;

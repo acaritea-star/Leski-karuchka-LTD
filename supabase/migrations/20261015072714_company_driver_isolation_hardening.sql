@@ -40,6 +40,20 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $fn$
    AND p.company_id=d.company_id);
 $fn$;
 
+-- An onboarding customer may have a company hint without being a fleet member.
+CREATE OR REPLACE FUNCTION public.is_company_member(target_company uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $fn$
+ SELECT EXISTS(SELECT 1 FROM public.profiles p
+  WHERE p.id=(SELECT auth.uid()) AND p.is_active AND p.company_id=target_company
+   AND (p.role='COMPANY_ADMIN' OR (p.role='DRIVER' AND EXISTS(
+    SELECT 1 FROM public.drivers d WHERE d.user_id=p.id AND d.company_id=p.company_id))));
+$fn$;
+CREATE OR REPLACE FUNCTION public.is_driver_of_company(target_company uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $fn$
+ SELECT EXISTS(SELECT 1 FROM public.drivers d
+  WHERE d.id=(SELECT private.current_driver_id()) AND d.company_id=target_company);
+$fn$;
+
 -- Notifications are produced by trusted workflows. The browser may mark its
 -- own notification read, but cannot change its recipient, company or payload.
 REVOKE INSERT,UPDATE,DELETE ON public.notifications FROM anon,authenticated;
