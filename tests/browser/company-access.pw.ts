@@ -66,6 +66,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
     else if (url.pathname.endsWith('/driver_day_summary')) data = { trips: 3, earnings: 12.50 };
     else if (url.pathname.endsWith('/legal_acceptances')) data = { id: account };
     else if (url.pathname.endsWith('/company_dashboard')) data = dashboard;
+    else if (url.pathname.endsWith('/notification_inbox_state')) data = { unread: 0, latest_id: null };
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: corsHeaders });
   });
@@ -188,7 +189,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
     ['Основен град на обслужване', 'Левски'], ['Удостоверение / разрешение за таксиметров превоз', 'TEST-1'], ['Валидно до', '2099-01-01'],
     ['Начална такса (EUR)', '2.15'], ['Минимална цена (EUR)', '0'], ['Цена на км (EUR)', '1.23'], ['Цена на минута от маршрута (EUR)', '0.17'],
   ]) await form.getByLabel(label, { exact: true }).fill(value);
-  const initialDashboardReads = Promise.all(['/company_dashboard', '/notifications'].map(path =>
+  const initialDashboardReads = Promise.all(['/company_dashboard', '/notification_inbox_state'].map(path =>
     page.waitForResponse(response => new URL(response.url()).pathname.endsWith(path) && response.request().method() !== 'OPTIONS')
       .then(async response => { expect(response.ok()).toBe(true); expect(await response.finished()).toBeNull(); })));
   await form.getByRole('button', { name: 'Запази фирмата и отвори панела' }).click();

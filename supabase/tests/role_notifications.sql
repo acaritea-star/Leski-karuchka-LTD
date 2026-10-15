@@ -80,8 +80,8 @@ BEGIN
  RESET ROLE;
  PERFORM set_config('request.jwt.claims','{}',true);
  INSERT INTO storage.objects(bucket_id,name) VALUES('driver-documents',da_user||'/'||document||'.pdf');
- INSERT INTO public.driver_documents(id,driver_id,company_id,type,expires_at,file_url,status)
- VALUES(document,da,ca,'license',today+7,'storage://driver-documents/'||da_user||'/'||document||'.pdf','pending');
+ INSERT INTO public.driver_documents(id,driver_id,company_id,type,expires_at,file_url,status,created_at)
+ VALUES(document,da,ca,'license',today+7,'storage://driver-documents/'||da_user||'/'||document||'.pdf','pending',now()-interval '1 hour');
  IF NOT EXISTS(SELECT 1 FROM public.notifications WHERE user_id=aa AND type='document_submitted' AND data->>'document_id'=document::text)
  OR EXISTS(SELECT 1 FROM public.notifications WHERE user_id=ab AND data->>'document_id'=document::text) THEN RAISE EXCEPTION 'FAIL document company audience'; END IF;
  UPDATE public.driver_documents SET status='approved',reviewed_at=clock_timestamp() WHERE id=document;

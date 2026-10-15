@@ -47,6 +47,11 @@ test('a healthy closed inbox performs small checks, pauses when hidden and reloa
   await expect.poll(() => socket.joined.some(x => x.endsWith(':customer'))).toBe(true);
   await page.clock.runFor(300_000);
   expect(state.notificationStateReads).toBeLessThanOrEqual(6); expect(state.notificationPageReads).toBe(0);
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
+  const beforeHidden = state.notificationStateReads;
+  await page.clock.runFor(300_000); expect(state.notificationStateReads).toBe(beforeHidden);
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); document.dispatchEvent(new Event('visibilitychange')); });
+  await page.clock.resume();
   state.notices = [{ id: noticeId(99), title: 'Възстановено известие', message: 'Synthetic', is_read: false, audience: 'customer', created_at: new Date().toISOString() }];
   socket.hint('customer', noticeId(99));
   await expect(page.getByRole('button', { name: 'Известия', exact: true })).toContainText('1');
