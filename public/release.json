@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.14-carrier-flow.1",
-  "baseCommit": "6321057d96a13aabcc285cbcb8fe80c14e86899b",
-  "databaseMigration": "carrier_offer_availability",
+  "release": "2026.10.15-company-isolation.1",
+  "baseCommit": "c130c83c60cb391e283c7dc31eed7f0c3cce7b87",
+  "databaseMigration": "company_driver_isolation_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261014130621",
+  "databaseMigrationVersion": "20261015080550",
   "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "eef9c0c22e1b1a609f2cbc3d21a5b5a16fecbc41",
+  "verifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -23,7 +23,8 @@
     "20261012184648_marketplace_offer_recovery",
     "20261012202035_carrier_choice_acceptance",
     "20261014051154_idle_location_validity",
-    "20261014130621_carrier_offer_availability"
+    "20261014130621_carrier_offer_availability",
+    "20261015080550_company_driver_isolation_hardening"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -66,5 +67,8 @@
   "carrierComparisonUxVersion": 3,
   "carrierOfferAvailabilityVersion": 1,
   "carrierOfferAvailabilityMigrationVersion": "20261014130621",
-  "carrierDispatchFlowVerifiedSourceCommit": "eef9c0c22e1b1a609f2cbc3d21a5b5a16fecbc41"
+  "carrierDispatchFlowVerifiedSourceCommit": "eef9c0c22e1b1a609f2cbc3d21a5b5a16fecbc41",
+  "companyDriverIsolationVersion": 1,
+  "companyDriverIsolationMigrationVersion": "20261015080550",
+  "companyDriverIsolationVerifiedSourceCommit": "7980c2b8ceb8bdbfcbaf69542e3469954e3e3a50"
 }
