@@ -1,3 +1,4 @@
+import BackButton from '@/components/feature/BackButton';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
@@ -373,12 +374,7 @@ export default function DriverRequests() {
     <div className="min-h-screen bg-background-50">
       {/* ── Header ── */}
       <header className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-background-100">
-        <button
-          onClick={() => navigate('/driver/home')}
-          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
-        >
-          <i className="ri-arrow-left-line text-foreground-600 text-lg" />
-        </button>
+        <BackButton to="/driver/home" />
         <h1 className="text-base font-bold text-foreground-950 font-heading">{t('nav_requests')}</h1>
         {!isOnline && (
           <span className="ml-auto flex items-center gap-1.5 text-xs text-foreground-400 bg-background-100 px-3 py-1.5 rounded-full">
@@ -404,9 +400,7 @@ export default function DriverRequests() {
             <i className="ri-error-warning-line" />
             {error || refusalMessage}
             {declinesLoadError && <button className="underline" onClick={() => void refreshDeclines()}>Обнови заявките</button>}
-            {error && <button onClick={() => setError('')} className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 cursor-pointer">
-              <i className="ri-close-line text-red-400 text-xs" />
-            </button>}
+            {error && <button type="button" aria-label="Затвори съобщението" onClick={() => setError('')} className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>}
           </div>
         )}
 

@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import DriverVerificationStatus from '@/components/feature/DriverVerificationStatus';
 import { verificationKey } from '@/lib/driverVerification';
 import DriverApplications from './DriverApplications';
@@ -272,9 +273,8 @@ function CompanyDrivers() {
 
       {/* Add Driver Modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-in zoom-in-95 fade-in duration-200">
+        <Modal label="Добави нов шофьор" onClose={() => setShowAdd(false)} className="max-w-lg">
+          <div className="relative bg-white rounded-2xl w-full max-w-lg animate-in zoom-in-95 fade-in duration-200">
             <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
               <h3 className="font-semibold text-foreground-950 font-heading">Добави нов шофьор</h3>
               <button
@@ -291,14 +291,13 @@ function CompanyDrivers() {
               {companyId && <DriverApplications key={companyId} companyId={companyId} />}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSelected(null)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-in zoom-in-95 fade-in duration-200">
+        <Modal label="Документи на шофьора" onClose={() => setSelected(null)} busy={setDocStatusMutation.isPending} className="max-w-lg">
+          <div className="relative bg-white rounded-2xl w-full max-w-lg animate-in zoom-in-95 fade-in duration-200">
             <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
               <div>
                 <h3 className="font-semibold text-foreground-950 font-heading">
@@ -388,7 +387,7 @@ function CompanyDrivers() {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AdminLayout>
   );

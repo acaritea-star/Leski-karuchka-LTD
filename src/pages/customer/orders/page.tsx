@@ -1,4 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import BackButton from '@/components/feature/BackButton';
+import Modal from '@/components/feature/Modal';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -33,6 +35,7 @@ export default function CustomerOrders() {
   const [ratingRequest, setRatingRequest] = useState<TaxiRequest | null>(null);
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingFeedback, setRatingFeedback] = useState('');
+  const ratingInFlight = useRef(false);
 
   const customerId = user?.id;
 
@@ -54,11 +57,11 @@ export default function CustomerOrders() {
 
   const ratingsQuery = useQuery({
     queryKey: customerId ? queryKeys.customerRatings(customerId) : ['ratings', 'customer', 'none'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ signal }) => {
+      const { data, error } = await withRequestTimeout(abort => supabase
         .from('ratings')
         .select('request_id')
-        .eq('customer_id', customerId as string);
+        .eq('customer_id', customerId as string).abortSignal(abort), 10_000, signal);
       if (error) throw error;
       return data ?? [];
     },
@@ -94,21 +97,32 @@ export default function CustomerOrders() {
 
   const ratingMutation = useMutation({
     mutationFn: async (input: { request: TaxiRequest; score: number; feedback: string }) => {
-      const { error } = await supabase.from('ratings').insert({
-        company_id: input.request.company_id,
-        request_id: input.request.id,
-        customer_id: customerId as string,
-        driver_id: input.request.driver_id as string,
-        score: input.score,
-        feedback: input.feedback.trim() || null,
-      });
-      if (error) throw error;
+      let failure: unknown;
+      try {
+        const { error } = await withRequestTimeout(signal => supabase.from('ratings').insert({
+          company_id: input.request.company_id, request_id: input.request.id, customer_id: customerId as string,
+          driver_id: input.request.driver_id as string, score: input.score, feedback: input.feedback.trim() || null,
+        }).abortSignal(signal));
+        if (!error) return;
+        failure = new Error(error.message);
+      } catch (error) { failure = error; }
+      // A lost response can follow a committed insert. Read the owned receipt
+      // before exposing a retry; the unique request constraint remains authoritative.
+      try {
+        const { data, error } = await withRequestTimeout(signal => supabase.from('ratings').select('request_id')
+          .eq('customer_id', customerId as string).eq('request_id', input.request.id).abortSignal(signal).maybeSingle());
+        if (!error && data) return;
+      } catch { /* Keep the entered rating when confirmation is unavailable. */ }
+      throw failure instanceof Error ? failure : new Error(t('error_general'));
     },
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
+      if (customerId) queryClient.setQueryData(queryKeys.customerRatings(customerId), (previous: { request_id: string }[] | undefined) =>
+        [...(previous ?? []).filter(row => row.request_id !== input.request.id), { request_id: input.request.id }]);
       queryClient.invalidateQueries({
         queryKey: customerId ? queryKeys.customerRatings(customerId) : ['ratings'],
       });
     },
+    onSettled: () => { ratingInFlight.current = false; },
   });
 
   const orders = ordersQuery.data ?? [];
@@ -123,7 +137,7 @@ export default function CustomerOrders() {
   const displayedOrders = activeTab === 'active' ? activeOrders : completedOrders;
 
   const canRate = (order: TaxiRequest) =>
-    order.status === 'completed' && !!order.driver_id && !ratedIds.has(order.id);
+    ratingsQuery.isSuccess && order.status === 'completed' && !!order.driver_id && !ratedIds.has(order.id);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -143,7 +157,8 @@ export default function CustomerOrders() {
   };
 
   const submitRating = () => {
-    if (!ratingRequest) return;
+    if (!ratingRequest || ratingInFlight.current) return;
+    ratingInFlight.current = true;
     ratingMutation.mutate(
       { request: ratingRequest, score: ratingScore, feedback: ratingFeedback },
       { onSuccess: () => setRatingRequest(null) },
@@ -199,21 +214,18 @@ export default function CustomerOrders() {
   return (
     <div className="min-h-screen bg-background-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-background-100 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate('/customer/home')}
-          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-background-100 transition-colors cursor-pointer"
-        >
-          <i className="ri-arrow-left-line text-foreground-600 text-lg" />
-        </button>
+      <div className="sticky top-0 z-50">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-background-100 px-4 py-3 flex items-center gap-3">
+        <BackButton to="/customer/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">{t('nav_orders')}</h1>
         <AppMenu />
       </header>
 
       {/* Tabs */}
-      <div className="sticky top-[52px] z-40 bg-background-50 px-4 pt-3 pb-2">
+      <div className="bg-background-50 px-4 pt-3 pb-2">
         <div className="flex bg-background-100 rounded-full p-1">
           <button
+            type="button" aria-pressed={activeTab === 'active'}
             onClick={() => setActiveTab('active')}
             className={`flex-1 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
               ${activeTab === 'active'
@@ -229,6 +241,7 @@ export default function CustomerOrders() {
             )}
           </button>
           <button
+            type="button" aria-pressed={activeTab === 'completed'}
             onClick={() => setActiveTab('completed')}
             className={`flex-1 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
               ${activeTab === 'completed'
@@ -241,8 +254,11 @@ export default function CustomerOrders() {
         </div>
       </div>
 
+      </div>
+
       {/* Orders list */}
       <div className="px-4 pb-8">
+        {ratingsQuery.isError && <p role="alert" className="py-3 text-sm text-red-600">{t('ratings_load_error')} <button type="button" className="underline min-h-11" disabled={ratingsQuery.isFetching} onClick={() => void ratingsQuery.refetch()}>{t('retry')}</button></p>}
         {displayedOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20 px-6">
             <div className="relative mb-5">
@@ -373,14 +389,14 @@ export default function CustomerOrders() {
 
       {/* Rating Modal */}
       {ratingRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setRatingRequest(null)} />
+        <Modal label={t('rate_driver')} onClose={() => setRatingRequest(null)} busy={ratingMutation.isPending} className="max-w-sm">
           <div className="relative bg-white rounded-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95 fade-in duration-200">
             <button
+              type="button" aria-label={t('cancel')}
               onClick={() => setRatingRequest(null)}
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
+              className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
             >
-              <i className="ri-close-line text-foreground-500 text-lg" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
             </button>
 
             <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4">
@@ -392,21 +408,18 @@ export default function CustomerOrders() {
             <p className="text-sm text-foreground-500 mb-4">{t('how_was_trip')}</p>
 
             {/* Stars */}
-            <div className="flex justify-center gap-2 mb-5">
+            <fieldset className="flex justify-center gap-1 mb-5">
+              <legend className="sr-only">{t('rate_driver')}</legend>
               {[1, 2, 3, 4, 5].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setRatingScore(s)}
-                  className="cursor-pointer"
-                >
-                  <i
-                    className={`${s <= ratingScore ? 'ri-star-fill text-primary-500' : 'ri-star-line text-foreground-300'} text-3xl transition-all duration-150`}
-                  />
-                </button>
+                <label key={s} className="relative w-11 h-11 shrink-0 flex items-center justify-center cursor-pointer">
+                  <input type="radio" name="trip-rating" value={s} checked={ratingScore === s} onChange={() => setRatingScore(s)} aria-label={t('rating_score', { n: s })} className="peer absolute inset-0 m-0 w-full h-full cursor-pointer opacity-0" />
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill={s <= ratingScore ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true" className={`${s <= ratingScore ? 'text-primary-500' : 'text-foreground-300'} pointer-events-none rounded peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-primary-500`}><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" /></svg>
+                </label>
               ))}
-            </div>
+            </fieldset>
 
             <textarea
+              aria-label={t('your_feedback')}
               value={ratingFeedback}
               onChange={(e) => setRatingFeedback(e.target.value)}
               maxLength={500}
@@ -417,7 +430,7 @@ export default function CustomerOrders() {
             <p className="text-[11px] text-foreground-400 text-right mb-4">{ratingFeedback.length}/500</p>
 
             {ratingMutation.isError && (
-              <p className="text-xs text-red-500 text-center mb-3">
+              <p role="alert" className="text-xs text-red-500 text-center mb-3 break-words">
                 {ratingMutation.error instanceof Error
                   ? ratingMutation.error.message
                   : t('error_general')}
@@ -432,7 +445,7 @@ export default function CustomerOrders() {
               {ratingMutation.isPending ? t('loading') : t('submit_rating')}
             </button>
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

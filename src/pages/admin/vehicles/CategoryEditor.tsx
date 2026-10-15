@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
@@ -57,8 +58,8 @@ export default function CategoryEditor({ companyId, categories, disabled, create
       </li>)}</ul>
       <button type="button" disabled={disabled} onClick={() => start()} className="text-sm font-semibold text-primary-700 disabled:opacity-50">Добави категория</button>
     </details>
-    {open && <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="category-title">
-      <section className="bg-white w-full max-w-md rounded-2xl p-5 max-h-[90dvh] overflow-y-auto">
+    {open && <Modal label={editing ? 'Редакция на категория' : 'Нова категория'} onClose={() => setOpen(false)} busy={saving} className="max-w-md">
+      <section className="bg-white w-full max-w-md rounded-2xl p-5">
         <h2 id="category-title" className="text-lg font-semibold mb-4">{editing ? 'Редакция на категория' : 'Нова категория'}</h2>
         <fieldset disabled={saving} className="space-y-3">
           <label className="block text-sm">Име на категорията<input value={form.name} maxLength={60} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="block border rounded-lg p-3 w-full mt-1" /></label>
@@ -71,6 +72,6 @@ export default function CategoryEditor({ companyId, categories, disabled, create
         {error && <p role="alert" className="text-sm text-red-700 mt-3">{error}</p>}
         <div className="flex gap-3 mt-5"><button type="button" disabled={saving} onClick={() => setOpen(false)} className="flex-1 border rounded-lg p-3">Отказ</button><button type="button" disabled={saving || disabled} onClick={() => void save()} className="flex-1 bg-primary-500 text-white rounded-lg p-3 disabled:opacity-50">{saving ? 'Записване…' : 'Запази категорията'}</button></div>
       </section>
-    </div>}
+        </Modal>}
   </>;
 }

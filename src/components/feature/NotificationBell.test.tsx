@@ -18,9 +18,10 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
     return channel;
   },
   from: () => {
-    const query = { select: () => query, eq: () => query, order: () => query,
-      limit: async () => { fake.fetch(); return { data: fake.rows, error: null }; },
-      update: () => ({ eq: () => ({ in: fake.update }) }) };
+    const write = { eq: () => write, in: (...args: unknown[]) => { fake.update(...args); return write; }, select: () => write,
+      abortSignal: () => fake.update.mock.results.at(-1)?.value };
+    const query = { select: () => query, eq: () => query, order: () => query, abortSignal: () => query,
+      limit: () => fake.fetch(), update: () => write };
     return query;
   },
 } }));
@@ -32,7 +33,9 @@ const mount = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Известия' }));
 };
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); fake.rows = []; fake.update.mockResolvedValue({ error: null });
+  vi.useFakeTimers(); vi.clearAllMocks(); fake.rows = [];
+  fake.fetch.mockImplementation(async () => ({ data: fake.rows, error: null }));
+  fake.update.mockResolvedValue({ data: [{ id: 'notice' }], error: null });
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -63,8 +66,32 @@ describe('notification recovery', () => {
     const button = screen.getByRole('button', { name: /прочетени/i });
     await act(async () => { fireEvent.click(button); });
     expect(screen.getByRole('button', { name: /прочетени/i })).toBeTruthy();
-    fake.update.mockResolvedValue({ error: null });
+    expect(screen.getByRole('alert').textContent).toContain('Прочитането не е потвърдено');
+    fake.update.mockResolvedValue({ data: [{ id: 'notice' }], error: null });
     await act(async () => { fireEvent.click(button); });
     expect(screen.queryByRole('button', { name: /прочетени/i })).toBeNull();
+  });
+  it('shows a recoverable load error instead of pretending the inbox is empty', async () => {
+    fake.fetch.mockResolvedValueOnce({ data: null, error: { message: 'offline' } });
+    await mount();
+    expect(screen.getByRole('alert').textContent).toContain('Известията не се заредиха');
+    expect(screen.queryByText('Няма известия')).toBeNull();
+    fake.rows = [notice()];
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Опитай отново' })); });
+    expect(screen.getByText('Шофьорът пристигна')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('blocks duplicate read writes, retains unread state on rejection, and closes with Escape', async () => {
+    let reject!: (reason: unknown) => void;
+    fake.rows = [notice()]; fake.update.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    await mount(); const button = screen.getByRole('button', { name: /прочетени/i });
+    act(() => { fireEvent.click(button); fireEvent.click(button); });
+    expect(fake.update).toHaveBeenCalledOnce(); expect((button as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { reject(new Error('offline')); });
+    expect(screen.getByRole('button', { name: /прочетени/i })).toBeTruthy();
+    expect(screen.getByRole('alert')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Известия' }));
   });
 });

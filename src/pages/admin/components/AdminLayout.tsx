@@ -135,29 +135,29 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0" inert={sidebarOpen || undefined}>
         {/* Top bar */}
-        <header className="bg-white border-b border-background-200 px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="bg-white border-b border-background-200 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label={sidebarOpen ? 'Затвори менюто' : 'Отвори менюто'}
               aria-expanded={sidebarOpen}
               aria-controls="company-navigation"
               ref={menuButton}
-              className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
+              className="lg:hidden w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <div><h1 className="lg:hidden text-[10px] text-foreground-500 font-semibold">{roleTitle}</h1><h2 className="text-base font-semibold text-foreground-950 font-heading">{title}</h2></div>
+            <div className="min-w-0"><h1 className="lg:hidden text-[10px] text-foreground-500 font-semibold">{roleTitle}</h1><h2 className="text-base font-semibold text-foreground-950 font-heading break-words">{title}</h2></div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex min-w-0 items-center gap-2 ${isSuperAdmin && !platformPage && companies.length ? 'w-full sm:w-auto sm:max-w-[60%]' : 'shrink-0'}`}>
             {isSuperAdmin && !platformPage && companies.length > 0 && (
-              <div className="relative">
+              <div className="relative min-w-0 flex-1">
                 <label htmlFor="admin-company" className="sr-only">Управлявана фирма</label>
                 <select
                   id="admin-company"
                   value={companyId || ''}
                   onChange={(e) => setCompanyId(e.target.value)}
-                  className="pl-8 pr-8 py-2 rounded-lg bg-background-50 border border-background-200 text-sm font-medium text-foreground-800 focus:outline-none focus:ring-2 focus:ring-primary-200 cursor-pointer appearance-none"
+                  className="w-full max-w-full min-h-11 pl-8 pr-8 py-2 rounded-lg bg-background-50 border border-background-200 text-sm font-medium text-foreground-800 focus:outline-none focus:ring-2 focus:ring-primary-200 cursor-pointer appearance-none"
                 >
                   <option value="" disabled>
                     Избери фирма

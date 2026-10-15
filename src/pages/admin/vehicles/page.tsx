@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import { documentExpired } from '@/lib/legalWorkflow';
 import { useState, useMemo, useRef } from 'react';
 import { withRequestTimeout } from '@/lib/requestTimeout';
@@ -218,9 +219,7 @@ function VehiclesEditor() {
           <i className="ri-error-warning-line" />
           {error || queryError}
           {queryError && <button onClick={() => void vehiclesQuery.refetch()} className="underline whitespace-nowrap">Опитай отново</button>}
-          <button onClick={() => setError('')} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
-            <i className="ri-close-line text-red-400 text-xs" />
-          </button>
+          {!queryError && <button type="button" aria-label="Затвори съобщението" onClick={() => setError('')} className="ml-auto w-11 h-11 shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>}
         </div>
       )}
 
@@ -301,7 +300,8 @@ function VehiclesEditor() {
                   Редактирай
                 </button>
                 <button
-                  onClick={() => setDeleteId(v.id)}
+                      type="button" aria-label={`Изтрий автомобил ${v.registration_number}`}
+                      onClick={() => setDeleteId(v.id)}
                   className="w-10 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                 >
                   <i className="ri-delete-bin-line text-sm" />
@@ -314,23 +314,23 @@ function VehiclesEditor() {
 
       {/* Add/Edit Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-in zoom-in-95 fade-in duration-200">
+        <Modal label={editing ? 'Редактирай автомобил' : 'Добави автомобил'} onClose={() => setShowForm(false)} busy={saveMutation.isPending} className="max-w-lg">
+          <div className="relative bg-white rounded-2xl w-full max-w-lg animate-in zoom-in-95 fade-in duration-200">
             <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
               <h3 className="font-semibold text-foreground-950 font-heading">
                 {editing ? 'Редактирай автомобил' : 'Добави автомобил'}
               </h3>
               <button
+                type="button" aria-label="Затвори автомобила"
                 onClick={() => setShowForm(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
+                className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-background-100 cursor-pointer"
               >
-                <i className="ri-close-line text-foreground-600 text-lg" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
               </button>
             </div>
 
             <div className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="text-xs text-foreground-600">Застраховка до<input type="date" value={form.insurance_expiry_date} onChange={e => setField('insurance_expiry_date', e.target.value)} className="block w-full p-2 mt-1 border border-background-200 rounded-lg" /></label>
                 <label className="text-xs text-foreground-600">Технически преглед до<input type="date" value={form.inspection_expiry_date} onChange={e => setField('inspection_expiry_date', e.target.value)} className="block w-full p-2 mt-1 border border-background-200 rounded-lg" /></label>
               </div>
@@ -364,8 +364,8 @@ function VehiclesEditor() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Година</label>
-                  <input
+                  <label htmlFor="admin-vehicles-year" className="text-xs font-medium text-foreground-500 block mb-1">Година</label>
+                  <input id="admin-vehicles-year"
                     type="number"
                     value={form.year}
                     onChange={(e) => setField('year', e.target.value)}
@@ -374,8 +374,8 @@ function VehiclesEditor() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Цвят</label>
-                  <input
+                  <label htmlFor="admin-vehicles-color" className="text-xs font-medium text-foreground-500 block mb-1">Цвят</label>
+                  <input id="admin-vehicles-color"
                     type="text"
                     value={form.color}
                     onChange={(e) => setField('color', e.target.value)}
@@ -421,8 +421,8 @@ function VehiclesEditor() {
                   {activeTypes.length === 1 && <p className="text-xs text-foreground-500 mt-1">Това е единствената активна категория на фирмата. Можеш да добавиш още.</p>}
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-foreground-500 block mb-1">Места</label>
-                  <input
+                  <label htmlFor="admin-vehicles-capacity" className="text-xs font-medium text-foreground-500 block mb-1">Места</label>
+                  <input id="admin-vehicles-capacity"
                     type="number"
                     value={form.capacity}
                     onChange={(e) => setField('capacity', e.target.value)}
@@ -466,13 +466,12 @@ function VehiclesEditor() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete Confirm */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteId(null)} />
+        <Modal label="Изтриване на автомобил" onClose={() => setDeleteId(null)} busy={deleteMutation.isPending} className="max-w-sm">
           <div className="relative bg-white rounded-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95 fade-in duration-200">
             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
               <i className="ri-delete-bin-line text-red-500 text-lg" />
@@ -496,7 +495,7 @@ function VehiclesEditor() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AdminLayout>
   );

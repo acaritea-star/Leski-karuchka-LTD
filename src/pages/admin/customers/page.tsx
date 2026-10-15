@@ -56,6 +56,7 @@ function CustomerList() {
         <div className="relative flex-1 min-w-[220px]">
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-foreground-400 text-sm" />
           <input
+            aria-label="Търси клиент"
             type="text"
             maxLength={80}
             value={search}
