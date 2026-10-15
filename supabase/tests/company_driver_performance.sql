@@ -3,8 +3,8 @@ BEGIN;
 SET LOCAL statement_timeout='30s';
 SELECT set_config('request.jwt.claims','{}',true);
 CREATE TEMP TABLE isolation_load_companies AS SELECT gen_random_uuid() id,n FROM generate_series(1,20) n;
-CREATE TEMP TABLE isolation_load_users AS SELECT gen_random_uuid() id,c.id company_id,n
- FROM isolation_load_companies c CROSS JOIN generate_series(1,50) n;
+CREATE TEMP TABLE isolation_load_users AS SELECT gen_random_uuid() id,c.id company_id,s.n
+ FROM isolation_load_companies c CROSS JOIN generate_series(1,50) s(n);
 INSERT INTO public.companies(id,name,slug,setup_completed_at)
  SELECT id,'Load fixture '||n,'isolation-load-'||id,now() FROM isolation_load_companies;
 INSERT INTO auth.users(id,email) SELECT id,'load-'||id||'@example.invalid' FROM isolation_load_users;
