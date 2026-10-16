@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { withRequestTimeout } from './requestTimeout';
 import { isAmbiguousWrite } from './rideOperations';
-export type MoneyCommand = { p_id: string; p_kind: string; p_amount: number; p_note: string; p_request_id?: string; p_reference_id?: string; p_source?: string; p_evidence_ref?: string };
+export type MoneyCommand = { p_id: string; p_kind: string; p_amount: number; p_note: string; p_request_id?: string; p_reference_id?: string; p_source?: string; p_evidence_ref?: string; p_payment_method?: 'cash' | 'card' | null };
 type Intent = { owner: string; scope: string; command: MoneyCommand };
 const key = (owner: string) => 'leski:pending-money:' + owner;
 export function readMoneyIntent(owner: string): Intent | null {
@@ -42,7 +42,7 @@ export async function findMoneyOperation(id: string, owner: string) {
 }
 export async function writeMoneyOperation(command: MoneyCommand, owner: string) {
  try {
-  const {data,error} = await withRequestTimeout(signal => supabase.rpc('record_driver_money_verified',{...command,p_actor:owner}).abortSignal(signal),15_000);
+  const {data,error} = await withRequestTimeout(signal => (Object.hasOwn(command,'p_payment_method') ? supabase.rpc('record_driver_money_method',{...command,p_payment_method:command.p_payment_method ?? null,p_actor:owner}) : supabase.rpc('record_driver_money_verified',{...command,p_actor:owner})).abortSignal(signal),15_000);
   if (error) throw error;
   if (data !== command.p_id) throw new Error('Записът не е потвърден.');
  } catch (cause) {

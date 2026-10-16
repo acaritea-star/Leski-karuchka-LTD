@@ -76,4 +76,6 @@ ROLLBACK;
 \ir company_driver_performance.sql
 \ir role_notifications.sql
 
+\ir ride_payment_receipts.sql
+
 \ir staff_mfa.sql

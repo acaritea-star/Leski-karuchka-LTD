@@ -23,6 +23,8 @@ const offlineDispatch = spawnSync('psql', [url, '-X', '-v', 'ON_ERROR_STOP=1', '
 if(offlineDispatch.status!==0) process.exit(offlineDispatch.status||1);
 const concurrency = spawnSync(process.execPath,['scripts/test-money-concurrency.mjs'],{stdio:'inherit'});
 if(concurrency.status!==0) process.exit(concurrency.status||1);
+const checkout = spawnSync(process.execPath,['scripts/test-checkout-concurrency.mjs'],{stdio:'inherit'});
+if(checkout.status!==0) process.exit(checkout.status||1);
 const acceptance = spawnSync(process.execPath,['scripts/test-acceptance-concurrency.mjs'],{stdio:'inherit'});
 if(acceptance.status!==0) process.exit(acceptance.status||1);
 

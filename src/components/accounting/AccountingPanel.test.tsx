@@ -66,7 +66,7 @@ it('requires evidence for an administrator correction of confirmed money', async
  fireEvent.change(reference, { target: { value: 'R-2' } });
  fireEvent.click(screen.getByRole('button', { name: /^Потвърди$/ }));
  await screen.findByText('Записът е запазен.');
- expect(mocks.rpc).toHaveBeenCalledWith('record_driver_money_verified', expect.objectContaining({ p_kind: 'reversal', p_reference_id: entry.id, p_source: 'receipt', p_evidence_ref: 'R-2', p_actor: 'user' }));
+ expect(mocks.rpc).toHaveBeenCalledWith('record_driver_money_method', expect.objectContaining({ p_kind: 'reversal', p_reference_id: entry.id, p_source: 'receipt', p_evidence_ref: 'R-2', p_actor: 'user' }));
 });
 it('does not replace an unavailable report with zero financial totals', async () => {
  mount(); await screen.findByText('История на сметките');

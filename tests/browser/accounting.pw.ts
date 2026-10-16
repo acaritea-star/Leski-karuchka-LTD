@@ -27,7 +27,7 @@ test('driver records actual payment once after a lost response and downloads one
    report.period.from = body.p_from; report.period.until = body.p_until;
    if (url.pathname.endsWith('/accounting_export')) exports++;
    data = report;
-  } else if (url.pathname.endsWith('/record_driver_money_verified')) {
+  } else if (url.pathname.endsWith('/record_driver_money_method')) {
    writes++; const body = route.request().postDataJSON();
    expect(body.p_actor).toBe(user.id); expect(body.p_amount).toBe(11.11); expect(body.p_request_id).toBe(financeIds.request);
    report.entries = [{ ...entryFixture(), id: body.p_id, amount: 11.11, signed_amount: 11.11, balance_delta: 11.11, note: body.p_note }]; report.entry_count = 1;

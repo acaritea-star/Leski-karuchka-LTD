@@ -15,16 +15,20 @@ export interface MoneyEntry {
  reversed: boolean; confirmed: boolean;
  reference_kind: 'income' | 'expense' | 'handover' | null; reference_recorded_at: string | null;
  signed_amount: number; balance_delta: number; reversed_at: string | null; confirmed_at: string | null;
+ payment_method?: 'cash' | 'card' | null; effective_method?: 'cash' | 'card' | null;
  evidence_source?: string; evidence_reference?: string | null;
 }
+export const paymentMethodLabel = (method: string | null | undefined) => method === 'cash' ? 'В брой' : method === 'card' ? 'С карта' : method === 'mixed' ? 'В брой и с карта' : 'Без посочен начин';
+export interface PaymentBreakdown { cash_income:number;card_income:number;unknown_income:number;cash_expenses:number;card_expenses:number;unknown_expenses:number;cash_handover:number;unknown_handover:number;cash_opening:number;cash_movement:number;cash_closing:number;unknown_closing:number }
 export interface AccountingReport {
+ payment_breakdown?: PaymentBreakdown;
  report_version: 2; currency: 'EUR'; generated_at: string;
  period: { from: string; until: string; timezone: 'Europe/Sofia' }; scope: { company_id: string; driver_id: string | null };
- totals: { completed: number; cancelled: number; interrupted: number; booked: number; missing_amounts: number; unreported_completed: number };
+ totals: { completed: number; cancelled: number; interrupted: number; booked: number; missing_amounts: number; unreported_completed: number; partially_paid?:number };
  finances: { income: number; expenses: number; handed_over: number; confirmed_handover: number; confirmed_income: number; net_income: number };
  balance: { opening: number; movement: number; closing: number; unconfirmed_handover: number; unconfirmed_income: number };
  driver_count: number; outcome_count: number; entry_count: number; outcomes: Outcome[]; entries: MoneyEntry[];
- reconciliation: { request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; difference:number|null }[];
+ reconciliation: { request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; outstanding?:number|null;payment_method?:string|null;checkout_choice?:string|null;payment_note?:string|null; difference:number|null }[];
  drivers: { driver_id: string | null; driver_name: string; trips: number; cancelled: number; booked: number; income: number; expenses: number; handed_over: number; confirmed_income: number; confirmed_handover: number; closing: number }[];
 }
 export function sofiaMonth(now = new Date()): string {
@@ -87,12 +91,22 @@ export function parseAccountingReport(value: unknown, month: string, scope: { co
  textValue(actualScope.company_id); dateValue(r.generated_at);
  const totals = object(r.totals), finances = object(r.finances), balance = object(r.balance);
  for (const key of ['completed','cancelled','interrupted','missing_amounts','unreported_completed']) countValue(totals[key]);
+ if (totals.partially_paid !== undefined) countValue(totals.partially_paid);
  if (amountValue(totals.booked) < 0) throw invalidReport();
  for (const key of ['income','expenses','handed_over','confirmed_handover','confirmed_income','net_income']) amountValue(finances[key]);
  for (const key of ['opening','movement','closing','unconfirmed_handover','unconfirmed_income']) amountValue(balance[key]);
  if (cents(balance.closing as number) !== cents(balance.opening as number) + cents(balance.movement as number) ||
   cents(finances.net_income as number) !== cents(finances.income as number) - cents(finances.expenses as number) ||
   cents(balance.movement as number) !== cents(finances.net_income as number) - cents(finances.handed_over as number)) throw invalidReport();
+ if (r.payment_breakdown !== undefined) {
+  const p = object(r.payment_breakdown);
+  for (const k of ['cash_income','card_income','unknown_income','cash_expenses','card_expenses','unknown_expenses','cash_handover','unknown_handover','cash_opening','cash_movement','cash_closing','unknown_closing']) amountValue(p[k]);
+  const c = (k:string) => cents(p[k] as number);
+  if (c('cash_income')+c('card_income')+c('unknown_income') !== cents(finances.income as number) ||
+   c('cash_expenses')+c('card_expenses')+c('unknown_expenses') !== cents(finances.expenses as number) ||
+   c('cash_handover')+c('unknown_handover') !== cents(finances.handed_over as number) ||
+   c('cash_movement') !== c('cash_income')-c('cash_expenses')-c('cash_handover') || c('cash_closing') !== c('cash_opening')+c('cash_movement')) throw invalidReport();
+ }
  for (const [name, counter, limit] of [['outcomes','outcome_count',full ? 10000 : 25],['entries','entry_count',full ? 10000 : 25],['drivers','driver_count',full ? 10000 : 50]] as const) {
   const count = countValue(r[counter]), rows = r[name];
   const offset = name === 'drivers' ? 0 : page * limit;
@@ -118,6 +132,7 @@ export function parseAccountingReport(value: unknown, month: string, scope: { co
   const e = object(row);
   for (const key of ['id','driver_user_id','driver_name','note']) textValue(e[key]);
   for (const key of ['driver_id','actor_id','request_id','reference_id']) textValue(e[key], true);
+  if (e.payment_method !== undefined && e.payment_method !== null && !['cash','card'].includes(String(e.payment_method))) throw invalidReport();
   dateValue(e.recorded_at); for (const key of ['reference_recorded_at','reversed_at','confirmed_at']) dateValue(e[key], true);
   if (!Object.hasOwn(kindLabels, String(e.kind)) || amountValue(e.amount) <= 0 || typeof e.reversed !== 'boolean' || typeof e.confirmed !== 'boolean') throw invalidReport();
   const referenced = e.kind === 'reversal' || e.kind === 'confirmation';
@@ -134,6 +149,8 @@ export function parseAccountingReport(value: unknown, month: string, scope: { co
  for (const row of r.reconciliation) {
   const rec = object(row);
   if (typeof rec.request_id !== 'string' || recIds.has(rec.request_id) || !outcomes.some(o => o.request_id === rec.request_id && o.outcome === 'completed') || typeof rec.company_confirmed !== 'boolean') throw invalidReport();
+  if (rec.outstanding != null && amountValue(rec.outstanding) < 0 || rec.payment_method != null && !['cash','card','mixed'].includes(String(rec.payment_method))) throw invalidReport();
+  if (rec.payment_note != null) textValue(rec.payment_note);
   recIds.add(rec.request_id); dateValue(rec.income_recorded_at, true);
   for (const key of ['estimated_amount','declared_income','difference']) if (rec[key] !== null) amountValue(rec[key]);
  }
@@ -155,6 +172,7 @@ export function csvCell(value: unknown): string {
 export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[], report?: AccountingReport): string {
  const rows: unknown[][] = [];
  if (report) {
+  if (report.payment_breakdown) rows.push(['Получени в брой',report.payment_breakdown.cash_income],['Получени с карта',report.payment_breakdown.card_income],['Приходи без посочен начин',report.payment_breakdown.unknown_income],['Изчислен остатък в брой',report.payment_breakdown.cash_closing]);
   rows.push(['Отчет',report.period.from,report.period.until,'Крайна дата — без включване','EUR','Europe/Sofia'],
    ['Фирма',report.scope.company_id],
    ['Обхват',report.scope.driver_id ? 'Шофьор' : 'Цялата фирма',report.scope.driver_id ?? ''],
@@ -167,6 +185,6 @@ export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[], report?: A
  }
  rows.push(['Вид', 'Шофьор', 'Дата (Europe/Sofia)', 'Заявка', 'Текущо състояние', 'Автор на отказа', 'Сума EUR (според вида)', 'Бележка', 'Идентификатор', 'Свързан запис', 'Източник на сверяване', 'Номер / референция', 'GPS наблюдения', 'Сигнали за преглед', 'Начало, потвърдено от клиент', 'Вид на свързания запис', 'Движение на остатъка EUR']);
  for (const o of outcomes) rows.push([o.outcome === 'completed' ? 'Завършен курс — стойност, не плащане' : 'Отменена заявка', o.driver_name || o.driver_id, new Date(o.occurred_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), o.request_id, stageLabels[o.previous_status] || o.previous_status, actorLabels[o.cancelled_by ?? ''] ?? '', o.outcome === 'completed' ? o.booked_amount : '', `${reasonLabels[o.cancel_reason ?? ''] ?? o.cancel_reason ?? ''}${o.reconstructed ? ' (възстановен стар запис)' : ''}`, o.id, '', 'Записана цена на заявката', '', o.evidence ? evidenceDescription(o.evidence) : 'Няма наблюдения', o.evidence?.flags.map(f=>evidenceFlagLabels[f] ?? f).join(', ') ?? '', o.evidence?.customer_confirmed_at ?? '', '', 0]);
- for (const e of entries) rows.push([kindLabels[e.kind], e.driver_name || e.driver_id, new Date(e.recorded_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), e.request_id, e.reversed ? 'С обратен запис' : e.confirmed ? 'Потвърдено' : 'Декларирано', '', e.kind === 'reversal' ? -e.amount : e.amount, e.note, e.id, e.reference_id, evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source, e.evidence_reference, '', '', '', e.reference_kind ? kindLabels[e.reference_kind] : '', e.balance_delta]);
+ for (const e of entries) rows.push([`${kindLabels[e.kind]} · ${paymentMethodLabel(e.effective_method ?? e.payment_method)}`, e.driver_name || e.driver_id, new Date(e.recorded_at).toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' }), e.request_id, e.reversed ? 'С обратен запис' : e.confirmed ? 'Потвърдено' : 'Декларирано', '', e.kind === 'reversal' ? -e.amount : e.amount, e.note, e.id, e.reference_id, evidenceLabels[e.evidence_source ?? 'declaration'] ?? e.evidence_source, e.evidence_reference, '', '', '', e.reference_kind ? kindLabels[e.reference_kind] : '', e.balance_delta]);
  return '\uFEFF' + rows.map(row => row.map(csvCell).join(';')).join('\r\n');
 }

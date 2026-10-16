@@ -151,7 +151,7 @@ test('company review requires evidence, locks a delayed write and preserves the 
       report.period.from = body.p_from; report.period.until = body.p_until;
       return reply(report);
     }
-    if (name !== 'record_driver_money_verified') return route.fallback();
+    if (name !== 'record_driver_money_method') return route.fallback();
     writes.push(body);
     expect(body.p_actor).toBe(uiAccount); expect(body.p_reference_id).toBe(original.id); expect(body.p_amount).toBe(12.34);
     if (body.p_kind === 'confirmation') {

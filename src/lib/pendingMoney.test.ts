@@ -38,3 +38,9 @@ it('does not reconcile a definite business rejection',async()=>{
  const command=prepareMoneyIntent('user',':driver',payload);mocks.rpc.mockReturnValue({abortSignal:()=>Promise.resolve({data:null,error:{code:'42501',message:'Account changed'}})});
  await expect(writeMoneyOperation(command,'user')).rejects.toMatchObject({code:'42501'});expect(mocks.lookup).not.toHaveBeenCalled();
 });
+it('sends an explicit tender to the method-aware endpoint while preserving old saved commands',async()=>{
+ const command=prepareMoneyIntent('user',':driver',{...payload,p_payment_method:'card'});
+ mocks.rpc.mockReturnValue({abortSignal:()=>Promise.resolve({data:command.p_id,error:null})});await writeMoneyOperation(command,'user');
+ expect(mocks.rpc).toHaveBeenCalledWith('record_driver_money_method',{...command,p_actor:'user'});
+ expect(()=>prepareMoneyIntent('user',':driver',{...payload,p_payment_method:'cash'})).toThrow('Първо');
+});

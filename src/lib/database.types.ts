@@ -438,6 +438,46 @@ export type Database = {
           },
         ]
       }
+      ride_payment_receipts: {
+        Row: {
+          request_id: string
+          id: string
+          company_id: string
+          driver_id: string
+          driver_user_id: string
+          expected_amount: number
+          received_amount: number
+          choice: string
+          payment_method: string | null
+          partial_amount: number | null
+          note: string
+          recorded_at: string
+          entry_id: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      expense_receipts: {
+        Row: {
+          id: string
+          entry_id: string
+          company_id: string
+          driver_id: string
+          driver_user_id: string
+          slot: number
+          file_name: string
+          mime_type: string
+          byte_size: number
+          digest: string
+          path: string
+          created_at: string
+          uploaded_at: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       driver_money_entries: {
         Row: {
           actor_id: string | null
@@ -450,6 +490,7 @@ export type Database = {
           evidence_source: string
           id: string
           kind: string
+          payment_method: string | null
           note: string
           recorded_at: string
           reference_id: string | null
@@ -466,6 +507,7 @@ export type Database = {
           evidence_source?: string
           id: string
           kind: string
+          payment_method: string | null
           note: string
           recorded_at?: string
           reference_id?: string | null
@@ -482,6 +524,7 @@ export type Database = {
           evidence_source?: string
           id?: string
           kind?: string
+          payment_method?: string | null
           note?: string
           recorded_at?: string
           reference_id?: string | null
@@ -1687,6 +1730,11 @@ export type Database = {
       }
     }
     Functions: {
+      complete_ride_payment: { Args: {p_id:string;p_request_id:string;p_actor:string;p_choice:string;p_partial_amount?:number|null;p_note?:string}; Returns:Json }
+      record_driver_money_method: { Args: {p_id:string;p_kind:string;p_amount:number;p_note:string;p_actor:string;p_payment_method:string|null;p_request_id?:string;p_reference_id?:string;p_source?:string;p_evidence_ref?:string}; Returns:string }
+      reserve_expense_receipt: { Args: {p_id:string;p_entry_id:string;p_actor:string;p_file_name:string;p_mime_type:string;p_byte_size:number;p_digest:string}; Returns:Json }
+      finalize_expense_receipt: { Args: {p_id:string;p_actor:string}; Returns:Json }
+
       notification_inbox_state: { Args: Record<string, never>; Returns: Json }
       notification_inbox_page: { Args: { p_before?: string; p_before_id?: string }; Returns: Json }
       mark_notifications_read: { Args: { p_ids?: string[] }; Returns: number }
