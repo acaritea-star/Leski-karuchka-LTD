@@ -6,7 +6,7 @@
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261016074354",
   "googleRoutesVersion": 15,
-  "verifiedSourceCommit": "1fbe0b34a7c26bc2f21633c363c35acdae67fb3f",
+  "verifiedSourceCommit": "4cbfe55e97468f5e2a1d60df9053fc59b4b1a2d7",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -115,5 +115,5 @@
   "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "staffMfaEnforcedAt": "2026-10-16T12:19:40.947757Z",
   "liveTrackingVersion": 1,
-  "liveTrackingVerifiedSourceCommit": "1fbe0b34a7c26bc2f21633c363c35acdae67fb3f"
+  "liveTrackingVerifiedSourceCommit": "4cbfe55e97468f5e2a1d60df9053fc59b4b1a2d7"
 }
