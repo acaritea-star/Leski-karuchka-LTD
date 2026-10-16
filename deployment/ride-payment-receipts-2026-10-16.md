@@ -88,6 +88,7 @@ foreign-company/driver/customer access and missing MFA. The concurrency suite
 uses actual separate PostgreSQL connections in disposable localhost Supabase.
 Browser scenarios cover lost responses, reload without an active ride, small
 viewports, private-file retry without another expense and readable health alerts.
+The real Auth/TOTP integration also uploads, finalizes and downloads actual private Storage bytes, checks public/aal1 denial and verifies overwrite/delete cannot change the original.
 Local PostgreSQL WASM is an additional syntax/logic check, not a substitute for
 the full Supabase CI integration.
 

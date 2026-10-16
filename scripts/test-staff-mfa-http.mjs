@@ -15,7 +15,7 @@ if (!url || !anon || !service || !['127.0.0.1', 'localhost'].includes(new URL(ur
 const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
 const admin = createClient(url, service, options);
 const sql = async q => (await exec('psql', [database, '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', q], { timeout: 20000 })).stdout.trim();
-const company = randomUUID(), users = [];
+const company = randomUUID(), users = [], proofFiles = [];
 function totp(secret) {
  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
  let bits = ''; for (const character of secret.toUpperCase().replace(/=+$/, '')) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
@@ -62,6 +62,35 @@ try {
   const token = (await client.auth.getSession()).data.session.access_token;
   if ((await rpcWithToken(token)).status !== 200) throw Error('Verified staff session denied: ' + role);
   if ((await rpcWithToken(lowToken)).status !== 403) throw Error('Old aal1 token upgraded without MFA');
+  if (role === 'DRIVER') {
+   // Exercise real Storage bytes/metadata with the verified staff session.
+   // No extra CLI invocation; the existing localhost-only configuration is reused.
+   const expenseId = randomUUID(), proofId = randomUUID();
+   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXYQAAAAASUVORK5CYII=', 'base64');
+   const posted = await client.rpc('record_driver_money_method', {p_id:expenseId,p_kind:'expense',p_amount:3,p_note:'Synthetic Storage test',p_actor:id,p_payment_method:'cash'});
+   if (posted.error || posted.data !== expenseId) throw Error('Verified driver expense failed');
+   proofFiles.push({entry:expenseId,id:proofId,path:null});
+   const reserved = await client.rpc('reserve_expense_receipt', {p_id:proofId,p_entry_id:expenseId,p_actor:id,p_file_name:'synthetic.png',p_mime_type:'image/png',p_byte_size:png.length,p_digest:'a'.repeat(64)});
+   if (reserved.error || !reserved.data?.path) throw Error('Real Storage reservation failed');
+   const path = reserved.data.path; proofFiles.at(-1).path = path;
+   const uploaded = await client.storage.from('expense-receipts').upload(path,png,{contentType:'image/png',upsert:false});
+   if (uploaded.error) throw Error('Verified receipt bytes upload failed: ' + uploaded.error.message);
+   const finalized = await client.rpc('finalize_expense_receipt',{p_id:proofId,p_actor:id});
+   if (finalized.error || !finalized.data?.uploaded_at) throw Error('Actual Storage metadata did not finalize: ' + (finalized.error?.message ?? 'missing confirmation'));
+   const downloaded = await client.storage.from('expense-receipts').download(path);
+   if (downloaded.error || !Buffer.from(await downloaded.data.arrayBuffer()).equals(png)) throw Error('Private receipt bytes did not round-trip');
+   const forbidden = await fetch(url+'/storage/v1/object/authenticated/expense-receipts/'+path,{headers:{apikey:anon,Authorization:'Bearer '+lowToken}});
+   if (forbidden.ok) throw Error('aal1 bypassed private receipt MFA');
+   const publicFile = await fetch(url+'/storage/v1/object/public/expense-receipts/'+path,{headers:{apikey:anon}});
+   if (publicFile.ok) throw Error('Expense proof became public');
+   const replacement = await client.storage.from('expense-receipts').upload(path,Buffer.from('replacement'),{contentType:'image/png',upsert:true});
+   if (!replacement.error) throw Error('Confirmed expense proof was overwritten');
+   await client.storage.from('expense-receipts').remove([path]);
+   const retained = await client.storage.from('expense-receipts').download(path);
+   if (retained.error || !Buffer.from(await retained.data.arrayBuffer()).equals(png)) throw Error('Driver deleted/replaced immutable evidence');
+   console.log('PASS: real private Storage upload/finalize/download; public/aal1/overwrite/delete denied; original bytes preserved');
+  }
+
   const secondLogin = createClient(url, anon, options);
   const signedAgain = await secondLogin.auth.signInWithPassword({ email, password });
   if (signedAgain.error) throw signedAgain.error;
@@ -77,6 +106,10 @@ try {
  await sql('UPDATE private.app_security SET staff_mfa_enforced=false;');
  const publicAfter = await fetch(url + '/rest/v1/companies?select=id&limit=0', { headers: { apikey: anon } });
  if (publicAfter.status !== 200) throw Error('Public reads failed with MFA enforcement off');
+ for (const proof of proofFiles) {
+  if (proof.path) {const removed=await admin.storage.from('expense-receipts').remove([proof.path]);if(removed.error)throw Error('Synthetic Storage cleanup failed');}
+  await sql(`DELETE FROM public.expense_receipts WHERE id='${proof.id}'; DELETE FROM public.driver_money_entries WHERE id='${proof.entry}';`);
+ }
  for (const id of users) {
   const result = await admin.auth.admin.deleteUser(id); if (result.error) throw Error('Synthetic Auth cleanup failed');
  }
