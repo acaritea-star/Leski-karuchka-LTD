@@ -76,5 +76,5 @@ try {
  for (const id of users) {
   const result = await admin.auth.admin.deleteUser(id); if (result.error) throw Error('Synthetic Auth cleanup failed');
  }
- await sql(`DELETE FROM public.companies WHERE id='${company}';`);
+ await sql(`BEGIN; DELETE FROM public.vehicle_types WHERE company_id='${company}'; DELETE FROM public.companies WHERE id='${company}'; COMMIT;`);
 }

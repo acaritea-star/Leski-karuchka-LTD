@@ -72,5 +72,9 @@ test('customer keeps first-factor login and emergency access stays visible witho
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.screenshot({ path: testInfo.outputPath('customer-emergency-access.png') });
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await page.getByRole('button', { name: 'Emergency help on 112', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Call 112', exact: true })).toHaveAttribute('href', 'tel:112');
+  await page.getByRole('button', { name: 'Back to the app', exact: true }).click();
   expect(mfaRequests).toBe(0); expect(state.errors).toEqual([]);
 });

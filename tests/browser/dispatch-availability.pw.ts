@@ -157,6 +157,9 @@ test('search remains usable above a short visual viewport and details keep the s
  expect(input!.y).toBeGreaterThanOrEqual(root!.y);expect(input!.y+input!.height).toBeLessThanOrEqual(button!.y);
  expect(button!.y+button!.height).toBeLessThanOrEqual(root!.y+root!.height);
  await expect(page.locator('.customer-header')).toBeHidden();
+ const emergency=page.getByRole('button',{name:'Спешна помощ на 112',exact:true});await expect(emergency).toBeVisible();
+ await emergency.click();await expect(page.getByRole('link',{name:'Обади се на 112',exact:true})).toHaveAttribute('href','tel:112');
+ await page.getByRole('button',{name:'Назад към приложението',exact:true}).click();
  await page.getByRole('radio',{name:/ОРИОН/}).click();await expect(order).toContainText('10.00');
  await page.evaluate(()=>{delete (window.visualViewport as unknown as {height?:number}).height;window.visualViewport!.dispatchEvent(new Event('resize'));});
  await expect(page.locator('.customer-header')).toBeVisible();
