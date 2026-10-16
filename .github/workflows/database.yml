@@ -14,11 +14,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install Auth client for localhost MFA integration
+        run: npm ci --omit=dev --ignore-scripts
       - name: Start disposable Supabase
         run: |
           mkdir -p "$RUNNER_TEMP/leski-db"
           cd "$RUNNER_TEMP/leski-db"
           npx --yes supabase@2.120.0 init
+          node "$GITHUB_WORKSPACE/scripts/enable-test-mfa.mjs" "$RUNNER_TEMP/leski-db/supabase/config.toml"
           npx --yes supabase@2.120.0 start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Restore schema checkpoint, apply new migrations and run rollback tests
         run: node scripts/test-database.mjs
