@@ -20,12 +20,13 @@ it('retries an uncertain write with the same operation ID instead of duplicating
  mocks.rpc.mockImplementationOnce(()=>({abortSignal:()=>Promise.resolve({error:{message:'network failure'}})}))
   .mockImplementationOnce((_name,command)=>({abortSignal:()=>Promise.resolve({data:command.p_id,error:null})}));
  mount();
- await screen.findByText('Моите сметки');
+ await screen.findByText('История на сметките');
+ fireEvent.click(screen.getByRole('button', { name: '+ Получени' }));
  fireEvent.change(screen.getByLabelText('Сума в евро'), {target:{value:'12,50'}});
  fireEvent.change(screen.getByLabelText('Описание'), {target:{value:'Cash received'}});
  fireEvent.click(screen.getByText('Добави запис'));
  await screen.findByRole('alert');
- fireEvent.click(screen.getByText('Добави запис'));
+ fireEvent.click(screen.getByText('Повтори същия запис'));
  await screen.findByText('Записът е запазен.');
  expect(mocks.rpc).toHaveBeenCalledTimes(2);
  expect(mocks.rpc.mock.calls[0][1].p_id).toBe(mocks.rpc.mock.calls[1][1].p_id);
@@ -33,20 +34,21 @@ it('retries an uncertain write with the same operation ID instead of duplicating
 });
 it('does not present driver entry controls in a company report', async () => {
  mount(true);
- await screen.findByText('Курсове и откази');
- expect(screen.queryByText('Моите сметки')).toBeNull();
+ await screen.findByText('История на сметките');
+ expect(screen.queryByRole('button', { name: '+ Получени' })).toBeNull();
  expect(screen.getAllByText('12.34 €').length).toBeGreaterThan(0);
 });
 it('changes the report month and reloads the first page', async () => {
  mount();
- await screen.findByText('Курсове и откази');
+ await screen.findByText('История на сметките');
  fireEvent.change(screen.getByLabelText('Месец на отчета'),{target:{value:'2026-09'}});
  await waitFor(() => expect(mocks.report).toHaveBeenLastCalledWith('2026-09', {companyId:undefined,driverId:'driver'},0,expect.any(AbortSignal)));
 });
 
 it('prefills a ride without claiming that the quoted amount has already been paid', async () => {
  Element.prototype.scrollIntoView = vi.fn();
- mount(); await screen.findByText('Отчети плащането');
+ mount(); await screen.findByText('История на сметките');
+ fireEvent.click(screen.getByRole('button', { name: 'Курсове' }));
  fireEvent.click(screen.getByText('Отчети плащането'));
  expect((screen.getByLabelText('Сума в евро') as HTMLInputElement).value).toBe('12.34');
  expect((screen.getByLabelText('Връзка с курс от показаната страница') as HTMLSelectElement).value).toBe(report.outcomes[0].request_id);
@@ -67,10 +69,35 @@ it('requires evidence for an administrator correction of confirmed money', async
  expect(mocks.rpc).toHaveBeenCalledWith('record_driver_money_verified', expect.objectContaining({ p_kind: 'reversal', p_reference_id: entry.id, p_source: 'receipt', p_evidence_ref: 'R-2', p_actor: 'user' }));
 });
 it('does not replace an unavailable report with zero financial totals', async () => {
- mount(); await screen.findByText('Курсове и откази');
+ mount(); await screen.findByText('История на сметките');
  mocks.report.mockRejectedValue(new Error('offline'));
  fireEvent.change(screen.getByLabelText('Месец на отчета'), { target: { value: '2026-09' } });
  await screen.findByRole('alert');
  expect(screen.queryByText('Остатък по въведените сметки')).toBeNull();
  expect((screen.getByRole('button', { name: 'Изтегли CSV' }) as HTMLButtonElement).disabled).toBe(true);
+});
+it('clears the financial draft after checking an uncertain operation that already succeeded', async () => {
+ mocks.lookup.mockResolvedValue({ data: null, error: null });
+ mocks.rpc.mockImplementation((_name, command) => ({ abortSignal: () => Promise.resolve({ error: { message: 'network failure' }, data: command.p_id }) }));
+ mount(); await screen.findByText('История на сметките');
+ fireEvent.click(screen.getByRole('button', { name: '+ Получени' }));
+ fireEvent.change(screen.getByLabelText('Сума в евро'), { target: { value: '12,50' } });
+ fireEvent.change(screen.getByLabelText('Описание'), { target: { value: 'Гориво' } });
+ fireEvent.click(screen.getByText('Добави запис')); await screen.findByRole('alert');
+ const id = mocks.rpc.mock.calls[0][1].p_id;
+ mocks.lookup.mockResolvedValue({ data: { id, actor_id: 'user' }, error: null });
+ fireEvent.click(screen.getByText('Провери записа')); await screen.findByText('Записът е потвърден.');
+ expect(screen.queryByRole('dialog')).toBeNull();
+ fireEvent.click(screen.getByRole('button', { name: '+ Получени' }));
+ expect((screen.getByLabelText('Сума в евро') as HTMLInputElement).value).toBe('');
+ expect((screen.getByLabelText('Описание') as HTMLInputElement).value).toBe('');
+});
+it('keeps a company report read-only when scoped to a driver', async () => {
+ mocks.report.mockResolvedValue(report);
+ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+ render(<QueryClientProvider client={client}><AccountingPanel companyId="company" driverId="driver" /></QueryClientProvider>);
+ await screen.findByText('История на сметките');
+ expect(screen.queryByRole('button', { name: '+ Получени' })).toBeNull();
+ expect(screen.queryByRole('button', { name: '− Разход' })).toBeNull();
+ expect(mocks.report).toHaveBeenCalledWith(expect.any(String), { companyId: 'company', driverId: 'driver' }, 0, expect.any(AbortSignal));
 });
