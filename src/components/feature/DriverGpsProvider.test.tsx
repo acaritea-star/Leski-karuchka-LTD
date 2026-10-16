@@ -87,3 +87,9 @@ it('rechecks permission granted by the Online action without a focus event or a 
  act(()=>client.setQueryData(['driver-test','driver-user'],{...fake.driver,is_online:true}));
  await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).toHaveBeenCalledOnce();client.clear();
 });
+it('rechecks an Online grant when an unavailable active ride already requires tracking',async()=>{
+ fake.permission='prompt';fake.driver.is_online=false;fake.active={id:'ride',driver_id:'driver',status:'in_progress'};
+ const client=await mount();await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).not.toHaveBeenCalled();
+ fake.permission='granted';act(()=>client.setQueryData(['driver-test','driver-user'],{...fake.driver,is_online:true}));
+ await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).toHaveBeenCalledOnce();client.clear();
+});

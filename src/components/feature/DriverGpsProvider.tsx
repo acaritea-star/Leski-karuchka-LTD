@@ -49,7 +49,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     return () => { active = false; window.removeEventListener('focus', read); window.removeEventListener('pageshow', resume); document.removeEventListener('visibilitychange', resume); };
     // Going Online may have just granted the native prompt. Recheck without
     // requesting permission again instead of retaining the pre-click state.
-  }, [user?.id, trackingRequired]);
+  }, [user?.id, trackingRequired, driver?.is_online]);
   useEffect(() => setRetrying(false), [user?.id]);
   // Offline drivers can center their map without sharing a working location.
   useEffect(() => {

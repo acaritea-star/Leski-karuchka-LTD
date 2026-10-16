@@ -21,7 +21,7 @@ dependencies, schema changes, Broadcast stream or paid map polling.
 2. Permission was read before the explicit Online action, then only on window
    focus. A successful native prompt could leave the provider's cached state at
    `prompt`, preventing the continuous watch after its initial saved position.
-   Starting work now rechecks permission without another native permission
+   Starting work, including changing availability during an existing ride, now rechecks permission without another native permission
    request. An expired/denied permission still requires an explicit GPS action.
 3. Both active-ride maps required a route or matching street geometry before
    drawing the car. A failed route and street request could hide valid GPS data.
@@ -73,10 +73,10 @@ exercise the real app and SDK with synthetic GPS, renderer, HTTP responses and
 WebSocket frames on Chromium and WebKit. External services are fulfilled/blocked;
 no real rides, notifications or billable Google calls are created.
 
-Local validation passed 605 unit/component tests (97 files), lint, TypeScript,
+Validation covers 606 unit/component tests (97 files), lint, TypeScript,
 the production build and unchanged legal-source digests. The current initial
-JavaScript graph grows from 207,279 to 207,870 compressed bytes (+591 bytes);
-initial plus booking grows from 241,402 to 241,887 (+485 bytes), measured with
+JavaScript graph grows from 207,279 to 207,881 compressed bytes (+602 bytes);
+initial plus booking grows from 241,402 to 241,900 (+498 bytes), measured with
 `scripts/measure-booking-bundle.mjs` on a fresh isolated build. Retained historical
 assets are excluded. The final packaged commit also runs the complete browser,
 database, concurrency and real TOTP checks in GitHub Actions before merge.
