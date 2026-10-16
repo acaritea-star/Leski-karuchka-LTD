@@ -336,6 +336,7 @@ export default {
   gps_live_shared: 'Location is shared live',
   gps_weak_signal: 'GPS signal is weak — retrying',
   position_not_updating: 'Position not updating',
+  gps_active_ride_offline: 'New requests are paused. GPS stays on for the current ride until it ends.',
   go_online_btn: 'Go online',
   go_online_hint: 'Press the button to become visible for ride requests',
   navigate_to_dest: 'Navigate to destination',

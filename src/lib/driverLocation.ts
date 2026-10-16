@@ -40,9 +40,9 @@ function validatePosition(position: GeolocationPosition) {
   if (!isInBulgaria(position.coords.latitude, position.coords.longitude)) throw new Error(SERVICE_AREA_ERROR);
 }
 /** Before an offer claim, refresh only when the confirmed GPS is getting old. */
-export async function ensureDriverLocation(driver: { id: string; company_id: string; user_id?: string; is_online?: boolean }, force = false) {
+export async function ensureDriverLocation(driver: { id: string; company_id: string; user_id?: string; is_online?: boolean }, force = false, activeRide = false) {
   if (getLocationEnabled(driver.user_id) === false) throw new Error('Местоположението е изключено от настройките.');
-  if (driver.is_online === false) throw new Error('Включи онлайн режим, за да приемаш заявки.');
+  if (driver.is_online === false && !activeRide) throw new Error('Включи онлайн режим, за да приемаш заявки.');
   // Requiring another native measurement on every claim can block an idle
   // desktop provider for its full one-minute sampling cycle. Use the exact
   // same bounded validity rule as dispatch, with time left for the RPC.
@@ -94,7 +94,8 @@ export async function setDriverOnline(driver: { id: string; company_id: string; 
       ? String(cause.message) : 'Промяната не е потвърдена.');
   }
   if (online && driver.user_id) setLocationEnabled(driver.user_id, true);
-  if (!online) stopDriverGps(true, driver.id);
+  // DriverGpsProvider owns the watch lifecycle. Going unavailable must not
+  // stop tracking an accepted/in-progress ride; it stops when that ride ends.
   return confirmed;
 }
 export function startDriverGps(id: string, company: string, callbacks: Callbacks = {}, userId?: string): boolean {

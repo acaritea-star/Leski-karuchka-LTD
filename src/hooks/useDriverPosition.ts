@@ -15,36 +15,54 @@ export function driverPosition(row: Record<string, unknown>): VehicleFix | null 
   return validFix(fix) && timestamp <= Date.now() + 30_000 ? fix : null;
 }
 
-export function useDriverPosition(driverId: string | null | undefined, enabled = true): VehicleFix | null {
-  const [fix, setFix] = useState<VehicleFix | null>(null);
+export function useDriverPosition(driverId: string | null | undefined, enabled = true, scope?: string): VehicleFix | null {
+  const [state, setState] = useState<{ driverId: typeof driverId; scope?: string; fix: VehicleFix | null } | null>(null);
   useEffect(() => {
-    setFix(null);
+    setState(null);
     if (!driverId || !enabled) return;
     let active = true;
+    let revision = 0;
     const apply = (row: Record<string, unknown>) => {
       const next = driverPosition(row);
       if (!active || !next) return;
       // A late poll response cannot rewind a newer Realtime GPS fix. A server
       // heartbeat with the same position_at also cannot restart the animation.
-      setFix(previous => previous && previous.timestamp >= next.timestamp ? previous : next);
+      setState(previous => previous?.fix && previous.fix.timestamp >= next.timestamp ? previous : { driverId, scope, fix: next });
     };
     const poll = createRealtimePoll(async signal => {
+        const started = revision;
         const { data, error } = await supabase.from('driver_locations')
           .select('latitude, longitude, heading, speed, accuracy, position_at, updated_at')
           .eq('driver_id', driverId).abortSignal(signal).maybeSingle();
         if (error) throw error;
-        return data;
-    }, data => { if (data) apply(data); });
+        return { data, started };
+    }, ({ data, started }) => {
+      if (data) apply(data);
+      // An authoritative empty read revokes the displayed location. A read
+      // begun before a new Realtime fix cannot erase that newer confirmation.
+      else if (active && started === revision) setState(null);
+    }, { healthyMs: 15_000, metric: 'tracking.read' });
     const channel = supabase.channel(`map-position-${driverId}`)
+      .on('system', {}, (payload: { extension?: string; status?: string }) => {
+        if (payload.extension === 'postgres_changes') poll.setStatus(payload.status === 'ok' ? 'SUBSCRIBED' : 'CHANNEL_ERROR');
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${driverId}` },
-        payload => apply(payload.new as Record<string, unknown>))
-      .subscribe(poll.setStatus);
+        payload => {
+          if (!active || !driverPosition(payload.new as Record<string, unknown>)) return;
+          revision++; apply(payload.new as Record<string, unknown>);
+          poll.setStatus('SUBSCRIBED');
+        })
+      .subscribe(status => {
+        // Older SDKs acknowledge the socket before Postgres is listening.
+        // Use the fast fallback until the system confirmation or a real fix.
+        if (status !== 'SUBSCRIBED') poll.setStatus(status);
+      });
     return () => {
       active = false; poll.stop();
       void supabase.removeChannel(channel);
     };
-  }, [driverId, enabled]);
-  return fix;
+  }, [driverId, enabled, scope]);
+  return enabled && state && state.driverId === driverId && state.scope === scope ? state.fix : null;
 }
 
 export function usePositionFreshness(fix: VehicleFix | null): boolean {

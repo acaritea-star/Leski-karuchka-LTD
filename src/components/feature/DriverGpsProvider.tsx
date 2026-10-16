@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocationPreference } from '@/hooks/useLocationPreference';
 import { getLocationEnabled, setLocationEnabled } from '@/lib/locationPreference';
 import { gpsPermission, getGpsPosition, requestGps, stopSharedGps } from '@/lib/sharedGps';
 import { useAuth } from '@/hooks/useAuth';
 import { isInBulgaria } from '@/lib/serviceArea';
 import { driverRecordOptions } from '@/lib/driverRecord';
+import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
 import { ensureDriverLocation, startDriverGps, stopDriverGps, getGpsStats } from '@/lib/driverLocation';
 
 type GpsState = { status: 'idle' | 'acquiring' | 'tracking' | 'stale' | 'error'; error: string; message?: string };
@@ -14,6 +15,7 @@ export const useDriverGps = () => useContext(Context);
 
 export default function DriverGpsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const client = useQueryClient();
   const owner = useRef(user?.id); owner.current = user?.id;
   const locationEnabled = useLocationPreference(user?.id);
   const allowLocation = locationEnabled !== false;
@@ -23,6 +25,16 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     ...driverRecordOptions(user?.id),
     enabled: isDriver, refetchInterval: isDriver ? 15_000 : false, refetchOnWindowFocus: true,
   });
+  const { data: activeRequest } = useQuery({
+    ...driverActiveRequestOptions(client, driver?.id),
+    enabled: isDriver && !!driver?.id && !driver.is_online,
+    // Offline idle drivers need one recovery read, not another polling loop.
+    // The panels share this key and immediately publish ride transitions.
+    refetchInterval: query => query.state.data ? 15_000 : false,
+    staleTime: 5000,
+  });
+  const trackingRequired = !!driver && (driver.is_online || !!activeRequest
+    && activeRequest.driver_id === driver.id && ['accepted', 'arrived', 'in_progress'].includes(activeRequest.status));
   const [state, setState] = useState<GpsState>({ status: 'idle', error: '' });
   const publishState = useCallback((next: GpsState) => setState(current => current.status === next.status
     && current.error === next.error && current.message === next.message ? current : next), []);
@@ -31,13 +43,17 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
   useEffect(() => {
     let active = true;
     const read = () => { void gpsPermission().then(value => { if (active) setPermission(value); }); };
-    read(); window.addEventListener('focus', read);
-    return () => { active = false; window.removeEventListener('focus', read); };
-  }, [user?.id]);
+    const resume = () => { if (document.visibilityState !== 'hidden') read(); };
+    read(); window.addEventListener('focus', read); window.addEventListener('pageshow', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => { active = false; window.removeEventListener('focus', read); window.removeEventListener('pageshow', resume); document.removeEventListener('visibilitychange', resume); };
+    // Going Online may have just granted the native prompt. Recheck without
+    // requesting permission again instead of retaining the pre-click state.
+  }, [user?.id, trackingRequired]);
   useEffect(() => setRetrying(false), [user?.id]);
   // Offline drivers can center their map without sharing a working location.
   useEffect(() => {
-    if (!isDriver || !user?.id || !driver?.id || driver.is_online || !allowLocation) return;
+    if (!isDriver || !user?.id || !driver?.id || trackingRequired || !allowLocation) return;
     let active = true;
     void gpsPermission().then(async permission => {
       if (!active || permission !== 'granted') return;
@@ -47,10 +63,10 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       if (position.coords.accuracy <= 100 && isInBulgaria(position.coords.latitude, position.coords.longitude) && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
     }).catch(() => { /* Explicit GPS/Online actions display actionable errors. */ });
     return () => { active = false; };
-  }, [isDriver, user?.id, driver?.id, driver?.is_online, allowLocation]);
+  }, [isDriver, user?.id, driver?.id, trackingRequired, allowLocation]);
 
   useEffect(() => {
-    if (!isDriver || !driver?.is_online || !allowLocation) { stopDriverGps(); setState({ status: 'idle', error: !allowLocation && driver?.is_online ? 'Местоположението е изключено.' : '' }); return; }
+    if (!isDriver || !driver?.id || !trackingRequired || !allowLocation) { stopDriverGps(); setState({ status: 'idle', error: !allowLocation && trackingRequired ? 'Местоположението е изключено.' : '' }); return; }
     if (permission !== 'granted') {
       stopDriverGps();
       if (permission === 'checking') { setState({ status: 'acquiring', error: '', message: 'Проверяваме разрешението за GPS…' }); return; }
@@ -116,15 +132,15 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility);
       document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
-  }, [isDriver, user?.id, driver?.id, driver?.company_id, driver?.is_online, allowLocation, permission, publishState]);
+  }, [isDriver, user?.id, driver?.id, driver?.company_id, trackingRequired, allowLocation, permission, publishState]);
   const retryLocation = useCallback(() => {
-    if (!isDriver || !driver?.is_online || !allowLocation || retrying) return;
+    if (!isDriver || !driver || !trackingRequired || !allowLocation || retrying) return;
     const startedOwner = user?.id;
     setRetrying(true);
-    void ensureDriverLocation(driver, true).then(() => { if (owner.current === startedOwner) setPermission('granted'); }).catch(error => {
+    void ensureDriverLocation(driver, true, !!activeRequest).then(() => { if (owner.current === startedOwner) setPermission('granted'); }).catch(error => {
       if (owner.current === startedOwner) setState({status: 'error', error: error instanceof Error ? error.message : 'GPS още не е потвърден.'});
     }).finally(() => { if (owner.current === startedOwner) setRetrying(false); });
-  }, [isDriver, driver, allowLocation, retrying, user?.id]);
+  }, [isDriver, driver, trackingRequired, activeRequest, allowLocation, retrying, user?.id]);
   const value = useMemo(() => ({ ...state, retryLocation, retrying }), [state, retryLocation, retrying]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

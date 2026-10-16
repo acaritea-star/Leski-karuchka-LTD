@@ -9,7 +9,7 @@ import { VehicleMotion, type VehicleFix, type VehicleFrame } from '@/lib/vehicle
 // Frame updates go directly to Maps; React, route requests and database writes
 // only see actual GPS fixes, never these presentation coordinates.
 export function useVehicleMarker(map: google.maps.Map | null, fix: VehicleFix | null,
-  path: readonly RoutePoint[], color = MAP_CAR_COLOR, onFrame?: (frame: VehicleFrame) => void, roads?: RoadNetwork | null, requireRoad = false, animationWindowMs = 5000) {
+  path: readonly RoutePoint[], color = MAP_CAR_COLOR, onFrame?: (frame: VehicleFrame) => void, roads?: RoadNetwork | null, requireRoad: boolean | 'prefer' = false, animationWindowMs = 5000) {
   const motion = useRef(new VehicleMotion(animationWindowMs));
   const frameRef = useRef<VehicleFrame | null>(null);
   const latest = useRef({ fix, path, color, onFrame, roads, requireRoad });
@@ -80,6 +80,10 @@ export function useVehicleMarker(map: google.maps.Map | null, fix: VehicleFix | 
           instant = !connection;
           displayed = { ...next, ...match.point, heading: match.heading };
           matchedRoad = match;
+        } else if (latest.current.requireRoad === 'prefer') {
+          // Active rides must not disappear when a route/tile fails. Show the
+          // measured GPS point without drawing a guessed path through buildings.
+          path = []; instant = true; matchedRoad = undefined;
         } else if (latest.current.requireRoad) {
           marker?.setMap(null); marker = null; return;
         }

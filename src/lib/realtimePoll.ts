@@ -1,9 +1,10 @@
 import { withRequestTimeout } from './requestTimeout';
+import type { RequestMetric } from './requestMetrics';
 
 /** One bounded reconciliation read. Realtime carries normal updates; HTTP
  * recovers missed events and disconnected sockets without overlapping reads. */
 export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike<T>, apply: (value: T) => void,
-  options: { fallbackMs?: number; healthyMs?: number; timeoutMs?: number; jitter?: () => number } = {}) {
+  options: { fallbackMs?: number; healthyMs?: number; timeoutMs?: number; jitter?: () => number; metric?: RequestMetric } = {}) {
   const fallbackMs = options.fallbackMs ?? 5000, healthyMs = options.healthyMs ?? 30_000;
   const jitter = options.jitter ?? Math.random;
   const controller = new AbortController();
@@ -21,7 +22,7 @@ export function createRealtimePoll<T>(read: (signal: AbortSignal) => PromiseLike
     if (!active || pending || paused()) return;
     pending = true;
     try {
-      const result = await withRequestTimeout(read, options.timeoutMs ?? 10_000, controller.signal);
+      const result = await withRequestTimeout(read, options.timeoutMs ?? 10_000, controller.signal, options.metric);
       if (!active) return;
       failures = 0; apply(result);
     } catch { if (active) failures++; }

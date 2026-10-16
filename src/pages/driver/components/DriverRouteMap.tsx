@@ -61,7 +61,7 @@ export default function DriverRouteMap({ targetLat, targetLng, driverId, request
     { requestId, purpose: targetKind });
   const roadNetwork = useRoadNetwork(pos);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, pos, routePath, undefined,
-    frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, true);
+    frame => { if (routePath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, 'prefer');
 
   useEffect(() => {
     let active = true;

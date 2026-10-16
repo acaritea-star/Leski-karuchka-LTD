@@ -54,7 +54,7 @@ export default function DriverTracking({
   const driverQuery = useQuery(trackingDriverOptions(user?.id, request.id, request.driver_id));
   const info = driverQuery.data?.info;
   const driverInfo = info ? { ...info, name: info.name || t('role_driver') } : null;
-  const location = useDriverPosition(request.driver_id);
+  const location = useDriverPosition(request.driver_id, true, `${user?.id}:${request.id}`);
   const positionStale = !usePositionFreshness(location);
   const loadingInfo = driverQuery.isPending;
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
@@ -97,7 +97,7 @@ export default function DriverTracking({
   const motionPath = livePath.length ? livePath : headingToPickup ? NO_ROUTE : tripPath;
   const roadNetwork = useRoadNetwork(location);
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, location, motionPath, CAR_COLORS[vehicleType] || CAR_COLORS.standard,
-    frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, true);
+    frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, 'prefer');
 
   // ── Initialise Google map (once) ──
   useEffect(() => {
