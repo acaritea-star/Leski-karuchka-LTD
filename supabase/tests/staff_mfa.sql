@@ -43,6 +43,7 @@ BEGIN
   IF private.staff_mfa_allowed() THEN RAISE EXCEPTION 'FAIL unverified factor accepted'; END IF;
   RESET ROLE;
   UPDATE auth.mfa_factors SET status='verified' WHERE id=fid;
+  IF public.staff_mfa_edge_allowed(uid,sid::text,'aal1') OR NOT public.staff_mfa_edge_allowed(uid,sid::text,'aal2') THEN RAISE EXCEPTION 'FAIL Edge assurance check'; END IF;
   SET LOCAL ROLE authenticated;
   IF NOT private.staff_mfa_allowed() THEN RAISE EXCEPTION 'FAIL verified staff rejected'; END IF;
   PERFORM set_config('request.path','/rpc/accounting_report',true); PERFORM set_config('request.method','POST',true);
@@ -52,11 +53,13 @@ BEGIN
   IF uid=drv AND NOT public.is_driver(did) THEN RAISE EXCEPTION 'FAIL driver denied'; END IF;
   RESET ROLE;
   UPDATE auth.sessions SET aal='aal1' WHERE id=sid;
+  IF public.staff_mfa_edge_allowed(uid,sid::text,'aal2') THEN RAISE EXCEPTION 'FAIL Edge accepted downgraded session'; END IF;
   SET LOCAL ROLE authenticated;
   IF private.staff_mfa_allowed() THEN RAISE EXCEPTION 'FAIL downgraded session with old aal2 JWT accepted'; END IF;
   RESET ROLE;
   UPDATE auth.sessions SET aal='aal2' WHERE id=sid;
   UPDATE auth.mfa_factors SET status='unverified' WHERE id=fid;
+  IF public.staff_mfa_edge_allowed(uid,sid::text,'aal2') THEN RAISE EXCEPTION 'FAIL Edge accepted unverified factor'; END IF;
   SET LOCAL ROLE authenticated;
   IF private.staff_mfa_allowed() THEN RAISE EXCEPTION 'FAIL removed verification accepted'; END IF;
   RESET ROLE;

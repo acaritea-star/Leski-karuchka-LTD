@@ -2,7 +2,7 @@
 
 ## Emergency action
 
-Customer booking, active-trip tracking, orders, profile and settings have a compact red 112 control. It opens an accessible dialog and a `tel:112` link; it does not call automatically. It uses no GPS, map API or backend call and creates no incident record or automatic company notification. The dialog explains that this application does not send trip/location data to 112. On devices without a dialer, use a phone. Automated tests inspect the link without activating an emergency call.
+Customer booking, active-trip tracking, orders, profile and settings have a compact red 112 control. It opens an accessible dialog and a `tel:112` link; it does not call automatically. It remains available during customer profile loading/failure and uses no GPS, map API or backend call and creates no incident record or automatic company notification. The dialog explains that this application does not send trip/location data to 112. On devices without a dialer, use a phone. Automated tests inspect the link without activating an emergency call.
 
 Official source: [EU emergency number 112](https://digital-strategy.ec.europa.eu/en/policies/112).
 
@@ -42,3 +42,12 @@ Tests include enrollment, wrong/leading-zero code, duplicate submit, failed fact
 For a lost sole authenticator, the project owner must verify the person's identity and perform a controlled MFA reset through Supabase Auth, recording the action. There is no email-only or client-side bypass. Factor reset forces setup again. Never expose the service key or a reset API to the browser.
 
 Emergency rollback: `deployment/staff-mfa.rollback.sql` disables server enforcement without deleting factors, sessions, application records or tenant rules; restore the matching frontend as required. The emergency 112 control has no database dependency.
+
+## Deployment evidence
+
+- Candidate `52f904c78e48c3ee88ee1bd3cdae5da2e9066f9d`: [Check](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/38867742781) and [Database regression](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/38867742791) passed. This includes 582 unit/component tests, 106 browser scenarios and actual Auth/TOTP for each staff role. The final package additionally checks emergency access during profile failure and the Edge assurance predicate.
+- Production migration applied as `20261016073419_customer_safety_staff_mfa`; the CLI-created candidate was renamed to match the actual history version without changing its SQL. SHA-256: `a193f214bca82c3c8701c2f7c55417d3414f3fc6f1b3a16fbedbd4ce79a8fd26`.
+- Readback: hook installed, 36 restrictive MFA policies, browser access to the deployment switch and service-only Edge proof API denied. `staff_mfa_enforced` is **false** pending frontend publication/cutover. No real factors were created or existing sessions removed.
+- Updated and read back the exact shared Auth source: google-geocode 9, google-routes 14, generate-vapid-keys 12, send-push-notification 11, expire-stale-requests 9, road-geometry 5, partner-invitation-email 2. Existing entrypoints, dependencies and JWT settings were preserved.
+- Advisor review: the new private deployment table intentionally has RLS without browser policies or browser grants ([advisor explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)). Existing PostGIS/extension/password advisories remain separate from this feature; the [PostGIS finding](https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public) is not claimed fixed.
+- The first integration attempt lacked the Auth SDK in the database job. A later attempt passed the real MFA scenarios but failed cleanup because company bootstrap creates vehicle categories. CI now installs the pinned client, explicitly enables only TOTP in the disposable project, and removes its synthetic categories before its synthetic firm. No production test accounts, documents, calls or notifications were created.

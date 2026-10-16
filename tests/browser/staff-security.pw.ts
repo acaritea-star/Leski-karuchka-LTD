@@ -78,3 +78,15 @@ test('customer keeps first-factor login and emergency access stays visible witho
   await page.getByRole('button', { name: 'Back to the app', exact: true }).click();
   expect(mfaRequests).toBe(0); expect(state.errors).toEqual([]);
 });
+
+test('customer emergency dialing stays reachable while the profile service is offline', async ({ page }) => {
+  await setupUi(page, 'CUSTOMER', 'aal1');
+  await page.route('**/rest/v1/profiles*', route => route.abort());
+  await page.goto('/customer/home');
+  const help = page.getByRole('button', { name: 'Спешна помощ на 112', exact: true });
+  await expect(help).toBeVisible(); await help.click();
+  await expect(page.getByRole('link', { name: 'Обади се на 112', exact: true })).toHaveAttribute('href', 'tel:112');
+  await page.getByRole('button', { name: 'Назад към приложението', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Профилът не е достъпен');
+  await expect(help).toBeVisible();
+});
