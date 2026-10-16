@@ -18,6 +18,7 @@ export async function invokeEdge<T>(
   name: 'google-geocode' | 'google-routes' | 'road-geometry',
   body: Record<string, unknown>,
   milliseconds: number,
+  parent?: AbortSignal,
 ): Promise<{ data: T | null; error: unknown }> {
   try {
     const data = await withRequestTimeout(async signal => {
@@ -38,7 +39,7 @@ export async function invokeEdge<T>(
         throw new EdgeRequestError(response.status, Number.isFinite(seconds) ? Math.max(0, Math.min(90_000, Math.ceil(seconds))) : 0, code);
       }
       return await response.json() as T;
-    }, milliseconds);
+    }, milliseconds, parent);
     return { data, error: null };
   } catch (error) { return { data: null, error }; }
 }

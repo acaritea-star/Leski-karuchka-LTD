@@ -33,6 +33,7 @@ export default {
   booking_sending: "Sending your request…",
   booking_order: "Book a ride",
   booking_restoring: "Checking for an active trip…",
+  booking_resolving_pickup: "Location found. Finding the street address — you can enter your destination.",
   booking_recovery_error: "We could not check for an active booking. Check your connection and try again.",
   booking_map_loading: "Loading the map…",
   booking_map_error: "The map did not load. You can try again.",

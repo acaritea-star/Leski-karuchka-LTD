@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.16-customer-safety-mfa.1",
-  "baseCommit": "a29decd3ee17738cad08bfe83c1395c64b008296",
+  "release": "2026.10.16-booking-performance.1",
+  "baseCommit": "1c191a587c3abc51b9ae0a41780f20a72cacb16a",
   "databaseMigration": "staff_mfa_public_request_hook",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261016074354",
-  "googleRoutesVersion": 14,
-  "verifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
+  "googleRoutesVersion": 15,
+  "verifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -63,8 +63,8 @@
   "carrierChoiceVersion": 1,
   "carrierChoiceMigrationVersion": "20261012202035",
   "carrierChoiceVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
-  "gpsAcquisitionVersion": 2,
-  "gpsAcquisitionVerifiedSourceCommit": "bb5b15d1d0a5cb3a57d1e7edc46a51eb1e40664f",
+  "gpsAcquisitionVersion": 3,
+  "gpsAcquisitionVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "idleLocationValidityVersion": 1,
   "idleLocationValidityMigrationVersion": "20261014051154",
   "carrierComparisonUxVersion": 4,
@@ -102,7 +102,7 @@
   "staffMfaVerifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
   "staffMfaEdgeVersions": {
     "google-geocode": 9,
-    "google-routes": 14,
+    "google-routes": 15,
     "generate-vapid-keys": 12,
     "send-push-notification": 11,
     "expire-stale-requests": 9,
@@ -110,5 +110,7 @@
     "partner-invitation-email": 2
   },
   "staffMfaMigrationSha256": "a193f214bca82c3c8701c2f7c55417d3414f3fc6f1b3a16fbedbd4ce79a8fd26",
-  "staffMfaHookMigrationSha256": "acc383a476b9f8252082d511d51582ec3b591b9b0e2c9a4e898c32db2c73227e"
+  "staffMfaHookMigrationSha256": "acc383a476b9f8252082d511d51582ec3b591b9b0e2c9a4e898c32db2c73227e",
+  "bookingPerformanceVersion": 1,
+  "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb"
 }

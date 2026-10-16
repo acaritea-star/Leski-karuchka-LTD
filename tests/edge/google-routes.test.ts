@@ -35,3 +35,21 @@ it('does not generate zero-priced quotes for missing route measurements',async()
  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({routes:[{polyline:{encodedPolyline:'mock'}}]})));
  expect((await handler(request())).status).toBe(502);expect(fake.rows).toHaveLength(0);
 });
+it('requests only route measurements and geometry for booking, without navigation steps', async () => {
+ const response = await handler(request()); const body = await response.json();
+ expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toMatchObject({
+  'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+ });
+ expect(body.legs).toEqual([]); expect(body.quotes).toHaveLength(2);
+});
+it('preserves navigation instructions with a precise field mask and the API staticDuration field', async () => {
+ vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ routes: [{ distanceMeters: 1200, duration: '240s', polyline: { encodedPolyline: 'road' },
+  legs: [{ distanceMeters: 1200, duration: '240s', steps: [{ distanceMeters: 1200, staticDuration: '200s', navigationInstruction: { instructions: 'Завийте надясно' } }] }] }] })));
+ const response = await handler(new Request('https://local.invalid', { method: 'POST', body: JSON.stringify({ origin: { lat: 43.2, lng: 25.6 }, destination: { lat: 43.3, lng: 25.7 } }) }));
+ const body = await response.json();
+ const mask = (vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>)['X-Goog-FieldMask'];
+ expect(mask).toContain('routes.legs.steps.navigationInstruction.instructions');
+ expect(mask).toContain('routes.legs.steps.staticDuration');
+ expect(mask.split(',')).not.toContain('routes.legs');
+ expect(body.legs[0].steps[0]).toEqual({ instruction: 'Завийте надясно', distance_meters: 1200, duration: '200s' });
+});

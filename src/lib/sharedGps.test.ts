@@ -94,6 +94,36 @@ it('never retries or falls back after permission denial', async () => {
   expect(gpsErrorMessage({ code: 3 })).toContain('актуална позиция');
   expect(gpsErrorMessage({ code: 2 })).toContain('недостъпно');
 });
+it('uses a short device-cache read for customer pickup while keeping the same accuracy requirement', async () => {
+  const pending = requestGps({ quick: true, maximumAgeMs: 5000 });
+  expect(get.mock.calls[0][2]).toMatchObject({ enableHighAccuracy: false, maximumAge: 5000, timeout: 2000 });
+  const position = fix(Date.now() - 3000); read(position);
+  await expect(pending).resolves.toBe(position);
+  expect(get).toHaveBeenCalledOnce();
+});
+it('immediately escalates an imprecise quick customer fix without publishing it', async () => {
+  const pending = requestGps({ quick: true, maximumAgeMs: 5000 });
+  const oldRead = read;
+  read({ ...fix(), coords: { ...fix().coords, accuracy: 900 } });
+  expect(get).toHaveBeenCalledTimes(2); expect(getGpsPosition()).toBeNull();
+  expect(get.mock.calls[1][2]).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
+  oldRead(fix()); expect(getGpsPosition()).toBeNull();
+  const position = fix(); read(position); await expect(pending).resolves.toBe(position);
+});
+it('bounds a hanging quick fix and retains the overall GPS deadline', async () => {
+  const pending = requestGps({ quick: true });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 3 });
+  await vi.advanceTimersByTimeAsync(2500);
+  expect(get.mock.calls[1][2]?.enableHighAccuracy).toBe(true);
+  await vi.advanceTimersByTimeAsync(21_500); await rejected;
+  read(fix()); expect(getGpsPosition()).toBeNull();
+});
+it('never escalates a quick fix after the customer denies permission', async () => {
+  const pending = requestGps({ quick: true });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 1 });
+  readError({ code: 1 } as GeolocationPositionError); await rejected;
+  await vi.advanceTimersByTimeAsync(30_000); expect(get).toHaveBeenCalledOnce();
+});
 it('does not publish invalid or out-of-order native callbacks', () => {
   const fn = vi.fn(), error = vi.fn(); releases.push(subscribeGps(fn, error));
   const newest = fix(); receive(newest);

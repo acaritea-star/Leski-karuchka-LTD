@@ -147,7 +147,7 @@ export function subscribeGps(position: Listener, error: Failure = () => {}) {
     }
   };
 }
-export function requestGps(options: { maximumAgeMs?: number } = {}): Promise<GeolocationPosition> {
+export function requestGps(options: { maximumAgeMs?: number; quick?: boolean } = {}): Promise<GeolocationPosition> {
   if (pending) return pending;
   const problem = positionProblem;
   if (latest && Date.now() - latest.timestamp <= Math.min(5000, options.maximumAgeMs ?? -1) && !problem(latest)) return Promise.resolve(latest);
@@ -188,12 +188,13 @@ export function requestGps(options: { maximumAgeMs?: number } = {}): Promise<Geo
     cancelPending = () => fail(new Error('Местоположението е изключено.'));
     document.addEventListener('visibilitychange', checkDeadline);
     window.addEventListener('pageshow', checkDeadline);
-    const read = (precise: boolean) => {
+    const read = (precise: boolean, quick = false) => {
       const token = ++attempt;
       const failure = (error: unknown) => {
         if (settled || token !== attempt) return;
         if (timer !== undefined) clearTimeout(timer);
-        if (precise && !isGpsPermissionDenied(error) && errorCode(error) !== 'GPS_ACCURACY' && Date.now() < deadline) read(false);
+        if (quick && !isGpsPermissionDenied(error) && Date.now() < deadline) read(true);
+        else if (precise && !isGpsPermissionDenied(error) && errorCode(error) !== 'GPS_ACCURACY' && Date.now() < deadline) read(false);
         else if (isTransientGpsError(error) && Date.now() < deadline) {
           // Some browser/OS combinations return an old fix even with
           // maximumAge:0. Keep the original deadline and wait for a real fix.
@@ -208,7 +209,7 @@ export function requestGps(options: { maximumAgeMs?: number } = {}): Promise<Geo
         else { if (isGpsPermissionDenied(error)) { permissionBlocked = true; clearWatch(); report(error); } fail(error); }
       };
       // Browsers can suspend or omit their native timeout. Keep our own limit.
-      timer = setTimeout(() => failure(timeout), Math.min(precise ? 14_000 : 10_000, Math.max(0, deadline - Date.now())));
+      timer = setTimeout(() => failure(timeout), Math.min(quick ? 2500 : precise ? 14_000 : 10_000, Math.max(0, deadline - Date.now())));
       try {
         navigator.geolocation.getCurrentPosition(position => {
           if (settled || token !== attempt) return;
@@ -217,10 +218,13 @@ export function requestGps(options: { maximumAgeMs?: number } = {}): Promise<Geo
           const invalid = problem(position);
           if (invalid) { failure(invalid); return; }
           accept(position);
-        }, failure, { enableHighAccuracy: precise, timeout: precise ? 12_000 : 8000, maximumAge: 0 });
+        }, failure, { enableHighAccuracy: precise, timeout: quick ? 2000 : precise ? 12_000 : 8000,
+          maximumAge: quick ? Math.max(0, Math.min(5000, options.maximumAgeMs ?? 0)) : 0 });
       } catch (error) { failure(error); }
     };
-    read(true);
+    // Customer pickup can use a fast device fix if it meets the same 100m
+    // accuracy and freshness checks. Driver acquisition keeps precise-first.
+    read(!options.quick, options.quick);
   });
   pending = task;
   void task.then(() => recordRequestMetric('gps.read', started, 'ok'), () => recordRequestMetric('gps.read', started, 'error'));

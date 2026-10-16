@@ -18,3 +18,15 @@ it('aborts superseded details and bounds autocomplete even if fetch ignores abor
   const search=searchPlaces('Левски');const assertion=expect(search).rejects.toThrow('забави');
   await vi.advanceTimersByTimeAsync(8001);await assertion;
 });
+it('biases destination suggestions near the pickup while retaining Bulgaria-wide coverage and minimal fields', async () => {
+  const { searchPlaces } = await import('./places');
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ suggestions: [] }) } as Response);
+  await searchPlaces('Горна', 'session', 'bg', undefined, { lat: 43.08, lng: 25.63 });
+  const options = vi.mocked(fetch).mock.calls[0][1]!;
+  expect(JSON.parse(options.body as string)).toMatchObject({ includedRegionCodes: ['bg'], sessionToken: 'session',
+    locationBias: { circle: { center: { latitude: 43.08, longitude: 25.63 }, radius: 30000 } } });
+  expect(JSON.parse(options.body as string).locationRestriction).toBeUndefined();
+  expect(options.headers).toMatchObject({ 'X-Goog-FieldMask': expect.not.stringContaining('*') });
+  await searchPlaces('София', 'session', 'bg', undefined, { lat: 0, lng: 0 });
+  expect(JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string).locationBias.rectangle).toBeTruthy();
+});

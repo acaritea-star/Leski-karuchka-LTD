@@ -92,8 +92,10 @@ export default function CustomerHome() {
   const [pickup, setPickup] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
   const [step, setStep] = useState<BookingStep>('pickup');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [pickerRevision, setPickerRevision] = useState(0);
   const [locating, setLocating] = useState(false);
+  const [resolvingPickup, setResolvingPickup] = useState(false);
+  const pickupAddressRequest = useRef<AbortController | null>(null);
   const [locationError, setLocationError] = useState('');
   const [recent, setRecent] = useState<LocationPreset[]>(() => loadRecent());
   useEffect(() => {
@@ -190,7 +192,7 @@ export default function CustomerHome() {
   const now = useFleetClock();
   const availabilityConfirmed = !availability.isError && availabilityFresh(availability.data, now);
   const readyCategory = availabilityConfirmed ? availability.data?.categories.find(c => c.id === vehicleType) : undefined;
-  const quoteReady = !!readyCategory?.drivers;
+  const quoteReady = !!readyCategory?.drivers && !resolvingPickup;
   const availableOffers = useMemo(() => new Set(offers.filter(offer => availabilityConfirmed
     && carrierAvailable(availability.data, offer, now)).map(carrierOfferKey)), [offers, availabilityConfirmed, availability.data, now]);
   useEffect(() => {
@@ -215,7 +217,7 @@ export default function CustomerHome() {
   const canRequest = step === 'offers' && !!selectedCarrier && !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
     && availableOffers.has(carrierOfferKey(selectedCarrier))
-    && !!pickup && !!destination && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
+    && !!pickup && !!destination && !locating && !resolvingPickup && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
     !!activeRequest &&
@@ -241,13 +243,15 @@ export default function CustomerHome() {
       setLocating(false);
       setLocationError('');
       if (step === 'pickup') {
+        pickupAddressRequest.current?.abort();
+        setResolvingPickup(false);
         setPickup(loc);
         setStep(stepAfterSelection('pickup', !!destination));
       } else if (step === 'dest') {
         setDestination(loc);
         setStep(stepAfterSelection('dest', !!pickup));
       }
-      setSearchQuery('');
+      setPickerRevision(value => value + 1);
     },
     [step, pickup, destination, addRecent],
   );
@@ -265,6 +269,7 @@ export default function CustomerHome() {
         if (!active) return;
         if (error || !data || data.destination_latitude == null || data.destination_longitude == null) throw new Error('Unavailable route');
         ++gpsRevision.current;
+        pickupAddressRequest.current?.abort(); setResolvingPickup(false);
         setPickup({ address: data.pickup_address ?? 'Начален адрес', lat: data.pickup_latitude, lng: data.pickup_longitude });
         setDestination({ address: data.destination_address ?? '', lat: data.destination_latitude, lng: data.destination_longitude });
         setCarrierKey(''); setStep('offers'); setRoute(null); setRequestError('');
@@ -276,20 +281,35 @@ export default function CustomerHome() {
   // Apply GPS to pickup once. Subsequent fixes never move chosen addresses.
   const detectLocation = useCallback(async (automatic = false) => {
     if (automatic && getLocationEnabled(user?.id) === false) return;
+    pickupAddressRequest.current?.abort();
+    setResolvingPickup(false);
     setLocating(true); setLocationError('');
     const revision = ++gpsRevision.current;
     try {
-      const pos = await requestGps({ maximumAgeMs: 5000 });
+      const pos = await requestGps({ maximumAgeMs: 5000, quick: true });
       if (gpsRevision.current !== revision) return;
       if (!Number.isFinite(pos.timestamp) || Date.now() - pos.timestamp > 30_000 || pos.timestamp > Date.now() + 30_000) throw new Error('GPS позицията е остаряла. Опитай отново.');
       if (!Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy < 0 || pos.coords.accuracy > 100) throw new Error('Неточна GPS позиция. Избери адрес или изчакай по-добър сигнал.');
       const { latitude, longitude } = pos.coords;
       if (!isInBulgaria(latitude, longitude)) throw new Error(SERVICE_AREA_ERROR);
       if (!automatic && user?.id) setLocationEnabled(user.id, true);
-      const geo = await reverseGeocode(latitude, longitude);
-      if (gpsRevision.current !== revision) return;
-      setPickup({ address: geo?.formatted_address || t('current_location'), lat: latitude, lng: longitude });
-      setStep(stepAfterSelection('pickup', !!destination)); setSearchQuery('');
+      // Coordinates are usable now. Let the customer enter the destination
+      // while the independent street-address lookup finishes.
+      setPickup({ address: t('current_location'), lat: latitude, lng: longitude });
+      setStep(stepAfterSelection('pickup', !!destination));
+      setPickerRevision(value => value + 1); setLocating(false);
+      const controller = new AbortController();
+      pickupAddressRequest.current = controller;
+      setResolvingPickup(true);
+      try {
+        const geo = await reverseGeocode(latitude, longitude, { signal: controller.signal });
+        if (!controller.signal.aborted && pickupAddressRequest.current === controller && geo?.formatted_address) {
+          setPickup(current => current?.lat === latitude && current.lng === longitude
+            ? { ...current, address: geo.formatted_address } : current);
+        }
+      } finally {
+        if (pickupAddressRequest.current === controller) setResolvingPickup(false);
+      }
     } catch (error) {
       if (gpsRevision.current === revision) setLocationError(gpsErrorMessage(error));
     } finally { if (gpsRevision.current === revision) setLocating(false); }
@@ -310,18 +330,29 @@ export default function CustomerHome() {
   }, [user?.id, recovering, activeRequest, pickup, locationEnabled, detectLocation, notificationRetry]);
 
   useEffect(() => {
-    if (locationEnabled !== true || !user?.id) return;
+    if (locationEnabled !== true || !user?.id || pickup || activeRequestId || recovering) return;
     let active = true;
     let unsubscribe = () => {};
     void gpsPermission().then(permission => {
       if (active && permission === 'granted') unsubscribe = subscribeGps(() => {});
     });
     return () => { active = false; unsubscribe(); };
-  }, [locationEnabled, user?.id]);
+  }, [locationEnabled, user?.id, pickup, activeRequestId, recovering]);
 
   useEffect(() => {
-    if (locationEnabled === false) { ++gpsRevision.current; setLocating(false); }
+    if (locationEnabled === false) {
+      ++gpsRevision.current; pickupAddressRequest.current?.abort();
+      setLocating(false); setResolvingPickup(false);
+    }
   }, [locationEnabled]);
+
+  useEffect(() => () => { pickupAddressRequest.current?.abort(); }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    if (!value) return;
+    ++gpsRevision.current;
+    setLocating(false); setLocationError('');
+  }, []);
 
   // Handle field click
   const handleFieldClick = (field: BookingStep) => {
@@ -330,12 +361,13 @@ export default function CustomerHome() {
     setLocating(false);
     setLocationError('');
     setStep(field);
-    setSearchQuery('');
+    setPickerRevision(value => value + 1);
     setRequestError('');
   };
 
   // Swap pickup and destination
   const swapLocations = () => {
+    ++gpsRevision.current; pickupAddressRequest.current?.abort(); setResolvingPickup(false); setLocating(false);
     setPickup(destination);
     setDestination(pickup);
   };
@@ -364,13 +396,14 @@ export default function CustomerHome() {
   useEffect(() => {
     if (!user?.id) return;
     let active = true;
+    const controller = new AbortController();
     setRecovering(true);
     setRecoveryError(false);
     const recover = async () => {
       try {
         const { data, error } = await withRequestTimeout(signal => supabase.from('taxi_requests').select('*')
           .eq('customer_id', user.id).in('status', ['pending', ...TRACKING_STATUSES])
-          .order('created_at', { ascending: false }).limit(1).abortSignal(signal).maybeSingle());
+          .order('created_at', { ascending: false }).limit(1).abortSignal(signal).maybeSingle(), 10_000, controller.signal);
         if (!active) return;
         if (error) throw error;
         if (data) {
@@ -381,7 +414,7 @@ export default function CustomerHome() {
       finally { if (active) setRecovering(false); }
     };
     void recover();
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [user?.id, recoveryAttempt]);
 
   // Realtime plus bounded reconciliation. Closed requests stop reading.
@@ -420,16 +453,17 @@ export default function CustomerHome() {
 
   // Only a server-created quote can be booked. A failed route never becomes a guessed fare.
   useEffect(() => {
-    if (!pickup || !destination || !quoteReady || activeRequestId) return;
+    if (!pickup || !destination || !quoteReady || activeRequestId) { setCalculating(false); return; }
     const quoteKey = JSON.stringify([quoteInput, quoteRefresh]);
     // A temporary availability loss must not buy the same valid route again.
     if (lastQuotedInput.current === quoteKey) return;
     let active = true;
+    const controller = new AbortController();
     const vehicleTypeForQuote = requestedType.current;
     setRoute(null); setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
-      computeRoute(pickup, destination, {quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,carrier_choice:true,pickup_address:pickup.address,destination_address:destination.address}})
+      computeRoute(pickup, destination, {signal:controller.signal,quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,carrier_choice:true,pickup_address:pickup.address,destination_address:destination.address}})
         .then(result => {
           if (!active) return;
           setCalculating(false);
@@ -445,7 +479,7 @@ export default function CustomerHome() {
           }
         });
     }, 350);
-    return () => { active = false; clearTimeout(timer); };
+    return () => { active = false; controller.abort(); clearTimeout(timer); };
   }, [pickup, destination, quoteReady, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
 
   const cancelRequest = async () => {
@@ -531,7 +565,7 @@ export default function CustomerHome() {
     offerView={offerView}
     mapControls={step === 'offers' && pickup && destination && !activeRequest && !authLoading && !recovering && !recoveryError ? <CarrierRoute
       pickup={pickup.address} destination={destination.address} onFieldClick={handleFieldClick} onSwap={swapLocations}
-      creating={requestStatus === 'creating'} refreshing={calculating}
+      creating={requestStatus === 'creating'} refreshing={calculating || resolvingPickup}
       onRefresh={!availabilityMessage ? () => void availability.refetch() : undefined} /> : undefined}
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
@@ -565,11 +599,12 @@ export default function CustomerHome() {
           vehicleOptions={vehicleTypes.map(v => ({ ...v, available: availabilityConfirmed && !!availability.data?.categories.find(c => c.id === v.id)?.drivers }))}
           onRequest={createRequest}
           onRefresh={() => { setQuoteRefresh(n => n + 1); void availability.refetch(); }}
-          creating={requestStatus === 'creating'} canRequest={canRequest} calculating={calculating}
+          creating={requestStatus === 'creating'} canRequest={canRequest} calculating={calculating || resolvingPickup}
           expired={!calculating && offers.length > 0 && !offers.some(q => q.quote_id && Date.parse(q.quote_expires_at) > now)} error={requestError || (carrierKey && !selectedCarrier && !calculating ? 'Избраната фирма вече няма оферта. Избери друга фирма.' : '')}
           availabilityMessage={availabilityMessage} onRefreshAvailability={() => void availability.refetch()} />
-          : <LocationPicker searchQuery={searchQuery} onSearchChange={setSearchQuery}
+          : <LocationPicker key={`${step}:${pickerRevision}`} onSearchChange={handleSearchChange}
             locating={locating} locationError={locationError} recent={recent}
+            resolvingPickup={resolvingPickup} bias={step === 'dest' ? pickup ?? undefined : undefined}
             onUseCurrent={() => void detectLocation()} onSelect={selectLocation} showCurrentLocation={step === 'pickup'} />}
       </>}
   </CustomerLayout>;

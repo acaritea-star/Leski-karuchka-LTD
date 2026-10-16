@@ -1,5 +1,5 @@
 // One shared script/bootstrap attempt. Failure releases both the promise and
-// polling timer so a recovered connection can retry without orphaned loaders.
+// deadline so a recovered connection can retry without orphaned loaders.
 let loaderPromise: Promise<void> | null = null;
 function hasMaps(): boolean {
   const g = (window as unknown as { google?: { maps?: { Map?: unknown } } }).google;
@@ -13,24 +13,27 @@ export function loadGoogleMaps(): Promise<void> {
     const key = (import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined) || '';
     if (!key) { reject(new Error('Google Maps API key is missing')); return; }
     const script = document.createElement('script');
-    let interval: number | undefined;
+    const callbacks = window as Window & { __leskiMapsReady?: () => void };
+    let timer: number | undefined;
     let settled = false;
-    const started = Date.now();
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
-      if (interval !== undefined) window.clearInterval(interval);
-      script.onerror = null;
+      if (timer !== undefined) window.clearTimeout(timer);
+      script.onerror = null; script.onload = null;
+      // A script already in flight can call back after a timeout/removal.
+      // Keep one inert callback instead of leaving a global reference error.
+      callbacks.__leskiMapsReady = () => {};
       if (error) { script.remove(); reject(error); } else resolve();
     };
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=__leskiMapsReady`;
     script.async = true;
     script.onerror = () => finish(new Error('Google Maps API failed to load'));
-    // onload is not readiness: loading=async initializes Maps afterwards.
-    interval = window.setInterval(() => {
-      if (hasMaps()) finish();
-      else if (Date.now() - started >= 20_000) finish(new Error('Google Maps API failed to initialise'));
-    }, 50);
+    // Google's readiness callback replaces repeated 50ms readiness polling.
+    const ready = () => { if (hasMaps()) finish(); };
+    callbacks.__leskiMapsReady = ready;
+    script.onload = ready;
+    timer = window.setTimeout(() => finish(new Error('Google Maps API failed to initialise')), 20_000);
     try { document.head.appendChild(script); }
     catch (error) { finish(error instanceof Error ? error : new Error('Google Maps API failed to load')); }
   });

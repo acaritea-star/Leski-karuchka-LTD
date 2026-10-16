@@ -86,16 +86,16 @@ export async function geocodeAddress(
 export async function reverseGeocode(
   lat: number,
   lng: number,
-  opts?: { language?: string; result_type?: string }
+  opts?: { language?: string; result_type?: string; signal?: AbortSignal }
 ): Promise<GeocodeResult | null> {
   try {
     const { data, error } = await invokeEdge<GeocodeResult>('google-geocode',
-      { lat, lng, language: opts?.language ?? 'bg', result_type: opts?.result_type }, 8000);
+      { lat, lng, language: opts?.language ?? 'bg', result_type: opts?.result_type }, 8000, opts?.signal);
     if (error) throw error;
     if (!data?.success) return null;
     return data as GeocodeResult;
   } catch (err) {
-    console.error('reverseGeocode error:', err);
+    if (!opts?.signal?.aborted) console.error('reverseGeocode error:', err);
     return null;
   }
 }
@@ -112,6 +112,7 @@ export async function computeRoute(
     waypoints?: RoutePoint[];
     requestId?: string;
     purpose?: 'pickup' | 'destination' | 'context';
+    signal?: AbortSignal;
     quote?: { vehicle_type_id: string; pickup_address: string; destination_address: string; marketplace?: boolean; carrier_choice?: boolean };
   }
 ): Promise<RouteResult | null> {
@@ -130,14 +131,14 @@ export async function computeRoute(
         units: opts?.units ?? 'METRIC',
         alternatives: opts?.alternatives ?? false,
         waypoints: opts?.waypoints,
-    }, 20_000);
+    }, 20_000, opts?.signal);
     if (error) throw error;
     recordRequestMetric('route.read',started,data?.success?'ok':'error');
     if (!data?.success) return null;
     return data as RouteResult;
   } catch (err) {
-    console.error('computeRoute error:', err);
-    recordRequestMetric('route.read',started,'error');
+    if (!opts?.signal?.aborted) console.error('computeRoute error:', err);
+    recordRequestMetric('route.read',started,opts?.signal?.aborted?'aborted':'error');
     if (err instanceof EdgeRequestError) return {
       success: false, distance_km: 0, duration_min: 0, duration_sec: 0, polyline: '', legs: [], alternatives_count: 0,
       status: err.status, retry_after_sec: err.retryAfterSeconds, code: err.code, error: err.message,
