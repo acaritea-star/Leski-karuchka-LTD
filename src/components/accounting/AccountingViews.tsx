@@ -1,5 +1,5 @@
 import { evidenceDescription, evidenceFlagLabels } from '@/lib/rideEvidence';
-import { actorLabels, evidenceLabels, kindLabels, money, reasonLabels, reportDate, stageLabels, type AccountingReport, type MoneyEntry, type Outcome } from '@/lib/accounting';
+import { actorLabels, evidenceLabels, kindLabels, money, paymentMethodLabel, reasonLabels, reportDate, stageLabels, type AccountingReport, type MoneyEntry, type Outcome } from '@/lib/accounting';
 
 export type MoneyAction = { entry: MoneyEntry; kind: 'confirmation' | 'reversal' };
 const link = 'min-h-11 inline-flex items-center text-sm font-semibold text-primary-700 underline underline-offset-4 disabled:opacity-40';
@@ -8,21 +8,24 @@ const signedMoney = (amount: number) => `${amount > 0 ? '+' : ''}${money(amount)
 const names = { income: 'Получени пари', expense: 'Разход', handover: 'Предаване на фирмата', confirmation: 'Сверяване от фирмата', reversal: 'Корекция' };
 
 export function AccountingOverview({ report, company, onTrips }: { report: AccountingReport; company: boolean; onTrips: () => void }) {
+  const payment = report.payment_breakdown;
   return <>
     <div className="rounded-2xl border border-primary-200 bg-white overflow-hidden">
       <div className="p-5 sm:p-6 bg-primary-50/60">
-        <h2 className="text-sm font-semibold text-foreground-700">Остатък по въведените сметки</h2>
-        <p className="mt-1 text-3xl sm:text-4xl font-bold font-heading tracking-tight tabular-nums text-foreground-950">{money(report.balance.closing)}</p>
-        <p className="mt-2 text-xs text-foreground-500">{company ? 'За избрания екип или шофьор.' : 'По твоите записи.'} Изчислен остатък, не преброена каса.</p>
+        <h2 className="text-sm font-semibold text-foreground-700">{payment ? 'В брой по записите' : 'Остатък по въведените сметки'}</h2>
+        <p className="mt-1 text-3xl sm:text-4xl font-bold font-heading tracking-tight tabular-nums text-foreground-950">{money(payment?.cash_closing ?? report.balance.closing)}</p>
+        <p className="mt-2 text-xs text-foreground-500">{company ? 'За избрания екип или шофьор.' : 'По твоите записи.'} {payment ? 'Получени в брой − разходи в брой − предадени на фирмата. Картите са отделно. Изчислено по записите, не е преброена каса.' : 'Изчислен остатък, не преброена каса.'}</p>
       </div>
       <dl className="grid grid-cols-3 divide-x divide-background-100">
         {[
-          ['Получени пари', report.finances.income], ['Разходи', report.finances.expenses], ['Предадени', report.finances.handed_over],
+          ...(payment ? [['В брой',payment.cash_income],['С карта',payment.card_income],['Разходи',report.finances.expenses]] : [['Получени пари',report.finances.income],['Разходи',report.finances.expenses],['Предадени',report.finances.handed_over]]),
         ].map(([title, value]) => <div key={title} className="min-w-0 p-3 sm:p-5">
           <dt className="text-[11px] sm:text-xs text-foreground-500">{title}</dt><dd className="mt-1 font-bold tabular-nums text-sm sm:text-xl break-words">{money(value as number)}</dd>
         </div>)}
       </dl>
     </div>
+    {payment && <p className="text-xs text-foreground-600 px-1">Предадени в брой на фирмата: <strong>{money(payment.cash_handover)}</strong>. Картовите плащания са потвърдени от шофьора и подлежат на сверяване с терминала.</p>}
+    {payment && (payment.unknown_income !== 0 || payment.unknown_expenses !== 0 || payment.unknown_handover !== 0 || payment.unknown_closing !== 0) && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Има записи без посочен начин на плащане. Те са отделно от касата: получени {money(payment.unknown_income)}, разходи {money(payment.unknown_expenses)}, предадени {money(payment.unknown_handover)}. Провери историята преди сверяване.</p>}
     <button type="button" onClick={onTrips} className="w-full min-h-12 flex items-center justify-between gap-3 rounded-xl border border-background-200 bg-white px-4 py-3 text-left text-sm">
       <span><strong>{report.totals.completed}</strong> завършени курса <span className="text-foreground-400">·</span> стойност <strong className="tabular-nums">{money(report.totals.booked)}</strong></span>
       <span aria-hidden="true" className="text-primary-700">→</span>
@@ -30,7 +33,7 @@ export function AccountingOverview({ report, company, onTrips }: { report: Accou
     <details className="rounded-xl border border-background-200 bg-white px-4 text-sm">
       <summary className="min-h-11 flex items-center cursor-pointer font-medium">Как се получават сумите</summary>
       <div className="pb-4 space-y-3 text-xs text-foreground-600">
-        <p>Стойността на курсовете е цената от заявките. Получените пари се въвеждат отделно и не се добавят автоматично от тази стойност.</p>
+        <p>При приключване на курс шофьорът потвърждава полученото плащане. То влиза автоматично тук и е свързано с курса. Неплатената част остава видима в „Курсове“. За стари и външни курсове може да се добави отделен запис.</p>
         <p>Начален остатък + приходи − разходи − предавания = краен остатък. Предаването не е разход, а сверяването не добавя парите повторно.</p>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
           {[
@@ -48,8 +51,8 @@ export function AccountingOverview({ report, company, onTrips }: { report: Accou
   </>;
 }
 
-export function AccountingMovements({ report, company, driver, userId, blocked, onAction }: {
-  report: AccountingReport; company: boolean; driver: boolean; userId?: string; blocked: boolean; onAction: (action: MoneyAction) => void;
+export function AccountingMovements({ report, company, driver, userId, blocked, onAction, onReceipts }: {
+  report: AccountingReport; company: boolean; driver: boolean; userId?: string; blocked: boolean; onAction: (action: MoneyAction) => void; onReceipts?: (entry: MoneyEntry) => void;
 }) {
   return <div className="rounded-2xl border border-background-200 bg-white p-4 sm:p-5">
     <h2 className="font-semibold text-foreground-950">История на сметките</h2>
@@ -68,8 +71,10 @@ export function AccountingMovements({ report, company, driver, userId, blocked, 
         </div>
         <div className="flex flex-wrap items-center gap-2"><span className={`${badge} ${pending ? 'bg-amber-50 text-amber-800' : e.confirmed || e.kind === 'confirmation' ? 'bg-emerald-50 text-emerald-800' : 'bg-background-100 text-foreground-600'}`}>{status}</span><span className="text-xs text-foreground-500">{reportDate(e.recorded_at)}</span></div>
         <p className="text-sm text-foreground-600 break-words">{e.note}</p>
+        <p className="text-xs text-foreground-500">{paymentMethodLabel(e.effective_method ?? e.payment_method)}</p>
         {e.kind === 'confirmation' && <p className="text-xs text-foreground-500">Сверена сума: {money(e.amount)} · без ново движение на остатъка</p>}
         <div className="flex flex-wrap gap-x-5">
+          {e.kind === 'expense' && onReceipts && <button className={link} onClick={()=>onReceipts(e)}>Документи към разхода</button>}
           {canDriverReverse && <button className={link} disabled={blocked} onClick={() => onAction({ entry: e, kind: 'reversal' })}>Коригирай</button>}
           {companyEntry && <button className={link} disabled={blocked} onClick={() => onAction({ entry: e, kind: e.confirmed ? 'reversal' : 'confirmation' })}>
             {e.confirmed ? 'Коригирай сверения запис' : e.kind === 'income' ? 'Свери приход' : 'Потвърди получаване'}
@@ -100,18 +105,20 @@ export function AccountingTrips({ report, company, driver, blocked, onPayment }:
     {!report.outcomes.length && <p className="py-6 text-sm text-foreground-500">Няма приключени заявки за този месец.</p>}
     <div className="divide-y divide-background-100">{report.outcomes.map(o => {
       const payment = reconciliation.get(o.request_id);
-      const unpaid = o.outcome === 'completed' && payment?.declared_income == null;
+      const unpaid = o.outcome === 'completed' && (payment?.declared_income == null || (payment.outstanding ?? 0) > 0);
       return <article key={o.id} className="py-4 space-y-2">
         <div className="flex justify-between gap-3"><p className="text-sm font-semibold">{o.outcome === 'completed' ? 'Завършен курс' : o.previous_status === 'in_progress' ? 'Прекратено пътуване' : 'Отменена заявка'}</p>
           <strong className="text-sm text-right tabular-nums">{o.outcome === 'completed' ? money(o.booked_amount) : 'Без начислен оборот'}</strong></div>
         <p className="text-xs text-foreground-500">{reportDate(o.occurred_at)}{company && ` · ${o.driver_name || 'Без назначен шофьор'}`}</p>
         {payment && <div className="space-y-1">
           <span className={`${badge} ${unpaid ? 'bg-amber-50 text-amber-800' : payment.company_confirmed ? 'bg-emerald-50 text-emerald-800' : 'bg-background-100 text-foreground-600'}`}>
-            {unpaid ? 'Без отчетено плащане' : payment.company_confirmed ? 'Сверено плащане' : 'Отчетено · за сверяване'}
+            {unpaid ? payment.declared_income == null ? 'Без отчетено плащане' : 'Частично платен' : payment.company_confirmed ? 'Сверено плащане' : 'Отчетено · за сверяване'}
           </span>
-          {!unpaid && <p className="text-xs text-foreground-600">Деклариран приход: {money(payment.declared_income)} · Разлика спрямо заявката: {money(payment.difference)}</p>}
+          {payment.declared_income != null && <p className="text-xs text-foreground-600">{paymentMethodLabel(payment.payment_method)} · Получено: {money(payment.declared_income)} · Разлика спрямо заявката: {money(payment.difference)}</p>}
+          {(payment.outstanding ?? 0)>0 && <p className="text-xs font-semibold text-amber-800">Остава за плащане: {money(payment.outstanding!)}</p>}
+          {payment.payment_note && <p className="text-xs text-foreground-600 break-words">Причина при приключване: {payment.payment_note}</p>}
         </div>}
-        {driver && unpaid && <button type="button" className={link} disabled={blocked} onClick={() => onPayment(o)}>Отчети плащането</button>}
+        {driver && unpaid && <button type="button" className={link} disabled={blocked} onClick={() => onPayment(o)}>{payment?.declared_income != null ? 'Отчети доплащане' : 'Отчети плащането'}</button>}
         <details className="text-xs text-foreground-500">
           <summary className="inline-flex items-center min-h-9 cursor-pointer underline underline-offset-4">Детайли за курса</summary>
           <div className="space-y-2 pt-1 break-words">
@@ -135,9 +142,10 @@ export function AccountingDrivers({ report, onChoose, onSearch }: { report: Acco
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">По шофьор — избран месец</h2><button className={link} onClick={onSearch}>Намери шофьор</button></div>
     {!report.drivers.length && <p className="py-6 text-sm text-foreground-500">Няма движения по шофьор за този месец.</p>}
     <div className="divide-y divide-background-100">{report.drivers.map(d => <article key={d.driver_id ?? 'unassigned'} className="py-4 space-y-2">
-      <div className="flex justify-between gap-3 text-sm font-semibold"><p className="break-words">{d.driver_name || 'Без назначен шофьор'}</p><p className="shrink-0 tabular-nums">{money(d.closing)}</p></div>
+      <div className="flex justify-between gap-3 text-sm font-semibold"><p className="break-words">{d.driver_name || 'Без назначен шофьор'}</p><p className="shrink-0 tabular-nums">{money(d.cash_closing ?? d.closing)}{d.cash_closing != null && <span className="ml-1 text-xs font-normal">в брой</span>}</p></div>
       <p className="text-xs text-foreground-500">{d.trips} завършени · {d.cancelled} отменени · стойност {money(d.booked)}</p>
-      <p className="text-xs text-foreground-500">Получени: {money(d.income)} · Разходи: {money(d.expenses)} · Предадени: {money(d.handed_over)}</p>
+      {d.cash_income != null && <p className="text-xs text-foreground-500">Получени в брой: {money(d.cash_income)} · С карта: {money(d.card_income ?? 0)}{d.unknown_income !== 0 && ` · Без посочен начин: ${money(d.unknown_income ?? 0)}`}</p>}
+      <p className="text-xs text-foreground-500">Общо получени: {money(d.income)} · Разходи: {money(d.expenses)} · Предадени: {money(d.handed_over)}</p>
       {d.driver_id && <button className={link} onClick={() => onChoose(d.driver_id!, d.driver_name || 'Шофьор')}>Отвори отчета</button>}
     </article>)}</div>
     {report.driver_count > report.drivers.length && <p className="mt-3 text-xs text-foreground-500">Показани са първите 50 групи. Намери конкретен шофьор с търсене или изтегли пълните записи в CSV.</p>}

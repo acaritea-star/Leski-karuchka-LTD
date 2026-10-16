@@ -62,3 +62,10 @@ it('labels the company and exact driver scope in the exported snapshot', () => {
  const company = accountingFixture('2026-10', null);
  expect(reportCsv([], [], company)).toContain('"Обхват";"Цялата фирма";""');
 });
+it('verifies separate cash/card totals and refuses a card amount presented as driver cash',()=>{
+ const r=accountingFixture();r.finances={...r.finances,income:30,expenses:3,handed_over:5,net_income:27};r.balance={...r.balance,opening:0,movement:22,closing:22};
+ r.payment_breakdown={cash_income:10,card_income:20,unknown_income:0,cash_expenses:3,card_expenses:0,unknown_expenses:0,cash_handover:5,unknown_handover:0,cash_opening:0,cash_movement:2,cash_closing:2,unknown_closing:0};
+ expect(parseAccountingReport(r,'2026-10',{driverId:financeIds.driver}).payment_breakdown?.cash_closing).toBe(2);
+ expect(()=>parseAccountingReport({...r,payment_breakdown:{...r.payment_breakdown,cash_closing:22}},'2026-10',{driverId:financeIds.driver})).toThrow('не може да бъде проверен');
+ expect(()=>parseAccountingReport({...r,payment_breakdown:{...r.payment_breakdown,unknown_income:1}},'2026-10',{driverId:financeIds.driver})).toThrow('не може да бъде проверен');
+});

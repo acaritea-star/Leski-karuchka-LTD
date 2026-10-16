@@ -1,0 +1,121 @@
+-- All synthetic financial fixtures roll back. No production rides or uploads.
+BEGIN;
+SET LOCAL statement_timeout='60s';
+UPDATE private.app_security SET ride_payment_required=true;
+CREATE OR REPLACE FUNCTION pg_temp.payment_denied(statement text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+ BEGIN EXECUTE statement;
+ EXCEPTION WHEN OTHERS THEN
+  IF SQLSTATE IN ('42501','P0001','23505','23514','22023') THEN RETURN; END IF;
+  RAISE;
+ END;
+ RAISE EXCEPTION 'FAIL allowed forbidden payment operation: %',statement;
+END $$;
+CREATE FUNCTION pg_temp.insert_checkout_ride(ride uuid,cid uuid,customer_uid uuid,did uuid,vt uuid) RETURNS void LANGUAGE sql AS $$
+ INSERT INTO public.taxi_requests(id,company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,pickup_address,destination_latitude,destination_longitude,destination_address,status,accepted_at,started_at,estimated_price)
+ VALUES(ride,cid,customer_uid,did,vt,43.2,25.6,'Synthetic',43.21,25.61,'Synthetic','in_progress',now()-interval '10 minutes',now()-interval '8 minutes',12.34);
+$$;
+DO $test$
+DECLARE cid uuid:=gen_random_uuid(); foreign_cid uuid:=gen_random_uuid(); duid uuid:=gen_random_uuid(); duid2 uuid:=gen_random_uuid();
+ admin_uid uuid:=gen_random_uuid(); foreign_uid uuid:=gen_random_uuid(); customer_uid uuid:=gen_random_uuid(); did uuid; vt uuid:=gen_random_uuid();
+ cash_ride uuid:=gen_random_uuid(); card_ride uuid:=gen_random_uuid(); unpaid_ride uuid:=gen_random_uuid(); partial_ride uuid:=gen_random_uuid();
+ cash_op uuid:=gen_random_uuid(); card_op uuid:=gen_random_uuid(); unpaid_op uuid:=gen_random_uuid(); partial_op uuid:=gen_random_uuid();
+ collision uuid:=gen_random_uuid(); topup uuid:=gen_random_uuid(); expense uuid:=gen_random_uuid(); handover uuid:=gen_random_uuid(); proof uuid:=gen_random_uuid();
+ r jsonb; again jsonb; report jsonb; proof_row jsonb; stmt text; i integer;
+BEGIN
+ INSERT INTO public.companies(id,name,slug) VALUES(cid,'Checkout test','checkout-'||cid),(foreign_cid,'Foreign checkout','checkout-'||foreign_cid);
+ INSERT INTO auth.users(id,email) SELECT u,'checkout-'||u||'@example.invalid' FROM unnest(ARRAY[duid,duid2,admin_uid,foreign_uid,customer_uid]) t(u);
+ UPDATE public.profiles SET role='DRIVER',company_id=cid WHERE id IN(duid,duid2);
+ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=cid WHERE id=admin_uid;
+ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=foreign_cid WHERE id=foreign_uid;
+ SELECT id INTO STRICT did FROM public.drivers WHERE user_id=duid;
+ INSERT INTO public.vehicle_types(id,company_id,name) VALUES(vt,cid,'Checkout');
+ PERFORM pg_temp.insert_checkout_ride(cash_ride,cid,customer_uid,did,vt);
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM pg_temp.payment_denied(format('UPDATE public.taxi_requests SET status=''completed'' WHERE id=%L',cash_ride));
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'',1)',cash_op,cash_ride,duid));
+ PERFORM public.record_driver_money_method(collision,'expense',1,'Synthetic rollback check',duid,'cash');
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',collision,cash_ride,duid));
+ IF EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=cash_ride) OR EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=cash_ride) OR NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=cash_ride AND status='in_progress') THEN RAISE EXCEPTION 'FAIL partial commit after money rejection'; END IF;
+ PERFORM public.record_driver_money_method(gen_random_uuid(),'reversal',0,'Rollback check cleanup',duid,NULL,NULL,collision);
+ r:=public.complete_ride_payment(cash_op,cash_ride,duid,'cash');
+ again:=public.complete_ride_payment(cash_op,cash_ride,duid,'cash');
+ IF r IS DISTINCT FROM again OR (r#>>'{ride,status}')<>'completed' OR (r#>>'{receipt,received_amount}')::numeric<>12.34 OR (r#>>'{receipt,entry_id}')::uuid<>cash_op THEN RAISE EXCEPTION 'FAIL atomic cash checkout'; END IF;
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''card'')',cash_op,cash_ride,duid));
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',gen_random_uuid(),cash_ride,duid));
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(card_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM public.complete_ride_payment(card_op,card_ride,duid,'card');
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(unpaid_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''unpaid'')',unpaid_op,unpaid_ride,duid));
+ PERFORM public.complete_ride_payment(unpaid_op,unpaid_ride,duid,'unpaid',NULL,'Card declined');
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(partial_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM public.complete_ride_payment(partial_op,partial_ride,duid,'partial_cash',5,'Only part received');
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''income'',8,''Overpayment'',%L,''card'',%L)',gen_random_uuid(),duid,partial_ride));
+ PERFORM public.record_driver_money_method(topup,'income',7.34,'Remaining fare',duid,'card',partial_ride);
+ PERFORM public.record_driver_money_method(topup,'income',7.34,'Remaining fare',duid,'card',partial_ride);
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''income'',7.34,''Remaining fare'',%L,''cash'',%L)',topup,duid,partial_ride));
+ PERFORM public.record_driver_money_method(expense,'expense',2.34,'Fuel',duid,'cash');
+ PERFORM public.record_driver_money_method(handover,'handover',5,'Cash desk',duid,'cash');
+ report:=public.accounting_export((clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date,((clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date+1),cid,did);
+ IF (report#>>'{finances,income}')::numeric<>37.02 OR (report#>>'{payment_breakdown,cash_income}')::numeric<>17.34 OR (report#>>'{payment_breakdown,card_income}')::numeric<>19.68 OR (report#>>'{payment_breakdown,cash_closing}')::numeric<>10 THEN RAISE EXCEPTION 'FAIL card/cash separation: %',report; END IF;
+ IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(report->'reconciliation') x WHERE x->>'request_id'=partial_ride::text AND (x->>'declared_income')::numeric=12.34 AND x->>'payment_method'='mixed' AND (x->>'outstanding')::numeric=0) THEN RAISE EXCEPTION 'FAIL aggregate partial payments'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(report->'reconciliation') x WHERE x->>'request_id'=unpaid_ride::text AND (x->>'outstanding')::numeric=12.34 AND x->>'payment_note'='Card declined') THEN RAISE EXCEPTION 'FAIL unpaid reconciliation'; END IF;
+ IF EXISTS(SELECT 1 FROM public.driver_money_entries WHERE request_id=unpaid_ride) THEN RAISE EXCEPTION 'FAIL phantom income'; END IF;
+ IF (SELECT count(*) FROM public.driver_money_entries WHERE request_id=cash_ride)<>1 THEN RAISE EXCEPTION 'FAIL duplicated cash income'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=card_ride AND payment_method='card' AND final_price=12.34 AND completed_at IS NOT NULL) THEN RAISE EXCEPTION 'FAIL card ride timeline'; END IF;
+ proof_row:=public.reserve_expense_receipt(proof,expense,duid,'fuel.png','image/png',100,repeat('a',64));
+ IF public.reserve_expense_receipt(proof,expense,duid,'fuel.png','image/png',100,repeat('a',64)) IS DISTINCT FROM proof_row THEN RAISE EXCEPTION 'FAIL reserve retry'; END IF;
+ PERFORM pg_temp.payment_denied(format('SELECT public.reserve_expense_receipt(%L,%L,%L,''fuel.png'',''image/png'',101,%L)',proof,expense,duid,repeat('a',64)));
+ PERFORM pg_temp.payment_denied(format('SELECT public.finalize_expense_receipt(%L,%L)',proof,duid));
+ PERFORM pg_temp.payment_denied(format('SELECT public.reserve_expense_receipt(%L,%L,%L,''bad.svg'',''image/svg+xml'',100,%L)',gen_random_uuid(),expense,duid,repeat('a',64)));
+ PERFORM pg_temp.payment_denied(format('INSERT INTO storage.objects(bucket_id,name) VALUES(''expense-receipts'',%L)',cid||'/invented.png'));
+ EXECUTE 'RESET ROLE';
+ -- Only fake Storage metadata, never external Storage writes, for RLS assertions.
+ INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('expense-receipts',proof_row->>'path','{"mimetype":"image/png","size":100}');
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ r:=public.finalize_expense_receipt(proof,duid);
+ IF r->>'uploaded_at' IS NULL OR public.finalize_expense_receipt(proof,duid) IS DISTINCT FROM r THEN RAISE EXCEPTION 'FAIL immutable proof finalization'; END IF;
+ PERFORM pg_temp.payment_denied(format('UPDATE public.expense_receipts SET file_name=''replacement.png'' WHERE id=%L',proof));
+ BEGIN
+  DELETE FROM storage.objects WHERE bucket_id='expense-receipts' AND name=proof_row->>'path';
+  GET DIAGNOSTICS i=ROW_COUNT;
+  IF i<>0 THEN RAISE EXCEPTION 'FAIL driver deleted evidence'; END IF;
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ FOR i IN 2..3 LOOP PERFORM public.reserve_expense_receipt(gen_random_uuid(),expense,duid,'extra.png','image/png',100,repeat('b',64)); END LOOP;
+ PERFORM pg_temp.payment_denied(format('SELECT public.reserve_expense_receipt(%L,%L,%L,''fourth.png'',''image/png'',100,%L)',gen_random_uuid(),expense,duid,repeat('c',64)));
+ EXECUTE 'RESET ROLE';
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_uid,'role','authenticated')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ IF (SELECT count(*) FROM public.expense_receipts WHERE entry_id=expense)<>1 OR NOT EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='expense-receipts' AND name=proof_row->>'path') THEN RAISE EXCEPTION 'FAIL own company evidence access'; END IF;
+ PERFORM public.record_driver_money_method(gen_random_uuid(),'confirmation',0,'Cash checked',admin_uid,NULL,NULL,handover,'cash_count');
+ report:=public.accounting_export((clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date,((clock_timestamp() AT TIME ZONE 'Europe/Sofia')::date+1),cid,did);
+ IF (report#>>'{payment_breakdown,cash_closing}')::numeric<>10 THEN RAISE EXCEPTION 'FAIL confirmation duplicated cash'; END IF;
+ EXECUTE 'RESET ROLE';
+ FOREACH duid2 IN ARRAY ARRAY[duid2,foreign_uid,customer_uid] LOOP
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid2,'role','authenticated')::text,true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  IF EXISTS(SELECT 1 FROM public.expense_receipts WHERE entry_id=expense) OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='expense-receipts' AND name=proof_row->>'path') OR EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=cash_ride) THEN RAISE EXCEPTION 'FAIL foreign evidence or payments exposed'; END IF;
+  PERFORM pg_temp.payment_denied(format('SELECT public.finalize_expense_receipt(%L,%L)',proof,duid2));
+  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',gen_random_uuid(),unpaid_ride,duid2));
+  EXECUTE 'RESET ROLE';
+ END LOOP;
+ UPDATE private.app_security SET staff_mfa_enforced=true;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated','aal','aal1')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ IF EXISTS(SELECT 1 FROM public.expense_receipts WHERE entry_id=expense) OR EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=cash_ride) THEN RAISE EXCEPTION 'FAIL MFA read bypass'; END IF;
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',cash_op,cash_ride,duid));
+ PERFORM pg_temp.payment_denied(format('SELECT public.reserve_expense_receipt(%L,%L,%L,''fuel.png'',''image/png'',100,%L)',proof,expense,duid,repeat('a',64)));
+ PERFORM pg_temp.payment_denied(format('SELECT public.finalize_expense_receipt(%L,%L)',proof,duid));
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''expense'',2,''Fuel'',%L,''cash'')',gen_random_uuid(),duid));
+ EXECUTE 'RESET ROLE';
+ RAISE NOTICE 'PASS: atomic checkout, retries, partial/cash/card, no phantom money, immutable evidence and company isolation';
+END $test$;
+ROLLBACK;

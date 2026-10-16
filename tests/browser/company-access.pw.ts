@@ -20,7 +20,7 @@ const dashboard = {
 
 async function expectDashboardReady(page: Page) {
   await expect(page.getByLabel('Обобщение на курсовете')).toContainText('Общо шофьори: 0');
-  await expect(page.getByLabel('Надеждност на услугата')).toContainText('Няма активни сигнали по тези показатели.');
+  await expect(page.getByLabel('Състояние на услугата')).toContainText('Няма открити проблеми по наблюдаваните показатели.');
   await expect(page.getByRole('button', { name: 'Опитай отново', exact: true })).toHaveCount(0);
 }
 

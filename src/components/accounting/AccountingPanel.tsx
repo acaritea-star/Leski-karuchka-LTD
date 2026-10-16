@@ -4,10 +4,11 @@ import Modal from '@/components/feature/Modal';
 import { useAuth } from '@/hooks/useAuth';
 import { clearMoneyIntent, findMoneyOperation, prepareMoneyIntent, readMoneyIntent, writeMoneyOperation, type MoneyCommand } from '@/lib/pendingMoney';
 import { isAmbiguousWrite } from '@/lib/rideOperations';
-import { loadAccounting, exportAccounting, money, parseMoney, reportCsv, reportDate, sofiaMonth, type Outcome } from '@/lib/accounting';
+import { loadAccounting, exportAccounting, money, parseMoney, reportCsv, reportDate, sofiaMonth, type Outcome, type MoneyEntry } from '@/lib/accounting';
 import { AccountingDrivers, AccountingMovements, AccountingOverview, AccountingTrips, type MoneyAction } from './AccountingViews';
 import type { AccountingDriver } from './AccountingDriverPicker';
 
+const ExpenseReceipts = lazy(() => import('./ExpenseReceipts'));
 const DriverPicker = lazy(() => import('./AccountingDriverPicker'));
 const inputClass = 'w-full min-h-11 rounded-xl border border-background-200 bg-white px-3 py-2.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100';
 const buttonClass = 'min-h-11 rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50';
@@ -27,7 +28,7 @@ function PendingOperation({ command, busy, onCheck, onRetry }: { command: MoneyC
   </div>;
 }
 
-export default function AccountingPanel({ companyId, driverId }: { companyId?: string; driverId?: string }) {
+function AccountingWorkspace({ companyId, driverId }: { companyId?: string; driverId?: string }) {
   const { user } = useAuth();
   const client = useQueryClient();
   const driverMode = !!driverId && !companyId;
@@ -40,6 +41,8 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
   const [kind, setKind] = useState<EntryKind>('income');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [method, setMethod] = useState<'cash'|'card'>('cash');
+  const [receiptEntry, setReceiptEntry] = useState<Pick<MoneyEntry,'id'|'amount'|'note'|'reversed'> | null>(null);
   const [requestId, setRequestId] = useState('');
   const [action, setAction] = useState<MoneyAction | null>(null);
   const [actionNote, setActionNote] = useState('');
@@ -76,6 +79,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
   const resetDraft = () => { setAmount(''); setNote(''); setRequestId(''); setActionNote(''); };
   const complete = async (command: MoneyCommand, message: string) => {
     clearMoneyIntent(user!.id, command.p_id);
+    if (command.p_kind === 'expense') setReceiptEntry({id:command.p_id,amount:command.p_amount,note:command.p_note,reversed:false});
     setPending(null); resetDraft(); setAction(null); setEntryOpen(false);
     setMonth(sofiaMonth()); setPage(0); setView('movements'); setSuccess(message);
     await client.invalidateQueries({ queryKey: ['accounting'] });
@@ -109,13 +113,14 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
   };
   const openEntry = (nextKind: EntryKind, trip?: Outcome) => {
     if (blocked) return;
-    setKind(nextKind); setAmount(trip?.booked_amount?.toFixed(2) ?? '');
+    const due = trip && report?.reconciliation.find(r => r.request_id === trip.request_id)?.outstanding;
+    setKind(nextKind); setMethod('cash'); setAmount((due ?? trip?.booked_amount)?.toFixed(2) ?? '');
     setNote(trip ? `Плащане по курс ${trip.request_id.slice(0, 8)}` : '');
     setRequestId(trip?.request_id ?? ''); setError(''); setSuccess(''); setAction(null); setEntryOpen(true);
   };
   const openAction = (next: MoneyAction) => {
     if (blocked) return;
-    setAction(next); setActionNote(''); setEvidenceSource('cash_count'); setEvidenceReference('');
+    setAction(next); setActionNote(''); setEvidenceSource((next.entry.effective_method ?? next.entry.payment_method) === 'card' ? 'bank_record' : 'cash_count'); setEvidenceReference('');
     setError(''); setSuccess(''); setEntryOpen(false);
   };
   const closeDialog = () => {
@@ -128,7 +133,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     if (pending) return;
     try {
       if (!note.trim()) throw new Error('Добави описание на сумата.');
-      void write({ p_kind: kind, p_amount: parseMoney(amount), p_note: note.trim(), p_request_id: kind === 'income' && requestId ? requestId : undefined });
+      void write({ p_kind: kind, p_amount: parseMoney(amount), p_note: note.trim(), p_payment_method: kind === 'handover' ? 'cash' : method, p_request_id: kind === 'income' && requestId ? requestId : undefined });
     } catch (err) { setError(err instanceof Error ? err.message : 'Провери сумата.'); }
   };
   const exportCsv = async () => {
@@ -174,12 +179,13 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     {query.isPending && <p role="status" className="py-8 text-sm text-foreground-500">Зареждане на отчета…</p>}
     {report && <>
       <AccountingOverview report={report} company={!!companyId} onTrips={() => changeView('trips')} />
+      {driverMode && <p className="text-xs text-foreground-500">Плащанията по курсовете се добавят при приключването им. Тук можеш да добавиш разход, външен приход или предаване на пари.</p>}
       {driverMode && <div className="grid grid-cols-3 gap-2" aria-label="Нов финансов запис">
         {(['income', 'expense', 'handover'] as const).map(value => <button key={value} type="button" disabled={blocked} onClick={() => openEntry(value)}
           className={`min-w-0 min-h-14 rounded-xl px-2 text-xs sm:text-sm font-semibold whitespace-nowrap disabled:opacity-40 ${value === 'income' ? 'bg-primary-500 text-white hover:bg-primary-600' : 'border border-background-200 bg-white hover:bg-background-50'}`}>{value === 'income' ? '+ Получени' : value === 'expense' ? '− Разход' : 'Предаване'}</button>)}
       </div>}
-      {!!report.totals.unreported_completed && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-x-3 text-sm text-amber-900">
-        <p><strong>{report.totals.unreported_completed}</strong> завършени курса без отчетено плащане</p>
+      {!!(report.totals.unreported_completed + (report.totals.partially_paid ?? 0)) && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-x-3 text-sm text-amber-900">
+        <p><strong>{report.totals.unreported_completed + (report.totals.partially_paid ?? 0)}</strong> завършени курса с непълно плащане</p>
         <button type="button" className="min-h-11 font-semibold underline" onClick={() => changeView('trips')}>Виж курсовете</button>
       </div>}
       {!!report.totals.missing_amounts && <p className="text-sm text-amber-800">{report.totals.missing_amounts} завършени курса са без записана крайна сума и не участват в сбора.</p>}
@@ -189,7 +195,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
         ] as [View, string][]).map(([value, title]) => <button key={value} type="button" aria-pressed={view === value} disabled={busy}
           onClick={() => changeView(value)} className={`flex-1 min-h-11 rounded-lg px-2 text-sm font-semibold ${view === value ? 'bg-primary-50 text-primary-800' : 'text-foreground-500 hover:bg-background-50'}`}>{title}</button>)}
       </nav>
-      {view === 'movements' && <AccountingMovements report={report} company={!!companyId} driver={driverMode} userId={user?.id} blocked={blocked} onAction={openAction} />}
+      {view === 'movements' && <AccountingMovements report={report} company={!!companyId} driver={driverMode} userId={user?.id} blocked={blocked} onAction={openAction} onReceipts={setReceiptEntry} />}
       {view === 'trips' && <AccountingTrips report={report} company={!!companyId} driver={driverMode} blocked={blocked} onPayment={trip => openEntry('income', trip)} />}
       {view === 'drivers' && companyId && <AccountingDrivers report={report} onChoose={(id, name) => chooseDriver({ id, name })} onSearch={() => setPickerOpen(true)} />}
       {view !== 'drivers' && maxPages > 1 && <div className="flex items-center justify-between gap-3 text-sm" aria-label="Страници на отчета">
@@ -212,6 +218,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
               <option value="">Без връзка с курс / външен приход</option>
               {report?.outcomes.filter(o => o.outcome === 'completed').map(o => <option key={o.id} value={o.request_id}>{reportDate(o.occurred_at)} — {money(o.booked_amount)} — {o.request_id.slice(0, 8)}</option>)}
             </select></label></>}
+          {kind !== 'handover' && <fieldset className="space-y-2"><legend className="text-sm font-medium">Начин на плащане</legend><div className="grid grid-cols-2 gap-2">{(['cash','card'] as const).map(value=><button key={value} type="button" aria-pressed={method===value} onClick={()=>setMethod(value)} className={`${secondaryButton} ${method===value?'border-primary-500 bg-primary-50 text-primary-800':''}`}>{value==='cash'?'В брой':'С карта'}</button>)}</div></fieldset>}
           {kind === 'expense' && <div className="flex flex-wrap gap-2" aria-label="Бързо описание на разхода">{['Гориво', 'Паркинг', 'Поддръжка'].map(value => <button key={value} type="button" className="min-h-9 rounded-full border border-background-200 px-3 text-xs" onClick={() => setNote(value)}>{value}</button>)}</div>}
           <label className="block text-sm font-medium">Описание<input className={`${inputClass} mt-1`} value={note} onChange={e => setNote(e.target.value)} maxLength={500} placeholder={kind === 'income' ? 'Например: получено плащане по курс' : kind === 'expense' ? 'Например: гориво' : 'Например: предаване на каса'} required /></label>
           <p className="text-xs text-foreground-500">Записва се с днешна дата и е видим за твоята фирма. Предаването на пари изисква отделно потвърждение от фирмата.</p>
@@ -223,7 +230,7 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
     {action && <Modal label={actionTitle} onClose={closeDialog} busy={busy} className="max-w-lg">
       <form className="p-5 space-y-4" onSubmit={e => {
         e.preventDefault();
-        if (!pending && actionNote.trim()) void write({ p_kind: action.kind, p_amount: action.entry.amount, p_note: actionNote.trim(), p_reference_id: action.entry.id,
+        if (!pending && actionNote.trim()) void write({ p_kind: action.kind, p_amount: action.entry.amount, p_note: actionNote.trim(), p_reference_id: action.entry.id, p_payment_method: action.entry.effective_method ?? action.entry.payment_method ?? null,
           ...(verifiedAction ? { p_source: evidenceSource, p_evidence_ref: evidenceReference.trim() || undefined } : {}) });
       }}>
         <div className="flex items-start justify-between gap-3"><h2 className="text-lg font-bold">{actionTitle}</h2><button type="button" aria-label="Затвори действието" className="min-w-11 min-h-11 rounded-xl hover:bg-background-100" onClick={closeDialog}>×</button></div>
@@ -243,6 +250,12 @@ export default function AccountingPanel({ companyId, driverId }: { companyId?: s
         {pendingPanel}
       </form>
     </Modal>}
+    {receiptEntry && user?.id && <Suspense fallback={<p role="status">Зареждане на документите…</p>}><ExpenseReceipts key={`${user.id}:${receiptEntry.id}`} entry={receiptEntry} owner={user.id} canUpload={driverMode} onClose={()=>setReceiptEntry(null)} /></Suspense>}
     {pickerOpen && companyId && <Suspense fallback={<p role="status" className="text-sm text-foreground-500">Зареждане на избора…</p>}><DriverPicker companyId={companyId} onChoose={chooseDriver} onClose={() => setPickerOpen(false)} /></Suspense>}
   </section>;
+}
+
+export default function AccountingPanel(props: { companyId?: string; driverId?: string }) {
+  const { user } = useAuth();
+  return <AccountingWorkspace key={`${user?.id ?? ''}:${props.companyId ?? ''}:${props.driverId ?? ''}`} {...props} />;
 }

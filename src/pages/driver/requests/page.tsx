@@ -9,7 +9,8 @@ import { withRequestTimeout } from '@/lib/requestTimeout';
 import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
 import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
-import { useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+const RideCheckout = lazy(() => import('@/pages/driver/components/RideCheckout'));
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +51,9 @@ export default function DriverRequests() {
   const [error, setError] = useState('');
   const [requestsRealtime, setRequestsRealtime] = useState(false);
   const offersConnected = useDriverOfferConnection();
+  const [checkoutOwner, setCheckoutOwner] = useState('');
+  const [checkoutRequest, setCheckoutRequest] = useState<TaxiRequest | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [driverNavInfo, setDriverNavInfo] = useState<NavInfo | null>(null);
 
   // Unlock audio on first user interaction (required by browsers)
@@ -222,22 +226,6 @@ export default function DriverRequests() {
     onError: (err) => {
       if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
       setError(err instanceof Error ? err.message : t('trip_start_error'));
-    },
-  });
-
-  // ── End trip action ──
-  const endMutation = useMutation({
-    retry: false,
-    mutationFn: (request: TaxiRequest) => transitionTaxiRequest(request, 'completed'),
-    onSuccess: (updated) => {
-      setError('');
-      if (driver?.id) {
-        cacheDriverRequest(queryClient, driver.id, updated);
-      }
-    },
-    onError: (err) => {
-      if (driver?.id) queryClient.invalidateQueries({ queryKey: queryKeys.driverActiveRequest(driver.id) });
-      setError(err instanceof Error ? err.message : t('trip_end_error'));
     },
   });
 
@@ -533,7 +521,7 @@ export default function DriverRequests() {
               {activeRequest.status === 'in_progress' && (
                 <>
                   <button
-                    onClick={() => endMutation.mutate(activeRequest)}
+                    onClick={() => { setPaymentNotice(''); setCheckoutOwner(user?.id ?? ''); setCheckoutRequest(activeRequest); }}
                     className="w-full py-3.5 rounded-xl bg-foreground-950 text-white text-sm font-semibold hover:bg-foreground-800 transition-colors whitespace-nowrap cursor-pointer active:scale-[0.98] flex items-center justify-center gap-2"
                   >
                     <i className="ri-flag-line" />
@@ -550,6 +538,14 @@ export default function DriverRequests() {
             </div>
           </div>
         )}
+
+        {paymentNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paymentNotice}</p>}
+        {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => { setCheckoutRequest(null); void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)}); }} onFinished={ride => {
+          if (activeOwner.current !== user.id) return;
+          cacheDriverRequest(queryClient, driver.id, ride); setCheckoutRequest(null); setError('');
+          setPaymentNotice('Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.');
+          void queryClient.invalidateQueries({ queryKey: ['accounting'] });
+        }} /></Suspense>}
 
         {/* ── Incoming Requests ── */}
         {!activeRequest && isOnline && (
