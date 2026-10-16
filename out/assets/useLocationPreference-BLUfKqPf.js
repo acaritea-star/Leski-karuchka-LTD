@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-B0Z9INg1.js";import{n as t}from"./jsx-runtime-DpJIb57s.js";import{A as n,O as r}from"./driverLocation-BosjHFxo.js";var i=e(t(),1);function a(e){let t=(0,i.useCallback)(t=>n(t,e),[e]);return(0,i.useSyncExternalStore)(t,()=>r(e),()=>null)}export{a as t};
