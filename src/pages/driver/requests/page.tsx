@@ -540,7 +540,7 @@ export default function DriverRequests() {
         )}
 
         {paymentNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paymentNotice}</p>}
-        {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => setCheckoutRequest(null)} onFinished={ride => {
+        {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => { setCheckoutRequest(null); void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)}); }} onFinished={ride => {
           if (activeOwner.current !== user.id) return;
           cacheDriverRequest(queryClient, driver.id, ride); setCheckoutRequest(null); setError('');
           setPaymentNotice('Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.');

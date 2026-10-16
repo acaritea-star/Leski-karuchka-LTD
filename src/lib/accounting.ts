@@ -29,7 +29,7 @@ export interface AccountingReport {
  balance: { opening: number; movement: number; closing: number; unconfirmed_handover: number; unconfirmed_income: number };
  driver_count: number; outcome_count: number; entry_count: number; outcomes: Outcome[]; entries: MoneyEntry[];
  reconciliation: { request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; outstanding?:number|null;payment_method?:string|null;checkout_choice?:string|null;payment_note?:string|null; difference:number|null }[];
- drivers: { driver_id: string | null; driver_name: string; trips: number; cancelled: number; booked: number; income: number; expenses: number; handed_over: number; confirmed_income: number; confirmed_handover: number; closing: number }[];
+ drivers: { driver_id: string | null; driver_name: string; trips: number; cancelled: number; booked: number; cash_income?:number;card_income?:number;unknown_income?:number;cash_closing?:number;income: number; expenses: number; handed_over: number; confirmed_income: number; confirmed_handover: number; closing: number }[];
 }
 export function sofiaMonth(now = new Date()): string {
  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Sofia', year: 'numeric', month: '2-digit' }).formatToParts(now);
@@ -157,6 +157,10 @@ export function parseAccountingReport(value: unknown, month: string, scope: { co
  for (const row of r.drivers as unknown[]) {
   const d = object(row); textValue(d.driver_id, true); textValue(d.driver_name);
   countValue(d.trips); countValue(d.cancelled);
+  if (d.cash_closing !== undefined) {
+   for (const k of ['cash_income','card_income','unknown_income','cash_closing']) amountValue(d[k]);
+   if (cents(d.cash_income as number)+cents(d.card_income as number)+cents(d.unknown_income as number) !== cents(d.income as number)) throw invalidReport();
+  }
   for (const key of ['booked','income','expenses','handed_over','confirmed_income','confirmed_handover','closing']) amountValue(d[key]);
  }
  return r as unknown as AccountingReport;

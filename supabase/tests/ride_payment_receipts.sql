@@ -16,7 +16,7 @@ DECLARE cid uuid:=gen_random_uuid(); foreign_cid uuid:=gen_random_uuid(); duid u
  admin_uid uuid:=gen_random_uuid(); foreign_uid uuid:=gen_random_uuid(); customer_uid uuid:=gen_random_uuid(); did uuid; vt uuid:=gen_random_uuid();
  cash_ride uuid:=gen_random_uuid(); card_ride uuid:=gen_random_uuid(); unpaid_ride uuid:=gen_random_uuid(); partial_ride uuid:=gen_random_uuid();
  cash_op uuid:=gen_random_uuid(); card_op uuid:=gen_random_uuid(); unpaid_op uuid:=gen_random_uuid(); partial_op uuid:=gen_random_uuid();
- topup uuid:=gen_random_uuid(); expense uuid:=gen_random_uuid(); handover uuid:=gen_random_uuid(); proof uuid:=gen_random_uuid();
+ collision uuid:=gen_random_uuid(); topup uuid:=gen_random_uuid(); expense uuid:=gen_random_uuid(); handover uuid:=gen_random_uuid(); proof uuid:=gen_random_uuid();
  r jsonb; again jsonb; report jsonb; proof_row jsonb; stmt text; i integer;
 BEGIN
  INSERT INTO public.companies(id,name,slug) VALUES(cid,'Checkout test','checkout-'||cid),(foreign_cid,'Foreign checkout','checkout-'||foreign_cid);
@@ -34,6 +34,10 @@ BEGIN
  PERFORM pg_temp.payment_denied(format('UPDATE public.taxi_requests SET status=''completed'' WHERE id=%L',cash_ride));
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'',1)',cash_op,cash_ride,duid));
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''unpaid'')',unpaid_op,unpaid_ride,duid));
+ PERFORM public.record_driver_money_method(collision,'expense',1,'Synthetic rollback check',duid,'cash');
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',collision,cash_ride,duid));
+ IF EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=cash_ride) OR EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=cash_ride) OR NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=cash_ride AND status='in_progress') THEN RAISE EXCEPTION 'FAIL partial commit after money rejection'; END IF;
+ PERFORM public.record_driver_money_method(gen_random_uuid(),'reversal',0,'Rollback check cleanup',duid,NULL,NULL,collision);
  r:=public.complete_ride_payment(cash_op,cash_ride,duid,'cash');
  again:=public.complete_ride_payment(cash_op,cash_ride,duid,'cash');
  IF r IS DISTINCT FROM again OR (r#>>'{ride,status}')<>'completed' OR (r#>>'{receipt,received_amount}')::numeric<>12.34 OR (r#>>'{receipt,entry_id}')::uuid<>cash_op THEN RAISE EXCEPTION 'FAIL atomic cash checkout'; END IF;

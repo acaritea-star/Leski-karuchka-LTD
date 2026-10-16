@@ -142,9 +142,10 @@ export function AccountingDrivers({ report, onChoose, onSearch }: { report: Acco
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">По шофьор — избран месец</h2><button className={link} onClick={onSearch}>Намери шофьор</button></div>
     {!report.drivers.length && <p className="py-6 text-sm text-foreground-500">Няма движения по шофьор за този месец.</p>}
     <div className="divide-y divide-background-100">{report.drivers.map(d => <article key={d.driver_id ?? 'unassigned'} className="py-4 space-y-2">
-      <div className="flex justify-between gap-3 text-sm font-semibold"><p className="break-words">{d.driver_name || 'Без назначен шофьор'}</p><p className="shrink-0 tabular-nums">{money(d.closing)}</p></div>
+      <div className="flex justify-between gap-3 text-sm font-semibold"><p className="break-words">{d.driver_name || 'Без назначен шофьор'}</p><p className="shrink-0 tabular-nums">{money(d.cash_closing ?? d.closing)}{d.cash_closing != null && <span className="ml-1 text-xs font-normal">в брой</span>}</p></div>
       <p className="text-xs text-foreground-500">{d.trips} завършени · {d.cancelled} отменени · стойност {money(d.booked)}</p>
-      <p className="text-xs text-foreground-500">Получени: {money(d.income)} · Разходи: {money(d.expenses)} · Предадени: {money(d.handed_over)}</p>
+      {d.cash_income != null && <p className="text-xs text-foreground-500">Получени в брой: {money(d.cash_income)} · С карта: {money(d.card_income ?? 0)}{d.unknown_income !== 0 && ` · Без посочен начин: ${money(d.unknown_income ?? 0)}`}</p>}
+      <p className="text-xs text-foreground-500">Общо получени: {money(d.income)} · Разходи: {money(d.expenses)} · Предадени: {money(d.handed_over)}</p>
       {d.driver_id && <button className={link} onClick={() => onChoose(d.driver_id!, d.driver_name || 'Шофьор')}>Отвори отчета</button>}
     </article>)}</div>
     {report.driver_count > report.drivers.length && <p className="mt-3 text-xs text-foreground-500">Показани са първите 50 групи. Намери конкретен шофьор с търсене или изтегли пълните записи в CSV.</p>}

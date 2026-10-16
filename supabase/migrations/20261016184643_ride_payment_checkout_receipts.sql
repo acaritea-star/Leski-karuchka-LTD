@@ -200,7 +200,9 @@ BEGIN
  WITH outcomes AS MATERIALIZED (
   SELECT o.*,concat_ws(' ',p.first_name,p.last_name) driver_name
   FROM public.request_outcomes o LEFT JOIN public.profiles p ON p.id=o.driver_user_id
+  LEFT JOIN public.taxi_requests request ON request.id=o.request_id
   WHERE o.company_id=cid AND (p_driver_id IS NULL OR o.driver_id=p_driver_id)
+   AND (o.driver_id IS NOT NULL OR request.fare_breakdown->'marketplace' IS NULL)
    AND o.occurred_at>=start_at AND o.occurred_at<end_at
  ), postings AS MATERIALIZED (
   SELECT e.*,concat_ws(' ',p.first_name,p.last_name) driver_name,
@@ -286,6 +288,10 @@ BEGIN
    coalesce(sum(signed_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='handover'),0) handed_over,
    coalesce(sum(verified_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='income'),0) confirmed_income,
    coalesce(sum(verified_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='handover'),0) confirmed_handover,
+   coalesce(sum(signed_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='income' AND effective_method='cash'),0) cash_income,
+   coalesce(sum(signed_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='income' AND effective_method='card'),0) card_income,
+   coalesce(sum(signed_amount) FILTER(WHERE recorded_at>=start_at AND effective_kind='income' AND effective_method IS NULL),0) unknown_income,
+   coalesce(sum(balance_delta) FILTER(WHERE effective_method='cash'),0) cash_closing,
    coalesce(sum(balance_delta),0) closing
   FROM movements GROUP BY driver_id
  ), driver_ids AS (
@@ -293,6 +299,7 @@ BEGIN
  ), drivers AS (
   SELECT ids.driver_id,coalesce(t.driver_name,m.driver_name,'') driver_name,
    coalesce(t.trips,0) trips,coalesce(t.cancelled,0) cancelled,coalesce(t.booked,0) booked,
+   coalesce(m.cash_income,0) cash_income,coalesce(m.card_income,0) card_income,coalesce(m.unknown_income,0) unknown_income,coalesce(m.cash_closing,0) cash_closing,
    coalesce(m.income,0) income,coalesce(m.expenses,0) expenses,coalesce(m.handed_over,0) handed_over,
    coalesce(m.confirmed_income,0) confirmed_income,coalesce(m.confirmed_handover,0) confirmed_handover,coalesce(m.closing,0) closing
   FROM driver_ids ids LEFT JOIN driver_trips t ON t.driver_id IS NOT DISTINCT FROM ids.driver_id
