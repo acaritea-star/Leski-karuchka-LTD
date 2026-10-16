@@ -1,3 +1,4 @@
+import EmergencyHelp from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
 import LocationSettings from '@/components/feature/LocationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
@@ -46,7 +47,7 @@ export default function CustomerSettings() {
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">
           {t('nav_settings')}
         </h1>
-        <AppMenu />
+        <EmergencyHelp /><AppMenu />
       </header>
 
       <div className="p-4 space-y-4">

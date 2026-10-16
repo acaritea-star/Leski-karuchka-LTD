@@ -1,3 +1,4 @@
+import EmergencyHelp from '@/components/feature/EmergencyHelp';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -47,7 +48,7 @@ export default function CustomerProfile() {
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">
           {t('nav_profile')}
         </h1>
-        <AppMenu />
+        <EmergencyHelp /><AppMenu />
       </header>
 
       <div className="p-4 space-y-4">

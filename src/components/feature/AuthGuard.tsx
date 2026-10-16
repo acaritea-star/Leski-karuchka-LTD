@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import LegalAcceptanceNotice from './LegalAcceptanceNotice';
+import EmergencyHelp from './EmergencyHelp';
 import { roleHomePath } from '@/lib/roleHome';
 
 interface AuthGuardProps {
@@ -22,6 +23,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
   const navigate = useNavigate();
 
   const rolesKey = allowedRoles ? allowedRoles.join(',') : '';
+  const emergency = allowedRoles?.includes('CUSTOMER') ? <div className="fixed top-4 right-4 z-[60]"><EmergencyHelp /></div> : null;
 
   useEffect(() => {
     if (loading) return;
@@ -39,14 +41,14 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
   }, [loading, user, session, profileError, navigate, redirectTo, rolesKey, needsCompanySetup]);
 
   if (loading) {
-    return (
+    return <>{emergency}{(
       <div className="min-h-screen bg-background-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-foreground-500">Зареждане...</span>
         </div>
       </div>
-    );
+    )}</>;
   }
 
   if (!user && (session || profileError)) {
@@ -58,7 +60,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
         setRetrying(false);
       }
     };
-    return (
+    return <>{emergency}{(
       <main className="min-h-screen flex items-center justify-center p-6">
         <div role="alert" className="max-w-sm text-center space-y-4">
           <p>Профилът не е достъпен в момента. Опитай отново или се свържи с поддръжката.</p>
@@ -75,7 +77,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
           <a href="/auth/login" className="block underline">Към входа</a>
         </div>
       </main>
-    );
+    )}</>;
   }
 
   if (!user || needsCompanySetup || (rolesKey && !allowedRoles?.includes(user.role))) {

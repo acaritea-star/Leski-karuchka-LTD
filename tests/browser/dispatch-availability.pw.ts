@@ -6,7 +6,7 @@ async function setup(page:Page) {
  page.on('requestfinished',r=>{if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(new URL(r.url()).hostname))state.google++;});
  const user={id:actor,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
  await page.addInitScript(user=>{
-  const token=[btoa(JSON.stringify({alg:'HS256'})),btoa(JSON.stringify({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})),'synthetic'].join('.');
+  const token=[btoa(JSON.stringify({alg:'HS256'})),btoa(JSON.stringify({sub:user.id,role:'authenticated',aal:'aal2',exp:Math.floor(Date.now()/1000)+3600})),'synthetic'].join('.');
   localStorage.setItem('sb-127-auth-token',JSON.stringify({access_token:token,refresh_token:'synthetic',token_type:'bearer',expires_at:Math.floor(Date.now()/1000)+3600,expires_in:3600,user}));
   localStorage.setItem('i18nextLng','bg');const savedAt=Date.now();localStorage.setItem('lk_cookie_consent_v3',JSON.stringify({version:3,savedAt,expiresAt:savedAt+180*86400000,consent:{necessary:true,functional:true,analytics:false,marketing:false}}));
   localStorage.setItem('leski_recent_locations',JSON.stringify([{id:'a',name:'Начало',address:'ул. Иван Вазов 2, Левски',lat:43.35,lng:25.14},{id:'b',name:'Край',address:'Гара, Левски',lat:43.36,lng:25.13}]));
@@ -157,6 +157,9 @@ test('search remains usable above a short visual viewport and details keep the s
  expect(input!.y).toBeGreaterThanOrEqual(root!.y);expect(input!.y+input!.height).toBeLessThanOrEqual(button!.y);
  expect(button!.y+button!.height).toBeLessThanOrEqual(root!.y+root!.height);
  await expect(page.locator('.customer-header')).toBeHidden();
+ const emergency=page.getByRole('button',{name:'Спешна помощ на 112',exact:true});await expect(emergency).toBeVisible();
+ await emergency.click();await expect(page.getByRole('link',{name:'Обади се на 112',exact:true})).toHaveAttribute('href','tel:112');
+ await page.getByRole('button',{name:'Назад към приложението',exact:true}).click();
  await page.getByRole('radio',{name:/ОРИОН/}).click();await expect(order).toContainText('10.00');
  await page.evaluate(()=>{delete (window.visualViewport as unknown as {height?:number}).height;window.visualViewport!.dispatchEvent(new Event('resize'));});
  await expect(page.locator('.customer-header')).toBeVisible();

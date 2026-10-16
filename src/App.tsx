@@ -1,3 +1,4 @@
+import StaffMfaBoundary from '@/components/feature/StaffMfaBoundary';
 import ErrorBoundary from '@/components/feature/ErrorBoundary';
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
@@ -31,18 +32,22 @@ function RouteFallback() {
   );
 }
 
+function AppAccess() {
+  const { pathname } = useLocation();
+  // Complete PKCE before requiring the second factor. No staff providers run here.
+  if (pathname === '/auth/callback') return <Suspense fallback={<RouteFallback />}><AppRoutes /></Suspense>;
+  return <StaffMfaBoundary><OperationTelemetry /><NotificationScope><DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
+    <Suspense fallback={<RouteFallback />}><AppRoutes /></Suspense>
+  </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider></NotificationScope></StaffMfaBoundary>;
+}
+
 function App() {
   return (
     <ErrorBoundary><I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <OperationTelemetry />
           <BrowserRouter basename={__BASE_PATH__}>
-            <NotificationScope><DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
-              <Suspense fallback={<RouteFallback />}>
-                <AppRoutes />
-              </Suspense>
-            </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider></NotificationScope>
+            <AppAccess />
             <CookieConsent />
           </BrowserRouter>
         </AuthProvider>

@@ -1,4 +1,11 @@
 export default {
+  emergency_open: 'Emergency help on 112',
+  emergency_title: 'Emergency help',
+  emergency_description: 'For immediate danger or police, fire or medical assistance, call 112.',
+  emergency_call: 'Call 112',
+  emergency_close: 'Close emergency help',
+  emergency_back: 'Back to the app',
+  emergency_dialer_note: 'Opens your device dialer. The app does not automatically send your location or an alert to 112. Tell the operator where you are. If this device cannot make calls, use a phone.',
   menu_terms: 'Terms of use',
   cookie_settings: 'Cookie settings',
   booking_fixed_fare: "Calculated route price, saved when you book. To the nearest cent, without rounding up to a whole amount.",

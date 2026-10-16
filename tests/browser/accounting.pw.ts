@@ -6,7 +6,7 @@ test('driver records actual payment once after a lost response and downloads one
  const report = addUnpaidRide(accountingFixture()); let writes = 0, exports = 0;
  const user = { id: financeIds.account, email: 'synthetic@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
  await page.addInitScript(user => {
-  const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
+  const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', aal: 'aal2', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
   localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, user }));
   localStorage.setItem('i18nextLng', 'bg');
   const savedAt = Date.now(); localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt, expiresAt: savedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));

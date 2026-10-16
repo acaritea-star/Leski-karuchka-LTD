@@ -1,0 +1,1 @@
+function e(e){switch(e){case`SUPER_ADMIN`:return`/admin/companies`;case`COMPANY_ADMIN`:return`/admin/dashboard`;case`DRIVER`:return`/driver/home`;case`CUSTOMER`:return`/customer/home`;default:return`/auth/login`}}export{e as t};

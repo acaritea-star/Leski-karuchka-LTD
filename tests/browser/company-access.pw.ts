@@ -29,7 +29,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
   const state = { companies: [company(ownCompany, 'Първа фирма')], profileWrites: 0, companyWrites: 0, companyFilters: [] as (string | null)[], invitations: [] as Record<string, unknown>[], errors: [] as string[], google: 0 };
   page.on('pageerror', error => state.errors.push(error.message));
   await page.addInitScript(user => {
-    const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
+    const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', aal: 'aal2', exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
     localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, user }));
     localStorage.setItem('i18nextLng', 'bg');
     localStorage.setItem('leski:auto-location:' + user.id, 'off');
@@ -149,7 +149,7 @@ test('invited company binds after login, finishes setup and keeps its own prices
   const values: Record<string, unknown> = { ...company(ownCompany, 'Нова фирма'), setup_completed_at: null, email: authUser.email, address: null, phone: null, legal_name: null, registration_id: null, service_city: null, permit_number: null, permit_expires_on: null };
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(user => {
-    const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now()/1000)+3600 })), 'synthetic'].join('.');
+    const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', aal: 'aal2', exp: Math.floor(Date.now()/1000)+3600 })), 'synthetic'].join('.');
     localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now()/1000)+3600, expires_in: 3600, user }));
     localStorage.setItem('i18nextLng', 'bg');
     localStorage.setItem('leski:auto-location:' + user.id, 'off');

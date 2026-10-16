@@ -1,3 +1,4 @@
+import { sessionHasMfa } from '@/lib/staffMfa';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const enrichWithDriverCompany = useCallback(
     async (baseUser: AppUser): Promise<AppUser> => {
-      if (baseUser.role === 'DRIVER' && !baseUser.company_id) {
+      if (baseUser.role === 'DRIVER' && !baseUser.company_id && sessionHasMfa(currentSession.current)) {
         try {
           const { data } = await withRequestTimeout(signal => supabase
             .from('drivers')
