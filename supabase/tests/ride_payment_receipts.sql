@@ -11,6 +11,10 @@ BEGIN
  END;
  RAISE EXCEPTION 'FAIL allowed forbidden payment operation: %',statement;
 END $$;
+CREATE FUNCTION pg_temp.insert_checkout_ride(ride uuid,cid uuid,customer_uid uuid,did uuid,vt uuid) RETURNS void LANGUAGE sql AS $$
+ INSERT INTO public.taxi_requests(id,company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,pickup_address,destination_latitude,destination_longitude,destination_address,status,accepted_at,started_at,estimated_price)
+ VALUES(ride,cid,customer_uid,did,vt,43.2,25.6,'Synthetic',43.21,25.61,'Synthetic','in_progress',now()-interval '10 minutes',now()-interval '8 minutes',12.34);
+$$;
 DO $test$
 DECLARE cid uuid:=gen_random_uuid(); foreign_cid uuid:=gen_random_uuid(); duid uuid:=gen_random_uuid(); duid2 uuid:=gen_random_uuid();
  admin_uid uuid:=gen_random_uuid(); foreign_uid uuid:=gen_random_uuid(); customer_uid uuid:=gen_random_uuid(); did uuid; vt uuid:=gen_random_uuid();
@@ -26,14 +30,11 @@ BEGIN
  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=foreign_cid WHERE id=foreign_uid;
  SELECT id INTO STRICT did FROM public.drivers WHERE user_id=duid;
  INSERT INTO public.vehicle_types(id,company_id,name) VALUES(vt,cid,'Checkout');
- INSERT INTO public.taxi_requests(id,company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,pickup_address,destination_latitude,destination_longitude,destination_address,status,accepted_at,started_at,estimated_price)
- SELECT id,cid,customer_uid,did,vt,43.2,25.6,'Synthetic',43.21,25.61,'Synthetic','in_progress',now()-interval '10 minutes',now()-interval '8 minutes',12.34
- FROM unnest(ARRAY[cash_ride,card_ride,unpaid_ride,partial_ride]) t(id);
+ PERFORM pg_temp.insert_checkout_ride(cash_ride,cid,customer_uid,did,vt);
  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
  EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM pg_temp.payment_denied(format('UPDATE public.taxi_requests SET status=''completed'' WHERE id=%L',cash_ride));
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'',1)',cash_op,cash_ride,duid));
- PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''unpaid'')',unpaid_op,unpaid_ride,duid));
  PERFORM public.record_driver_money_method(collision,'expense',1,'Synthetic rollback check',duid,'cash');
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',collision,cash_ride,duid));
  IF EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=cash_ride) OR EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=cash_ride) OR NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=cash_ride AND status='in_progress') THEN RAISE EXCEPTION 'FAIL partial commit after money rejection'; END IF;
@@ -43,8 +44,18 @@ BEGIN
  IF r IS DISTINCT FROM again OR (r#>>'{ride,status}')<>'completed' OR (r#>>'{receipt,received_amount}')::numeric<>12.34 OR (r#>>'{receipt,entry_id}')::uuid<>cash_op THEN RAISE EXCEPTION 'FAIL atomic cash checkout'; END IF;
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''card'')',cash_op,cash_ride,duid));
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',gen_random_uuid(),cash_ride,duid));
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(card_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM public.complete_ride_payment(card_op,card_ride,duid,'card');
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(unpaid_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''unpaid'')',unpaid_op,unpaid_ride,duid));
  PERFORM public.complete_ride_payment(unpaid_op,unpaid_ride,duid,'unpaid',NULL,'Card declined');
+ EXECUTE 'RESET ROLE';
+ PERFORM pg_temp.insert_checkout_ride(partial_ride,cid,customer_uid,did,vt);
+ EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM public.complete_ride_payment(partial_op,partial_ride,duid,'partial_cash',5,'Only part received');
  PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''income'',8,''Overpayment'',%L,''card'',%L)',gen_random_uuid(),duid,partial_ride));
  PERFORM public.record_driver_money_method(topup,'income',7.34,'Remaining fare',duid,'card',partial_ride);
@@ -73,9 +84,11 @@ BEGIN
  r:=public.finalize_expense_receipt(proof,duid);
  IF r->>'uploaded_at' IS NULL OR public.finalize_expense_receipt(proof,duid) IS DISTINCT FROM r THEN RAISE EXCEPTION 'FAIL immutable proof finalization'; END IF;
  PERFORM pg_temp.payment_denied(format('UPDATE public.expense_receipts SET file_name=''replacement.png'' WHERE id=%L',proof));
- DELETE FROM storage.objects WHERE bucket_id='expense-receipts' AND name=proof_row->>'path';
- GET DIAGNOSTICS i=ROW_COUNT;
- IF i<>0 THEN RAISE EXCEPTION 'FAIL driver deleted evidence'; END IF;
+ BEGIN
+  DELETE FROM storage.objects WHERE bucket_id='expense-receipts' AND name=proof_row->>'path';
+  GET DIAGNOSTICS i=ROW_COUNT;
+  IF i<>0 THEN RAISE EXCEPTION 'FAIL driver deleted evidence'; END IF;
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  FOR i IN 2..3 LOOP PERFORM public.reserve_expense_receipt(gen_random_uuid(),expense,duid,'extra.png','image/png',100,repeat('b',64)); END LOOP;
  PERFORM pg_temp.payment_denied(format('SELECT public.reserve_expense_receipt(%L,%L,%L,''fourth.png'',''image/png'',100,%L)',gen_random_uuid(),expense,duid,repeat('c',64)));
  EXECUTE 'RESET ROLE';
