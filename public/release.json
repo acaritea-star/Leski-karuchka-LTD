@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.16-live-tracking.1",
-  "baseCommit": "4bc43824629f728d76d1459a127f35fe64a3fca0",
-  "databaseMigration": "staff_mfa_public_request_hook",
+  "release": "2026.10.16-ride-payment-receipts.1",
+  "baseCommit": "b9bfc53706eec07ac7556eec6aea970a949dfd4f",
+  "databaseMigration": "ride_payment_checkout_receipts",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261016074354",
+  "databaseMigrationVersion": "20261016184643",
   "googleRoutesVersion": 15,
-  "verifiedSourceCommit": "4cbfe55e97468f5e2a1d60df9053fc59b4b1a2d7",
+  "verifiedSourceCommit": "e8cc5714b34780b81e8b2a84646091269e2565ea",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -27,15 +27,16 @@
     "20261015080550_company_driver_isolation_hardening",
     "20261015195949_role_scoped_notifications",
     "20261016073419_customer_safety_staff_mfa",
-    "20261016074354_staff_mfa_public_request_hook"
+    "20261016074354_staff_mfa_public_request_hook",
+    "20261016184643_ride_payment_checkout_receipts"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
   "driverPreparationMigrationVersion": "20261011081118",
   "driverPreparationVerifiedSourceCommit": "3563ac0883b3a2fd0177dab221ee509b4f544d49",
   "financialReportVersion": 2,
-  "financialMigrationVersion": "20261010045324",
-  "financialVerifiedSourceCommit": "105efbde47936e8d4fbd24fdce30c8653e08d231",
+  "financialMigrationVersion": "20261016184643",
+  "financialVerifiedSourceCommit": "e8cc5714b34780b81e8b2a84646091269e2565ea",
   "companyVehicleCategoryMigrationVersion": "20261010162446",
   "companyVehicleCategoryVerifiedSourceCommit": "700b96ad9a2611f55d9bd2fba20ae857dd284283",
   "driverOnboardingMigrationVersion": "20261010204407",
@@ -85,8 +86,8 @@
   "permissionPreferencesVersion": 1,
   "notificationDeploymentStatus": "database-ready",
   "notificationAudienceMigrationSha256": "f79710b19bfdfac0e8d934558a2ed77debae099f400e63ef9ea50a46eb526f2b",
-  "accountingUxVersion": 1,
-  "accountingUxVerifiedSourceCommit": "3c6a8e52dc91e12f9c811f02ab0b03cdfe18fe0c",
+  "accountingUxVersion": 2,
+  "accountingUxVerifiedSourceCommit": "e8cc5714b34780b81e8b2a84646091269e2565ea",
   "emergencyCallVersion": 1,
   "staffMfaVersion": 1,
   "staffMfaRequiredRoles": [
@@ -115,5 +116,12 @@
   "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "staffMfaEnforcedAt": "2026-10-16T12:19:40.947757Z",
   "liveTrackingVersion": 1,
-  "liveTrackingVerifiedSourceCommit": "4cbfe55e97468f5e2a1d60df9053fc59b4b1a2d7"
+  "liveTrackingVerifiedSourceCommit": "4cbfe55e97468f5e2a1d60df9053fc59b4b1a2d7",
+  "ridePaymentVersion": 1,
+  "ridePaymentVerifiedSourceCommit": "e8cc5714b34780b81e8b2a84646091269e2565ea",
+  "ridePaymentMigrationVersion": "20261016184643",
+  "ridePaymentGateActivation": "after-frontend-publish",
+  "expenseEvidenceVersion": 1,
+  "operationalHealthUxVersion": 2,
+  "ridePaymentMigrationSha256": "6bcf77f815e620ab5eaa3c1914f25f7f5c2f207ce5c0dc99265eaa55973304cf"
 }
