@@ -1,3 +1,4 @@
+import EmergencyHelp from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
 import Modal from '@/components/feature/Modal';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -218,7 +219,7 @@ export default function CustomerOrders() {
       <header className="bg-white/80 backdrop-blur-xl border-b border-background-100 px-4 py-3 flex items-center gap-3">
         <BackButton to="/customer/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">{t('nav_orders')}</h1>
-        <AppMenu />
+        <EmergencyHelp /><AppMenu />
       </header>
 
       {/* Tabs */}

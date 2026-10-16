@@ -243,3 +243,13 @@
   .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] > .customer-route-controls,
   .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] > .customer-notice { display:none; }
 }
+
+/* Keep emergency access distinct without adding a floating map obstruction. */
+.customer-brand > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.customer-brand small { overflow:hidden; text-overflow:ellipsis; }
+.customer-brand > img { flex-shrink:0; }
+.customer-short-emergency { display:none; }
+@media(max-width:599px) {
+  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=all] .customer-short-emergency,
+  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] .customer-short-emergency { display:flex; justify-content:flex-end; flex-shrink:0; }
+}

@@ -1,3 +1,4 @@
+import StaffSecuritySettings from '@/components/feature/StaffSecuritySettings';
 import BackButton from '@/components/feature/BackButton';
 import { useSignOut } from '@/hooks/useSignOut';
 import { withRequestTimeout } from '@/lib/requestTimeout';
@@ -102,7 +103,7 @@ export default function DriverProfile() {
 
             {profile && <DriverPreparationCard driverId={profile.id} />}
             <LocationSettings driver onOffline={() => void fetchProfile()} />
-            <NotificationSettings />
+            <NotificationSettings /><StaffSecuritySettings />
             <PrivacyRequests />
 
             {/* Vehicle Card */}

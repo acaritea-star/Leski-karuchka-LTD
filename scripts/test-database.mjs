@@ -35,3 +35,7 @@ run('deployment/idle-location-validity.rollback.sql');
 run('deployment/carrier-choice-acceptance.rollback.sql');
 run('deployment/marketplace-offer-recovery.rollback.sql');
 run('deployment/marketplace-dispatch.rollback.sql');
+
+const mfa = spawnSync(process.execPath, ['scripts/test-staff-mfa-http.mjs'], { stdio: 'inherit' });
+if (mfa.status !== 0) process.exit(mfa.status || 1);
+run('deployment/staff-mfa.rollback.sql');

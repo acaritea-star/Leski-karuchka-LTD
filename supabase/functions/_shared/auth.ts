@@ -19,6 +19,16 @@ export async function authorize(req: Request) {
   const { data: profile, error: profileError } = await admin.from('profiles').select('id,role,company_id,is_active').eq('id', data.user.id).maybeSingle();
   if (profileError) throw new Response('Account service unavailable', { status: 503, headers: cors });
   if (!profile?.is_active) throw new Response('Active account required', { status: 403, headers: cors });
+  // getUser above validated this bearer. Decode only after that validation;
+  // authorization still comes from the live profile/session/factor in Postgres.
+  let claims: { aal?: string; session_id?: string };
+  try { claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); }
+  catch { throw new Response('Invalid session', { status: 401, headers: cors }); }
+  const { data: mfaAllowed, error: mfaError } = await admin.rpc('staff_mfa_edge_allowed', {
+    p_user: data.user.id, p_session: claims.session_id ?? '', p_aal: claims.aal ?? 'aal1',
+  });
+  if (mfaError) throw new Response('Account service unavailable', { status: 503, headers: cors });
+  if (mfaAllowed !== true) throw new Response('MFA_REQUIRED', { status: 403, headers: cors });
   const { data: allowed, error: limitError } = await admin.rpc('consume_api_budget', { p_user_id: data.user.id });
   if (limitError) throw new Response('Service unavailable', { status: 503, headers: cors });
   if (!allowed) throw new Response('Too many requests; retry in one minute', { status: 429, headers: cors });

@@ -1,3 +1,4 @@
+import StaffSecuritySettings from '@/components/feature/StaffSecuritySettings';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
@@ -121,7 +122,7 @@ function SettingsEditor() {
 
   return (
     <AdminLayout title={t('nav_settings')}>
-      <div className="max-w-2xl"><NotificationSettings /></div>
+      <div className="max-w-2xl"><NotificationSettings /><StaffSecuritySettings /></div>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
