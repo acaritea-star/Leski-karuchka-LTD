@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.16-accounting-ux.1",
-  "baseCommit": "8527d5f6e39751f7c10dc5d3282c487c0013c6a2",
-  "databaseMigration": "role_scoped_notifications",
+  "release": "2026.10.16-customer-safety-mfa.1",
+  "baseCommit": "a29decd3ee17738cad08bfe83c1395c64b008296",
+  "databaseMigration": "staff_mfa_public_request_hook",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261015195949",
-  "googleRoutesVersion": 13,
-  "verifiedSourceCommit": "3c6a8e52dc91e12f9c811f02ab0b03cdfe18fe0c",
+  "databaseMigrationVersion": "20261016074354",
+  "googleRoutesVersion": 14,
+  "verifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -25,7 +25,9 @@
     "20261014051154_idle_location_validity",
     "20261014130621_carrier_offer_availability",
     "20261015080550_company_driver_isolation_hardening",
-    "20261015195949_role_scoped_notifications"
+    "20261015195949_role_scoped_notifications",
+    "20261016073419_customer_safety_staff_mfa",
+    "20261016074354_staff_mfa_public_request_hook"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -84,5 +86,29 @@
   "notificationDeploymentStatus": "database-ready",
   "notificationAudienceMigrationSha256": "f79710b19bfdfac0e8d934558a2ed77debae099f400e63ef9ea50a46eb526f2b",
   "accountingUxVersion": 1,
-  "accountingUxVerifiedSourceCommit": "3c6a8e52dc91e12f9c811f02ab0b03cdfe18fe0c"
+  "accountingUxVerifiedSourceCommit": "3c6a8e52dc91e12f9c811f02ab0b03cdfe18fe0c",
+  "emergencyCallVersion": 1,
+  "staffMfaVersion": 1,
+  "staffMfaRequiredRoles": [
+    "SUPER_ADMIN",
+    "COMPANY_ADMIN",
+    "DRIVER"
+  ],
+  "staffMfaMigrationVersion": "20261016073419",
+  "staffMfaHookMigrationVersion": "20261016074354",
+  "staffMfaMigrationApplied": true,
+  "staffMfaBackendStatus": "ready-for-cutover",
+  "staffMfaEnforcementEnabled": false,
+  "staffMfaVerifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
+  "staffMfaEdgeVersions": {
+    "google-geocode": 9,
+    "google-routes": 14,
+    "generate-vapid-keys": 12,
+    "send-push-notification": 11,
+    "expire-stale-requests": 9,
+    "road-geometry": 5,
+    "partner-invitation-email": 2
+  },
+  "staffMfaMigrationSha256": "a193f214bca82c3c8701c2f7c55417d3414f3fc6f1b3a16fbedbd4ce79a8fd26",
+  "staffMfaHookMigrationSha256": "acc383a476b9f8252082d511d51582ec3b591b9b0e2c9a4e898c32db2c73227e"
 }
