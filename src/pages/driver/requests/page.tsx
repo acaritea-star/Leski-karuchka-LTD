@@ -6,7 +6,7 @@ import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
-import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
+import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
 import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
 import { useState, useEffect, useRef } from 'react';
@@ -74,22 +74,7 @@ export default function DriverRequests() {
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
-    queryKey: driver?.id ? queryKeys.driverActiveRequest(driver.id) : ['taxi_requests', 'driver', 'none', 'active'],
-    queryFn: async ({ signal }) => {
-      const key = queryKeys.driverActiveRequest(driver!.id);
-      const started = queryClient.getQueryData<TaxiRequest | null>(key);
-      const { data, error } = await withRequestTimeout(abort => supabase
-        .from('taxi_requests')
-        .select('*')
-        .eq('driver_id', driver!.id)
-        .in('status', ['accepted', 'arrived', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return mergeDriverActiveRead(started, queryClient.getQueryData<TaxiRequest | null>(key), data);
-    },
-    enabled: !!driver?.id,
+    ...driverActiveRequestOptions(queryClient, driver?.id),
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
@@ -384,7 +369,12 @@ export default function DriverRequests() {
 
       <div className="p-4 max-w-lg mx-auto">
         {identity.data?.company && <p className="text-sm text-foreground-700 mb-3"><strong>Фирма: {identity.data.company}</strong>{identity.data.category && <> · Категория: {identity.data.category}</>}</p>}
-        {isOnline && gps.status !== 'tracking' && !gps.error && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">{gps.message || 'Изчакваме актуален GPS. Онлайн бутонът е включен, но новите заявки изискват потвърдена позиция.'}</p>}
+        {activeRequest && !isOnline && <p className="text-sm text-foreground-600 mb-3">{t('gps_active_ride_offline')}</p>}
+        {(isOnline || activeRequest) && gps.status !== 'tracking' && !gps.error && <p role="status" className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3 mb-3">{gps.message || 'Изчакваме актуална GPS позиция.'}</p>}
+        {activeRequest && gps.status !== 'tracking' && <div className="mb-3 text-sm">
+          {gpsError && <p role="alert" className="text-red-600 mb-2">{gpsError}</p>}
+          <button type="button" className="text-primary-700 underline" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>
+        </div>}
 
         {/* ── Error ── */}
         {(error || refusalMessage) && (

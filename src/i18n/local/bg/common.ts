@@ -336,6 +336,7 @@ export default {
   gps_live_shared: 'Локацията се споделя на живо',
   gps_weak_signal: 'GPS сигналът е слаб — опитваме отново',
   position_not_updating: 'Позицията не се обновява',
+  gps_active_ride_offline: 'Не приемаш нови заявки. GPS остава включен за текущия курс до приключването му.',
   go_online_btn: 'Включи се онлайн',
   go_online_hint: 'Натиснете бутона, за да станете видими за заявки',
   navigate_to_dest: 'Навигирай към дестинацията',

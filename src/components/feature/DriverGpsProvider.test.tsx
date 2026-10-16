@@ -7,12 +7,14 @@ const fake = vi.hoisted(() => ({
  callbacks:null as null | {onUpdate:()=>void;onError:(error:string,recoverable?:boolean)=>void},
  stats:{lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''},
  start:vi.fn(),stop:vi.fn(),probe:vi.fn(),permission:'granted',
+ active:null as null | {id:string;driver_id:string;status:string},
 }));
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:fake.user})}));
 vi.mock('@/hooks/useLocationPreference',()=>({useLocationPreference:()=>true}));
 vi.mock('@/lib/locationPreference',()=>({getLocationEnabled:()=>true,setLocationEnabled:vi.fn()}));
 vi.mock('@/lib/sharedGps',()=>({gpsPermission:async()=>fake.permission,getGpsPosition:()=>null,requestGps:vi.fn(),stopSharedGps:vi.fn()}));
 vi.mock('@/lib/driverRecord',()=>({driverRecordOptions:(id:string)=>({queryKey:['driver-test',id],queryFn:async()=>fake.driver,staleTime:Infinity})}));
+vi.mock('@/lib/driverActiveRequest',()=>({driverActiveRequestOptions:(_client:unknown,id:string)=>({queryKey:['active-test',id],queryFn:async()=>fake.active})}));
 vi.mock('@/lib/driverLocation',()=>({GPS_STALE_MS:45000,getGpsStats:()=>({...fake.stats,confirmed:fake.stats.lastWriteAgeMs<90000&&fake.stats.lastConfirmedFixAgeMs<90000}),
  startDriverGps:(id:string,company:string,callbacks:typeof fake.callbacks)=>{fake.callbacks=callbacks;fake.start(id,company);},
  stopDriverGps:fake.stop,ensureDriverLocation:vi.fn().mockResolvedValue(undefined)}));
@@ -20,7 +22,7 @@ import DriverGpsProvider,{useDriverGps} from './DriverGpsProvider';
 function Probe(){const gps=useDriverGps();fake.probe();return <div><output data-testid="state">{gps.status}</output><p role="status">{gps.message}</p>{gps.error&&<p role="alert">{gps.error}</p>}</div>;}
 async function mount(){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});client.setQueryData(['driver-test','driver-user'],fake.driver);
  render(<QueryClientProvider client={client}><DriverGpsProvider><Probe /></DriverGpsProvider></QueryClientProvider>);await act(async()=>{});return client;}
-beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();fake.permission='granted';fake.callbacks=null;fake.stats={lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''};
+beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();fake.permission='granted';fake.driver.is_online=true;fake.active=null;fake.callbacks=null;fake.stats={lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''};
  Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 it('shows acquisition instead of a red error for an initial coarse fix and goes green only after a confirmed write',async()=>{
@@ -63,4 +65,31 @@ it('does not prompt for GPS automatically when remembered consent has expired',a
 it('does not acquire GPS automatically while browser permission is denied',async()=>{
  fake.permission='denied';const client=await mount();
  expect(fake.start).not.toHaveBeenCalled();expect(screen.getByRole('alert').textContent).toContain('настройките на браузъра');client.clear();
+});
+
+it('keeps an unavailable driver tracking the existing ride and stops after its confirmed completion',async()=>{
+ fake.driver.is_online=false;fake.active={id:'ride',driver_id:'driver',status:'in_progress'};
+ const client=await mount();await act(async()=>vi.advanceTimersByTimeAsync(1));
+ expect(fake.start).toHaveBeenCalledOnce();
+ fake.stats={lastWriteAgeMs:0,lastConfirmedFixAgeMs:0,error:''};act(()=>fake.callbacks!.onUpdate());
+ expect(screen.getByTestId('state').textContent).toBe('tracking');
+ const stopped=fake.stop.mock.calls.length;
+ act(()=>client.setQueryData(['active-test','driver'],null));await act(async()=>vi.advanceTimersByTimeAsync(1));
+ expect(fake.stop.mock.calls.length).toBeGreaterThan(stopped);expect(screen.getByTestId('state').textContent).toBe('idle');client.clear();
+});
+it('does not share a location for an unavailable idle driver',async()=>{
+ fake.driver.is_online=false;const client=await mount();await act(async()=>vi.advanceTimersByTimeAsync(1));
+ expect(fake.start).not.toHaveBeenCalled();client.clear();
+});
+it('rechecks permission granted by the Online action without a focus event or a second prompt',async()=>{
+ fake.permission='prompt';fake.driver.is_online=false;const client=await mount();
+ expect(fake.start).not.toHaveBeenCalled();fake.permission='granted';
+ act(()=>client.setQueryData(['driver-test','driver-user'],{...fake.driver,is_online:true}));
+ await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).toHaveBeenCalledOnce();client.clear();
+});
+it('rechecks an Online grant when an unavailable active ride already requires tracking',async()=>{
+ fake.permission='prompt';fake.driver.is_online=false;fake.active={id:'ride',driver_id:'driver',status:'in_progress'};
+ const client=await mount();await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).not.toHaveBeenCalled();
+ fake.permission='granted';act(()=>client.setQueryData(['driver-test','driver-user'],{...fake.driver,is_online:true}));
+ await act(async()=>vi.advanceTimersByTimeAsync(1));expect(fake.start).toHaveBeenCalledOnce();client.clear();
 });

@@ -118,6 +118,13 @@ it('allows going offline without a GPS prompt and returns the confirmed status i
   expect(upsert).not.toHaveBeenCalled();
   expect(confirmed).toMatchObject({ is_online:false,status:'offline' });
 });
+it('leaves the GPS lease to its owner when availability changes during a ride', async () => {
+  startDriverGps('driver','company');watch(fix());await flush();
+  await setDriverOnline({id:'driver',company_id:'company'},false);
+  expect(getGpsStats().running).toBe(true);
+  const before=upsert.mock.calls.length;await vi.advanceTimersByTimeAsync(5000);watch(fix(43.3));await flush();
+  expect(upsert.mock.calls.length).toBeGreaterThan(before);
+});
 it('does not stop the new driver GPS when an old offline acknowledgement arrives late', async () => {
   let finish!: (value: unknown) => void;
   updateSingle.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));

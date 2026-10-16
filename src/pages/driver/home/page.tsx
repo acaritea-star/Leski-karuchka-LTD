@@ -7,7 +7,7 @@ import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
-import { mergeDriverActiveRead } from '@/lib/requestSnapshot';
+import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { ensureDriverLocation, setDriverOnline } from '@/lib/driverLocation';
 import { useDriverGps } from '@/components/feature/DriverGpsProvider';
@@ -72,22 +72,7 @@ export default function DriverHome() {
 
   // ── Active request ──
   const activeRequestQuery = useQuery({
-    queryKey: driver?.id ? queryKeys.driverActiveRequest(driver.id) : ['taxi_requests', 'driver', 'none', 'active'],
-    queryFn: async ({ signal }) => {
-      const key = queryKeys.driverActiveRequest(driver!.id);
-      const started = queryClient.getQueryData<TaxiRequest | null>(key);
-      const { data, error } = await withRequestTimeout(abort => supabase
-        .from('taxi_requests')
-        .select('*')
-        .eq('driver_id', driver!.id)
-        .in('status', ['accepted', 'arrived', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .abortSignal(abort).maybeSingle(), 10_000, signal);
-      if (error) throw error;
-      return mergeDriverActiveRead(started, queryClient.getQueryData<TaxiRequest | null>(key), data);
-    },
-    enabled: !!driver?.id,
+    ...driverActiveRequestOptions(queryClient, driver?.id),
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
@@ -490,6 +475,7 @@ export default function DriverHome() {
                 )}
               </button>
 
+              {activeRequest && !driver?.is_online && <p className="text-xs text-foreground-600 mb-3">{t('gps_active_ride_offline')}</p>}
               {(!driver || !driver.is_verified) && <p className="text-xs text-foreground-600 my-3">{driver ? 'Онлайн режимът се отключва след одобрението.' : 'Няма потвърден шофьорски запис.'} <button type="button" className="underline text-primary-700" onClick={() => void driverQuery.refetch()}>Обнови статуса</button></p>}
               {displayedError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-2 flex items-center gap-2">
@@ -498,8 +484,8 @@ export default function DriverHome() {
                   {declinesLoadError && <button className="text-xs underline" onClick={() => void refreshDeclines()}>Обнови заявките</button>}
                 </div>
               )}
-              {driver?.is_online && gpsStatus !== 'tracking' && <button type="button" className="text-sm text-primary-700 underline mb-3" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>}
-              {driver?.is_online && !displayedError && (
+              {(driver?.is_online || activeRequest) && gpsStatus !== 'tracking' && <button type="button" className="text-sm text-primary-700 underline mb-3" disabled={gps.retrying} onClick={gps.retryLocation}>{gps.retrying ? 'Обновяване на GPS…' : 'Обнови GPS'}</button>}
+              {(driver?.is_online || activeRequest) && !displayedError && (
                 <div className={`rounded-xl px-3 py-2 mb-3 flex items-center gap-2 ${
                   gpsStatus === 'tracking'
                     ? 'bg-emerald-50 border border-emerald-200'

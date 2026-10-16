@@ -92,6 +92,15 @@ it('waits for a reliable road then places the same GPS fix on it without an apar
   view.rerender({network:roads});
   expect(marker).toHaveBeenCalledWith(expect.objectContaining({position:route[0]}));
 });
+it('keeps a confirmed GPS marker visible when route and street services are unavailable without animating through buildings', () => {
+  const gps={...fix(),lng:25.0001};
+  const empty:typeof route=[];
+  const view=renderHook(({current})=>useVehicleMarker(map,current,empty,undefined,undefined,null,'prefer'),{initialProps:{current:gps}});
+  expect(marker).toHaveBeenCalledWith(expect.objectContaining({position:{lat:gps.lat,lng:gps.lng}}));
+  act(()=>vi.advanceTimersByTime(5000));const next={...fix(2),lng:25.002};view.rerender({current:next});
+  expect(setPosition).toHaveBeenLastCalledWith({lat:next.lat,lng:next.lng});
+  expect(requestAnimationFrame).not.toHaveBeenCalled();
+});
 it('uses navigation geometry before a competing parallel street', () => {
   const roads=new RoadNetwork([{points:[[43,25.0002],[43.0005,25.0002]],oneway:0}]);
   const gps={...fix(),lng:25.00015};

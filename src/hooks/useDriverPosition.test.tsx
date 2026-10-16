@@ -3,10 +3,15 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { driverPosition, useDriverPosition, usePositionFreshness } from './useDriverPosition';
 import { freshFix } from '@/lib/vehicleMotion';
-const mocks = vi.hoisted(() => ({ read: vi.fn(), remove: vi.fn(), signals: [] as AbortSignal[], apply: null as ((payload: { new: Record<string, unknown> }) => void) | null }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), remove: vi.fn(), signals: [] as AbortSignal[],
+  apply: null as ((payload: { new: Record<string, unknown> }) => void) | null,
+  system: null as ((payload: {extension:string;status:string}) => void) | null,
+  status: null as ((status:string)=>void) | null }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
   from: () => ({ select: () => ({ eq: () => ({ abortSignal: (signal: AbortSignal) => { mocks.signals.push(signal); return { maybeSingle: mocks.read }; } }) }) }),
-  channel: () => ({ on(_event: string, _filter: unknown, apply: typeof mocks.apply) { mocks.apply = apply; return this; }, subscribe() { return this; } }),
+  channel: () => ({ on(event: string, _filter: unknown, apply: typeof mocks.apply | typeof mocks.system) {
+    if(event==='system') mocks.system=apply as typeof mocks.system;else mocks.apply=apply as typeof mocks.apply;return this;
+  }, subscribe(status:typeof mocks.status) { mocks.status=status;return this; } }),
   removeChannel: mocks.remove,
 } }));
 const row = (offset = 0) => ({ latitude: 43, longitude: 25 + offset / 100_000, heading: 0, speed: 5, accuracy: 8,
@@ -71,4 +76,38 @@ it('resumes after pageshow and cancels a pending poll on unmount', async () => {
   expect(pendingSignal?.aborted).toBe(true);
   await act(async () => vi.advanceTimersByTimeAsync(60_000));
   expect(mocks.read).toHaveBeenCalledTimes(3);
+});
+
+it('keeps fast recovery until Postgres is listening and recovers extension errors on a connected socket',async()=>{
+ mocks.read.mockReset().mockImplementation(async()=>({data:row(),error:null}));
+ const view=renderHook(()=>useDriverPosition('driver-one'));await act(async()=>{});
+ act(()=>mocks.status?.('SUBSCRIBED'));await act(async()=>vi.advanceTimersByTimeAsync(5000));
+ expect(mocks.read).toHaveBeenCalledTimes(2);
+ await act(async()=>mocks.system?.({extension:'postgres_changes',status:'ok'}));
+ const healthy=mocks.read.mock.calls.length;
+ await act(async()=>vi.advanceTimersByTimeAsync(14999));expect(mocks.read).toHaveBeenCalledTimes(healthy);
+ await act(async()=>vi.advanceTimersByTimeAsync(1));expect(mocks.read).toHaveBeenCalledTimes(healthy+1);
+ await act(async()=>mocks.system?.({extension:'postgres_changes',status:'error'}));
+ const degraded=mocks.read.mock.calls.length;
+ await act(async()=>vi.advanceTimersByTimeAsync(5000));expect(mocks.read).toHaveBeenCalledTimes(degraded+1);
+ expect(view.result.current?.timestamp).toBe(Date.now());
+});
+it('clears revoked GPS access but does not let an older empty poll erase a newer Realtime fix',async()=>{
+ let finish!:(value:unknown)=>void;mocks.read.mockReset().mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+ const view=renderHook(()=>useDriverPosition('driver-one'));
+ act(()=>mocks.apply?.({new:row(1000)}));await act(async()=>finish({data:null,error:null}));
+ expect(view.result.current?.lng).toBe(25.01);
+ mocks.read.mockResolvedValue({data:null,error:null});await act(async()=>window.dispatchEvent(new Event('pageshow')));
+ expect(view.result.current).toBeNull();
+});
+it('never exposes a previous driver or ride during the render that changes its scope',async()=>{
+ mocks.read.mockReset().mockResolvedValue({data:row(),error:null});
+ const seen:Array<ReturnType<typeof useDriverPosition>>=[];
+ const view=renderHook(({id,scope,enabled})=>{const fix=useDriverPosition(id,enabled,scope);seen.push(fix);return fix;},
+  {initialProps:{id:'driver-one',scope:'ride-one',enabled:true}});
+ await act(async()=>{});expect(view.result.current).not.toBeNull();
+ mocks.read.mockImplementation(()=>new Promise(()=>{}));
+ for(const props of [{id:'driver-two',scope:'ride-one',enabled:true},{id:'driver-two',scope:'ride-two',enabled:true},{id:'driver-two',scope:'ride-two',enabled:false}]){
+  seen.length=0;view.rerender(props);expect(seen.every(fix=>fix===null)).toBe(true);
+ }
 });
