@@ -56,7 +56,7 @@ super administrators. The query keeps its existing visible-only one-minute rate.
 
 1. Verify unit/browser checks, full disposable Supabase SQL/RLS tests and the
    dedicated concurrent checkout test before applying production DDL.
-2. Apply `20261016184643_ride_payment_checkout_receipts.sql`. Its private
+2. Apply `20261016192953_ride_payment_checkout_receipts.sql`. Its private
    `ride_payment_required` flag starts **false** so the currently published
    frontend can continue finishing rides during the deployment interval.
    The atomic checkout RPC and all evidence/MFA protections work immediately.
@@ -95,3 +95,8 @@ the full Supabase CI integration.
 References: Supabase private buckets and Storage access control:
 https://supabase.com/docs/guides/storage/buckets/fundamentals
 https://supabase.com/docs/guides/storage/security/access-control
+
+Production schema applied with Supabase migration `20261016192953` on 16 October
+2026. The repository filename follows the server-assigned version. Read-only
+verification confirmed a private 5 MiB bucket, RLS on both new tables and staff
+MFA enforcement. The completion gate was staged off pending frontend publication.
