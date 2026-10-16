@@ -6,7 +6,7 @@
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261016074354",
   "googleRoutesVersion": 15,
-  "verifiedSourceCommit": "f03c5f1424270488ddac8480430c031c779acba0",
+  "verifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -64,7 +64,7 @@
   "carrierChoiceMigrationVersion": "20261012202035",
   "carrierChoiceVerifiedSourceCommit": "9ac096f8bd0cd3ab45fbc27cd4276d39527ea694",
   "gpsAcquisitionVersion": 3,
-  "gpsAcquisitionVerifiedSourceCommit": "f03c5f1424270488ddac8480430c031c779acba0",
+  "gpsAcquisitionVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
   "idleLocationValidityVersion": 1,
   "idleLocationValidityMigrationVersion": "20261014051154",
   "carrierComparisonUxVersion": 4,
@@ -112,5 +112,5 @@
   "staffMfaMigrationSha256": "a193f214bca82c3c8701c2f7c55417d3414f3fc6f1b3a16fbedbd4ce79a8fd26",
   "staffMfaHookMigrationSha256": "acc383a476b9f8252082d511d51582ec3b591b9b0e2c9a4e898c32db2c73227e",
   "bookingPerformanceVersion": 1,
-  "bookingPerformanceVerifiedSourceCommit": "f03c5f1424270488ddac8480430c031c779acba0"
+  "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb"
 }
