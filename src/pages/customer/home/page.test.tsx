@@ -338,11 +338,12 @@ it('reuses the quoted route when nearby availability disappears and returns', as
 it('clears the route spinner when availability is lost during a pending quote', async () => {
   fake.route.mockReturnValueOnce(new Promise(() => {}));
   await mount(); await chooseRoute();
+  expect(screen.getByText('Изчисляваме маршрута и цената…')).toBeTruthy();
   const signal = fake.route.mock.calls[0][2].signal as AbortSignal;
   fake.counts = { standard: 0 };
   await act(async () => vi.advanceTimersByTimeAsync(15_000));
   expect(signal.aborted).toBe(true);
-  expect(screen.queryByText('Смятаме маршрута и цената…')).toBeNull();
+  expect(screen.queryByText('Изчисляваме маршрута и цената…')).toBeNull();
   expect(screen.getByText(/Сега няма свободен шофьор/)).toBeTruthy();
   expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
 });
