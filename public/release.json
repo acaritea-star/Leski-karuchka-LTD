@@ -1,6 +1,6 @@
 {
-  "release": "2026.10.16-booking-performance.1",
-  "baseCommit": "1c191a587c3abc51b9ae0a41780f20a72cacb16a",
+  "release": "2026.10.16-staff-mfa-enforced.1",
+  "baseCommit": "076ed07852b53677f91c56483af4eb02936472f7",
   "databaseMigration": "staff_mfa_public_request_hook",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
@@ -97,8 +97,8 @@
   "staffMfaMigrationVersion": "20261016073419",
   "staffMfaHookMigrationVersion": "20261016074354",
   "staffMfaMigrationApplied": true,
-  "staffMfaBackendStatus": "ready-for-cutover",
-  "staffMfaEnforcementEnabled": false,
+  "staffMfaBackendStatus": "enforced",
+  "staffMfaEnforcementEnabled": true,
   "staffMfaVerifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
   "staffMfaEdgeVersions": {
     "google-geocode": 9,
@@ -112,5 +112,6 @@
   "staffMfaMigrationSha256": "a193f214bca82c3c8701c2f7c55417d3414f3fc6f1b3a16fbedbd4ce79a8fd26",
   "staffMfaHookMigrationSha256": "acc383a476b9f8252082d511d51582ec3b591b9b0e2c9a4e898c32db2c73227e",
   "bookingPerformanceVersion": 1,
-  "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb"
+  "bookingPerformanceVerifiedSourceCommit": "b9021ab11dd7cfef30b6a0afeab780de6c828cfb",
+  "staffMfaEnforcedAt": "2026-10-16T12:19:40.947757Z"
 }
