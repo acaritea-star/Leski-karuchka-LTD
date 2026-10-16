@@ -32,6 +32,8 @@ async function rpcWithToken(token) {
 }
 try {
  await sql(`INSERT INTO public.companies(id,name,slug) VALUES('${company}','MFA HTTP test','mfa-http-${company}'); UPDATE private.app_security SET staff_mfa_enforced=true;`);
+ const publicRead = await fetch(url + '/rest/v1/companies?select=id&limit=0', { headers: { apikey: anon } });
+ if (publicRead.status !== 200) throw Error('MFA request hook blocked anonymous public reads');
  for (const role of ['CUSTOMER', 'SUPER_ADMIN', 'COMPANY_ADMIN', 'DRIVER']) {
   const email = `mfa-http-${randomUUID()}@example.invalid`, password = randomBytes(24).toString('base64url');
   const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
@@ -73,6 +75,8 @@ try {
  console.log('PASS: real Auth TOTP for all staff roles; aal1/invalid code/old token/factor removal denied; customer unchanged');
 } finally {
  await sql('UPDATE private.app_security SET staff_mfa_enforced=false;');
+ const publicAfter = await fetch(url + '/rest/v1/companies?select=id&limit=0', { headers: { apikey: anon } });
+ if (publicAfter.status !== 200) throw Error('Public reads failed with MFA enforcement off');
  for (const id of users) {
   const result = await admin.auth.admin.deleteUser(id); if (result.error) throw Error('Synthetic Auth cleanup failed');
  }

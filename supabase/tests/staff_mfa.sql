@@ -80,6 +80,11 @@ BEGIN
  WHERE ns.nspname='public' AND c.relkind IN ('r','p') AND c.relrowsecurity AND c.relname<>'profiles'
  AND NOT EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='staff_mfa_required' AND NOT p.polpermissive);
  IF n<>0 THEN RAISE EXCEPTION 'FAIL % app tables lack restrictive MFA policy',n; END IF;
+ PERFORM set_config('request.jwt.claims','{}',true);
+ SET LOCAL ROLE anon;
+ IF has_schema_privilege('anon','private','USAGE') THEN RAISE EXCEPTION 'FAIL anonymous private schema access broadened'; END IF;
+ PERFORM public.staff_mfa_pre_request();
+ RESET ROLE;
  RAISE NOTICE 'PASS: staff aal1 denied, live session/factor required, customer unchanged, bootstrap isolated, company scope retained';
 END $test$;
 ROLLBACK;
