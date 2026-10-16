@@ -19,6 +19,8 @@ test('driver records actual payment once after a lost response and downloads one
   if (url.pathname.endsWith('/auth/v1/user')) data = user;
   else if (url.pathname.endsWith('/profiles')) data = { id: user.id, role: 'DRIVER', company_id: financeIds.company, is_active: true, first_name: 'Тест', last_name: 'Водач', email: user.email };
   else if (url.pathname.endsWith('/drivers')) data = { id: financeIds.driver, user_id: user.id, company_id: financeIds.company, is_verified: true, is_online: false, vehicle_id: null };
+  else if (url.pathname.endsWith('/legal_acceptances')) data = { id: user.id };
+  else if (url.pathname.endsWith('/notification_inbox_state')) data = { unread: 0, latest_id: null };
   else if (url.pathname.endsWith('/accounting_report') || url.pathname.endsWith('/accounting_export')) {
    const body = route.request().postDataJSON();
    expect(body.p_driver_id).toBe(financeIds.driver);
@@ -38,6 +40,7 @@ test('driver records actual payment once after a lost response and downloads one
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: { 'access-control-allow-origin': '*' } });
  });
  await page.goto('/driver/earnings');
+ await page.getByRole('button', { name: 'Курсове', exact: true }).click();
  await page.getByRole('button', { name: 'Отчети плащането', exact: true }).click();
  await expect(page.getByLabel('Сума в евро')).toHaveValue('12.34');
  expect(writes).toBe(0);
@@ -46,6 +49,7 @@ test('driver records actual payment once after a lost response and downloads one
  await expect(page.getByText('Записът е запазен.', { exact: true })).toBeVisible();
  await expect(page.getByRole('button', { name: 'Отчети плащането', exact: true })).toHaveCount(0);
  expect(writes).toBe(1);
+ await page.getByRole('button', { name: 'Курсове', exact: true }).click();
  await expect(page.getByText(/Разлика спрямо заявката: -1.23/)).toBeVisible();
  for (const size of [{ width: 320, height: 568 }, { width: 720, height: 390 }]) {
   await page.setViewportSize(size);

@@ -156,6 +156,8 @@ export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[], report?: A
  const rows: unknown[][] = [];
  if (report) {
   rows.push(['Отчет',report.period.from,report.period.until,'Крайна дата — без включване','EUR','Europe/Sofia'],
+   ['Фирма',report.scope.company_id],
+   ['Обхват',report.scope.driver_id ? 'Шофьор' : 'Цялата фирма',report.scope.driver_id ?? ''],
    ['Момент на извличане',report.generated_at],
    ['Начален остатък по записите',report.balance.opening],['Приходи (нето корекции)',report.finances.income],
    ['Разходи (нето корекции)',report.finances.expenses],['Предавания (нето корекции)',report.finances.handed_over],

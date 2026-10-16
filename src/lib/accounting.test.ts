@@ -55,3 +55,10 @@ it('preserves a negative correction as a numeric CSV amount and zero cash moveme
  const confirmation = { ...entryFixture(), kind: 'confirmation' as const, signed_amount: 0, balance_delta: 0, reference_kind: 'income' as const, reference_id: 'original' };
  expect(reportCsv([], [confirmation]).split('\r\n')[1]).toMatch(/;"0"$/);
 });
+it('labels the company and exact driver scope in the exported snapshot', () => {
+ const driver = accountingFixture();
+ expect(reportCsv([], [], driver)).toContain(`"Фирма";"${financeIds.company}"`);
+ expect(reportCsv([], [], driver)).toContain(`"Обхват";"Шофьор";"${financeIds.driver}"`);
+ const company = accountingFixture('2026-10', null);
+ expect(reportCsv([], [], company)).toContain('"Обхват";"Цялата фирма";""');
+});
