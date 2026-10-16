@@ -41,3 +41,14 @@ it('does not retry a rejected edge request automatically', async () => {
   expect(await invokeEdge('road-geometry', {}, 1000)).toMatchObject({ data: null, error: { message: 'Edge request failed (429)' } });
   expect(fetch).toHaveBeenCalledOnce();
 });
+it('cancels a superseded route while waiting for auth without starting an API request', async () => {
+  let release!: (value: unknown) => void;
+  session.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+  const controller = new AbortController();
+  const pending = invokeEdge('google-routes', {}, 20_000, controller.signal);
+  controller.abort();
+  expect(await pending).toMatchObject({ data: null, error: { name: 'AbortError' } });
+  release({ data: { session: { access_token: 'session-token' } }, error: null });
+  await Promise.resolve(); await Promise.resolve();
+  expect(fetch).not.toHaveBeenCalled(); expect(vi.getTimerCount()).toBe(0);
+});

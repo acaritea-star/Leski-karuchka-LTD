@@ -136,7 +136,10 @@ export async function googleRoutes(req: Request): Promise<Response> {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': API_KEY,
-        'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs',
+        // Booking needs no navigation steps. Navigation requests keep only the
+        // fields consumed by the driver, excluding per-step polylines/advisories.
+        'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline'
+          + (quoteOptions ? '' : ',routes.legs.distanceMeters,routes.legs.duration,routes.legs.steps.navigationInstruction.instructions,routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration'),
       },
       body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(12000),
@@ -204,13 +207,13 @@ export async function googleRoutes(req: Request): Promise<Response> {
       duration_min: Math.ceil(durationSec / 60),
       duration_sec: durationSec,
       polyline: route.polyline?.encodedPolyline || '',
-      legs: (route.legs || []).map((leg: {distanceMeters:number;duration:string;steps?:Array<{navigationInstruction?:{instructions?:string};distanceMeters?:number;duration?:string}>}) => ({
+      legs: (quoteOptions ? [] : route.legs || []).map((leg: {distanceMeters:number;duration:string;steps?:Array<{navigationInstruction?:{instructions?:string};distanceMeters?:number;staticDuration?:string}>}) => ({
         distance_meters: leg.distanceMeters,
         duration: leg.duration,
         steps: (leg.steps || []).map((step) => ({
           instruction: step.navigationInstruction?.instructions || '',
           distance_meters: step.distanceMeters,
-          duration: step.duration,
+          duration: step.staticDuration,
         })),
       })),
       alternatives_count: (data.routes || []).length - 1,

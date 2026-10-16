@@ -1,5 +1,6 @@
 import type { LocationPreset } from '@/lib/geo';
 import { withRequestTimeout } from './requestTimeout';
+import { isInBulgaria } from './serviceArea';
 
 // Google Maps Platform API key — injected from the environment (public browser key)
 const API_KEY = (import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined) || '';
@@ -31,7 +32,8 @@ export async function searchPlaces(
   query: string,
   sessionToken?: string,
   language = 'bg',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  bias?: { lat: number; lng: number },
 ): Promise<PlacePrediction[]> {
   if (!API_KEY || query.trim().length < 2) return [];
 
@@ -40,7 +42,9 @@ export async function searchPlaces(
     languageCode: language,
     regionCode: 'BG',
     includedRegionCodes: ['bg'],
-    locationBias: {
+    locationBias: bias && isInBulgaria(bias.lat, bias.lng) ? {
+      circle: { center: { latitude: bias.lat, longitude: bias.lng }, radius: 30000 },
+    } : {
       rectangle: {
         low: BG_SOUTH_WEST,
         high: BG_NORTH_EAST,

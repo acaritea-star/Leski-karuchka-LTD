@@ -49,6 +49,29 @@ describe('address lookup', () => {
     expect(screen.queryByRole('button', { name: 'От моята локация' })).toBeNull();
     expect(document.activeElement).not.toBe(screen.getByRole('searchbox'));
   });
+  it('keeps local input through unrelated renders and resets it for the next address step', async () => {
+    vi.mocked(searchPlaces).mockResolvedValue([]);
+    const view = render(<LocationPicker {...props} searchQuery={undefined} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'София' } });
+    view.rerender(<LocationPicker {...props} searchQuery={undefined} locating />);
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('София');
+    await act(async () => vi.advanceTimersByTimeAsync(301));
+    expect(searchPlaces).toHaveBeenCalledOnce();
+    view.rerender(<LocationPicker key="destination" {...props} searchQuery={undefined} showCurrentLocation={false} />);
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
+  });
+  it('shows progress while stale suggestions are disabled and the keyboard remains usable', async () => {
+    vi.mocked(searchPlaces).mockResolvedValueOnce([{ place_id: 'old', description: 'Стар адрес' }])
+      .mockReturnValueOnce(new Promise(() => {}));
+    render(<LocationPicker {...props} searchQuery={undefined} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Лев' } });
+    await act(async () => vi.advanceTimersByTimeAsync(301));
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Левски' } });
+    await act(async () => vi.advanceTimersByTimeAsync(451));
+    expect(screen.getByRole('status', { name: 'Търсене на адреси...' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Стар адрес' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('searchbox') as HTMLInputElement).disabled).toBe(false);
+  });
 });
 
 it('keeps existing suggestions visible but blocks selecting stale addresses while searching', async () => {

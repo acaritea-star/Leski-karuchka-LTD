@@ -18,13 +18,14 @@ const fake = vi.hoisted(() => ({
   readById: vi.fn(), notify: null as null | ((payload: { new: Record<string, unknown> }) => void),
   rpc: vi.fn(), route: vi.fn(), reverse: vi.fn(), register: vi.fn(),
   active: null as Record<string, unknown> | null, recoveryError: false,
+  mapRenders: 0,
   vehicleTypes: [{ id: 'standard', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }],
   user: { id: 'customer', company_id: 'company', first_name: 'Тест', email: 'test@example.test' },
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: fake.user, loading: false }) }));
 vi.mock('@/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({ register: fake.register }) }));
 vi.mock('@/lib/googleMaps', () => ({ computeRoute: fake.route, reverseGeocode: fake.reverse }));
-vi.mock('@/pages/customer/components/BookingMap', () => ({ default: () => <div>Map</div> }));
+vi.mock('@/pages/customer/components/BookingMap', () => ({ default: () => { fake.mapRenders++; return <div>Map</div>; } }));
 vi.mock('@/pages/customer/components/DriverTracking', () => ({ default: () => <div>Tracking</div> }));
 vi.mock('@/components/feature/NotificationBell', () => ({ default: () => null }));
 vi.mock('@/pages/customer/components/AppMenu', () => ({ default: () => null }));
@@ -58,6 +59,7 @@ const chooseRoute = async () => {
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); fake.counts=null; fake.carriers=null; fake.companies=['company']; fake.active = null; fake.recoveryError = false;
+  fake.mapRenders = 0;
   fake.vehicleTypes = [{ id: 'standard', name: 'Economy', capacity: 4, is_active: true, company_id:'company' }];
   fake.readById.mockReset().mockImplementation(async () => ({ data: fake.active, error: null }));
   fake.notify = null;
@@ -233,6 +235,58 @@ it('ignores a late reverse-geocoding result after location is turned off', async
   await act(async () => done({ formatted_address: 'GPS адрес' }));
   expect(screen.queryByText('GPS адрес')).toBeNull();
 });
+it('lets the customer choose a destination during geocoding, then buys exactly one quote with the resolved address', async () => {
+  gpsBrowser();
+  let finish!: (value: unknown) => void;
+  fake.reverse.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  await mount();
+  expect(screen.getByRole('heading', { name: 'Накъде отиваш?' })).toBeTruthy();
+  expect(screen.getByText(/Позицията е намерена/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /Край/ }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).not.toHaveBeenCalled();
+  expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => finish({ formatted_address: 'Уточнен GPS адрес' }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).toHaveBeenCalledOnce();
+  expect(fake.route.mock.calls[0][2].quote.pickup_address).toBe('Уточнен GPS адрес');
+});
+it('ignores a late GPS street address after the customer replaces the pickup manually', async () => {
+  gpsBrowser();
+  let finish!: (value: unknown) => void;
+  fake.reverse.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  await mount();
+  const signal = fake.reverse.mock.calls[0][2].signal as AbortSignal;
+  fireEvent.click(screen.getByRole('button', { name: '1. Откъде тръгваш?' }));
+  fireEvent.click(screen.getByRole('button', { name: /Начало/ }));
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ formatted_address: 'Стар GPS адрес' }));
+  fireEvent.click(screen.getByRole('button', { name: /Край/ }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).toHaveBeenCalledOnce();
+  expect(fake.route.mock.calls[0][2].quote.pickup_address).toBe(pickup.address);
+  expect(screen.queryByText('Стар GPS адрес')).toBeNull();
+});
+it('keeps typing inside the picker without rendering the map on each key', async () => {
+  await mount();
+  const before = fake.mapRenders;
+  const input = screen.getByRole('searchbox');
+  for (const value of ['Г', 'Го', 'Гор', 'Горна', 'Горна Оряховица']) fireEvent.change(input, { target: { value } });
+  expect((input as HTMLInputElement).value).toBe('Горна Оряховица');
+  expect(fake.mapRenders).toBe(before);
+});
+it('typing an address fences a late native GPS callback instead of switching the current step', async () => {
+  const browser = gpsBrowser('prompt');
+  let receive!: (position: GeolocationPosition) => void;
+  browser.get.mockImplementationOnce(callback => { receive = callback; });
+  await mount();
+  fireEvent.click(screen.getByRole('button', { name: 'От моята локация' }));
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Левски' } });
+  await act(async () => receive(gpsFix()));
+  expect(screen.getByRole('heading', { name: 'Откъде тръгваш?' })).toBeTruthy();
+  expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('Левски');
+  expect(fake.reverse).not.toHaveBeenCalled();
+});
 
 it('releases a stuck booking button and retries with the same request ID without accepting the late reply', async () => {
   let done!: (value: unknown) => void;
@@ -280,6 +334,17 @@ it('reuses the quoted route when nearby availability disappears and returns', as
   fake.counts={standard:1};fireEvent.click(screen.getByRole('button',{name:'Обнови наличността'}));await act(async()=>vi.advanceTimersByTimeAsync(1));
   expect((screen.getByRole('button',{name:/Поръчай каручка/}) as HTMLButtonElement).disabled).toBe(false);
   await act(async()=>vi.advanceTimersByTimeAsync(400));expect(fake.route).toHaveBeenCalledOnce();
+});
+it('clears the route spinner when availability is lost during a pending quote', async () => {
+  fake.route.mockReturnValueOnce(new Promise(() => {}));
+  await mount(); await chooseRoute();
+  const signal = fake.route.mock.calls[0][2].signal as AbortSignal;
+  fake.counts = { standard: 0 };
+  await act(async () => vi.advanceTimersByTimeAsync(15_000));
+  expect(signal.aborted).toBe(true);
+  expect(screen.queryByText('Смятаме маршрута и цената…')).toBeNull();
+  expect(screen.getByText(/Сега няма свободен шофьор/)).toBeTruthy();
+  expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(true);
 });
 it('requires an explicit price refresh when a newly available carrier was not quoted', async () => {
   await mount();await chooseRoute();
