@@ -120,7 +120,7 @@ function AccountingWorkspace({ companyId, driverId }: { companyId?: string; driv
   };
   const openAction = (next: MoneyAction) => {
     if (blocked) return;
-    setAction(next); setActionNote(''); setEvidenceSource('cash_count'); setEvidenceReference('');
+    setAction(next); setActionNote(''); setEvidenceSource((next.entry.effective_method ?? next.entry.payment_method) === 'card' ? 'bank_record' : 'cash_count'); setEvidenceReference('');
     setError(''); setSuccess(''); setEntryOpen(false);
   };
   const closeDialog = () => {

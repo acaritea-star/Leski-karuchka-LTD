@@ -28,7 +28,7 @@ test('expense attachment retries only the same private file and never posts a se
 });
 test('company health screen uses understandable actions and distinguishes past GPS failures from a current outage',async({page},testInfo)=>{
  const state=await setupUi(page,'COMPANY_ADMIN');await page.route('**/rest/v1/rpc/operational_health',route=>route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify({checked_at:new Date().toISOString(),stale_online_drivers:1,flagged_rides_24h:2,oldest_push_seconds:0,route_budget:null,metrics:[{name:'gps.read',count:39,errors:20,avg_ms:1365,max_ms:8500}]})}));
- await page.goto('/admin/dashboard');const panel=page.getByRole('region',{name:'Състояние на услугата'});await expect(panel.getByText('1 онлайн шофьори не изпращат актуална локация')).toBeVisible();await expect(panel.getByRole('link',{name:'Отвори шофьорите'})).toBeVisible();
+ await page.goto('/admin/dashboard');const panel=page.getByRole('region',{name:'Състояние на услугата'});await expect(panel.getByText('1 онлайн шофьор не изпраща актуална локация')).toBeVisible();await expect(panel.getByRole('link',{name:'Отвори шофьорите'})).toBeVisible();
  await expect(panel).toContainText('не означава, че проблемът е активен в момента');await expect(panel).not.toContainText('gps.read');await expect(panel).not.toContainText('1365');
  await panel.scrollIntoViewIfNeeded();await panel.screenshot({path:testInfo.outputPath('company-health.png')});await page.setViewportSize({width:320,height:568});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(state.errors).toEqual([]);
 });

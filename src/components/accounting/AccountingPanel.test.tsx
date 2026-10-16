@@ -101,3 +101,11 @@ it('keeps a company report read-only when scoped to a driver', async () => {
  expect(screen.queryByRole('button', { name: '− Разход' })).toBeNull();
  expect(mocks.report).toHaveBeenCalledWith(expect.any(String), { companyId: 'company', driverId: 'driver' }, 0, expect.any(AbortSignal));
 });
+
+it('starts card reconciliation with a payment record and a required transaction reference', async () => {
+ const data=accountingFixture();data.entries=[{...entryFixture(),payment_method:'card'}];data.entry_count=1;
+ mount(true,data);await screen.findByText('Свери приход');fireEvent.click(screen.getByText('Свери приход'));
+ expect((screen.getByLabelText('Източник') as HTMLSelectElement).value).toBe('bank_record');
+ expect((screen.getByLabelText('Номер / референция') as HTMLInputElement).required).toBe(true);
+ expect(mocks.rpc).not.toHaveBeenCalled();
+});
