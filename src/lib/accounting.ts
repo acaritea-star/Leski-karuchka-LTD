@@ -18,7 +18,7 @@ export interface MoneyEntry {
  payment_method?: 'cash' | 'card' | null; effective_method?: 'cash' | 'card' | null;
  evidence_source?: string; evidence_reference?: string | null;
 }
-export const paymentMethodLabel = (method: string | null | undefined) => method === 'cash' ? 'В брой' : method === 'card' ? 'С карта' : method === 'mixed' ? 'В брой и с карта' : 'Без посочен начин';
+export const paymentMethodLabel = (method: string | null | undefined) => method === 'cash' ? 'В брой' : method === 'card' ? 'С карта' : method === 'mixed' ? 'Смесено плащане' : 'Без посочен начин';
 export interface PaymentBreakdown { cash_income:number;card_income:number;unknown_income:number;cash_expenses:number;card_expenses:number;unknown_expenses:number;cash_handover:number;unknown_handover:number;cash_opening:number;cash_movement:number;cash_closing:number;unknown_closing:number }
 export interface AccountingReport {
  payment_breakdown?: PaymentBreakdown;
