@@ -9,7 +9,7 @@ import type { PartnerAccess } from '@/lib/partnerAccess';
 import DriverOnboarding from './DriverOnboarding';
 import PreparationProgress from './PreparationProgress';
 
-export default function InvitedDriverPreparation({ access, onRefresh }: { access: PartnerAccess; onRefresh: () => Promise<unknown> }) {
+export default function InvitedDriverPreparation({ access, onRefresh, onChooseCompany }: { access: PartnerAccess; onRefresh: () => Promise<unknown>; onChooseCompany?: () => void }) {
   const { user } = useAuth();
   const { logout, pending } = useSignOut();
   const [application, setApplication] = useState(access.application_id);
@@ -22,6 +22,7 @@ export default function InvitedDriverPreparation({ access, onRefresh }: { access
     <section className="bg-white border border-background-200 rounded-2xl p-5 sm:p-7 space-y-6"><div className="space-y-3"><p className="text-sm font-semibold text-primary-700 break-words">{access.company_name}</p><h1 className={`font-heading font-bold text-foreground-950 leading-tight ${confirmedApplication ? 'text-2xl' : 'text-3xl'}`}>{confirmedApplication ? 'Продължи подготовката' : 'Добре дошъл!'}</h1>
       {!confirmedApplication && <p className="text-base leading-relaxed text-foreground-700">Ще те водим стъпка по стъпка. Започни с данните си.</p>}
       <p className="text-sm leading-relaxed text-foreground-500">Запазеното остава. Можеш да продължиш по-късно със същия профил.</p></div>
+      {!confirmedApplication && onChooseCompany && <button type="button" disabled={busy} onClick={onChooseCompany} className="min-h-11 text-sm text-primary-700 underline">Към избора на фирма</button>}
       {!confirmedApplication && <><PreparationProgress step={1} /><div className="space-y-2"><h2 className="text-xl font-semibold text-foreground-950">Започни с твоите данни</h2><p className="text-base leading-relaxed text-foreground-600">Провери името и телефона си, за да може фирмата да се свърже с теб.</p></div></>}
       {confirmedApplication ? <DriverOnboarding applicationId={confirmedApplication} onReviewed={() => { void onRefresh(); }} /> : <form aria-label="Данни на поканения шофьор" className="space-y-5" onSubmit={async e => {
         e.preventDefault(); if (latch.current) return;

@@ -89,6 +89,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          accepts_driver_applications: boolean
           address: string | null
           base_fare: number
           brand_color_primary: string | null
@@ -118,6 +119,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepts_driver_applications?: boolean
           address?: string | null
           base_fare?: number
           brand_color_primary?: string | null
@@ -147,6 +149,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepts_driver_applications?: boolean
           address?: string | null
           base_fare?: number
           brand_color_primary?: string | null
@@ -1748,6 +1751,7 @@ export type Database = {
       create_partner_invitation: { Args: { p_id: string; p_kind: string; p_email: string; p_company?: string }; Returns: string }
       revoke_partner_invitation: { Args: { p_id: string }; Returns: undefined }
       resolve_partner_access: { Args: { p_kind?: string; p_invitation?: string }; Returns: Json }
+      open_driver_access: { Args: { p_company: string }; Returns: Json }
       complete_company_setup: { Args: { p_company: string; p_data: Json }; Returns: Json }
       driver_onboarding: { Args: { p_application: string }; Returns: Json }
       begin_driver_onboarding: { Args: { p_company: string; p_full_name: string; p_phone: string; p_experience: string; p_has_vehicle: boolean; p_message?: string }; Returns: string }

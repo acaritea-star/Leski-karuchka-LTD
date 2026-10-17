@@ -241,8 +241,9 @@ function AccountingWorkspace({ companyId, driverId }: { companyId?: string; driv
           <label className="block text-sm font-medium">Основание<input ref={actionInput} className={`${inputClass} mt-1`} required value={actionNote} onChange={e => setActionNote(e.target.value)} maxLength={500} /></label>
           {verifiedAction && <>
             <label className="block text-sm font-medium">Източник<select aria-label="Източник" className={`${inputClass} mt-1`} value={evidenceSource} onChange={e => setEvidenceSource(e.target.value)}>
-              <option value="cash_count">Преброени пари</option><option value="cash_book">Касов разчет</option><option value="receipt">Разписка / документ</option><option value="bank_record">Платежен запис</option>
+              {(action.entry.effective_method ?? action.entry.payment_method) !== 'card' && <><option value="cash_count">Преброени пари</option><option value="cash_book">Касов разчет</option></>}<option value="receipt">Разписка / документ</option><option value="bank_record">Платежен запис</option>
             </select></label>
+            {(action.entry.effective_method ?? action.entry.payment_method) === 'card' && <p className="text-xs text-foreground-500">Свери картовото плащане с платежен запис или документ от терминала. Преброеният кеш не доказва плащане с карта.</p>}
             <label className="block text-sm font-medium">Номер / референция<input className={`${inputClass} mt-1`} maxLength={160} required={evidenceSource !== 'cash_count'} value={evidenceReference} onChange={e => setEvidenceReference(e.target.value)} /></label>
           </>}
           {!pending && <div className="flex flex-wrap gap-2"><button className={`${buttonClass} flex-1`} disabled={busy}>Потвърди</button><button type="button" className={secondaryButton} onClick={closeDialog}>Откажи</button></div>}

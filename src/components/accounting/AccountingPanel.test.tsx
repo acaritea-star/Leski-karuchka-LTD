@@ -107,5 +107,7 @@ it('starts card reconciliation with a payment record and a required transaction 
  mount(true,data);await screen.findByText('Свери приход');fireEvent.click(screen.getByText('Свери приход'));
  expect((screen.getByLabelText('Източник') as HTMLSelectElement).value).toBe('bank_record');
  expect((screen.getByLabelText('Номер / референция') as HTMLInputElement).required).toBe(true);
+ expect(screen.queryByRole('option', { name: 'Преброени пари' })).toBeNull();
+ expect(screen.queryByRole('option', { name: 'Касов разчет' })).toBeNull();
  expect(mocks.rpc).not.toHaveBeenCalled();
 });
