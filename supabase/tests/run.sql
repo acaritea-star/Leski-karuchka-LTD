@@ -78,4 +78,6 @@ ROLLBACK;
 
 \ir ride_payment_receipts.sql
 
+\ir open_driver_applications.sql
+
 \ir staff_mfa.sql

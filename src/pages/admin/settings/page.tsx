@@ -20,6 +20,7 @@ interface CompanyProfile {
   permit_expires_on: string;
   document_checks_required: boolean;
   legal_verified_at: string | null;
+  accepts_driver_applications: boolean;
 }
 
 export default function AdminSettings() {
@@ -37,7 +38,7 @@ function SettingsEditor() {
     phone: '',
     email: '',
     address: '',
-    legal_name: '', registration_id: '', permit_number: '', permit_expires_on: '', document_checks_required: false, legal_verified_at: null,
+    legal_name: '', registration_id: '', permit_number: '', permit_expires_on: '', document_checks_required: false, legal_verified_at: null, accepts_driver_applications: false,
   });
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -54,7 +55,7 @@ function SettingsEditor() {
     try {
       const { data, error: err } = await withRequestTimeout(signal => supabase
         .from('companies')
-        .select('name, phone, email, address, legal_name, registration_id, permit_number, permit_expires_on, document_checks_required, legal_verified_at')
+        .select('name, phone, email, address, legal_name, registration_id, permit_number, permit_expires_on, document_checks_required, legal_verified_at, accepts_driver_applications')
         .eq('id', companyId)
         .abortSignal(signal).single());
 
@@ -68,6 +69,7 @@ function SettingsEditor() {
           address: data.address || '',
           legal_name: data.legal_name || '', registration_id: data.registration_id || '', permit_number: data.permit_number || '',
           permit_expires_on: data.permit_expires_on || '', document_checks_required: data.document_checks_required, legal_verified_at: data.legal_verified_at,
+          accepts_driver_applications: data.accepts_driver_applications ?? false,
         });
       }
     } catch (err: unknown) {
@@ -100,6 +102,7 @@ function SettingsEditor() {
           legal_name: profile.legal_name.trim() || null, registration_id: profile.registration_id.trim() || null,
           permit_number: profile.permit_number.trim() || null, permit_expires_on: profile.permit_expires_on || null,
           document_checks_required: profile.document_checks_required,
+          accepts_driver_applications: profile.accepts_driver_applications,
           ...(user?.role === 'SUPER_ADMIN' ? { legal_verified_at: profile.legal_verified_at } : {}),
         })
         .eq('id', companyId).select('legal_verified_at').abortSignal(signal).single());
@@ -149,6 +152,10 @@ function SettingsEditor() {
           <p className="text-sm text-foreground-500 mb-6">Тази информация се показва на клиентите и шофьорите.</p>
 
           <div className="space-y-5">
+            <label className="flex items-start gap-3 rounded-xl bg-background-50 p-4 text-sm">
+              <input type="checkbox" checked={profile.accepts_driver_applications} disabled={saving || !loaded} onChange={e => setProfile(prev => ({ ...prev, accepts_driver_applications: e.target.checked, document_checks_required: e.target.checked || prev.document_checks_required }))} className="mt-1 h-5 w-5 shrink-0" />
+              <span><span className="block font-semibold">Приемай кандидатури без покана</span><span className="block mt-1 text-foreground-600">След завършена фирмена настройка кандидатите могат да изберат твоята фирма. Обучението, документите и фирменото одобрение остават задължителни. Шофьорите не могат да променят тарифите.</span></span>
+            </label>
             <div>
               <label htmlFor="admin-settings-name" className="text-sm font-medium text-foreground-700 block mb-1.5">Име на компанията</label>
               <input id="admin-settings-name"
@@ -187,7 +194,7 @@ function SettingsEditor() {
             </div>
 
             {(['legal_name','registration_id','permit_number','permit_expires_on'] as const).map(key => <label key={key} className="block text-sm font-medium text-foreground-700">{{legal_name:'Юридическо име на превозвача',registration_id:'ЕИК на превозвача',permit_number:'Разрешение / регистрация за превоз',permit_expires_on:'Валидно до'}[key]}<input type={key === 'permit_expires_on' ? 'date' : 'text'} maxLength={key==='registration_id'?13:200} value={profile[key]} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full px-4 py-3 rounded-lg border border-background-200 text-sm text-foreground-950"/></label>)}
-            <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={profile.document_checks_required} onChange={e=>setField('document_checks_required',e.target.checked)}/>Изисквай одобрена книжка и застраховка с валиден срок за нови заявки</label>
+            <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={profile.document_checks_required} disabled={saving || profile.accepts_driver_applications} onChange={e=>setField('document_checks_required',e.target.checked)}/>Изисквай одобрена книжка и застраховка с валиден срок за нови заявки</label>
             <p className="text-xs text-foreground-500">Известните изтекли срокове се проверяват и без тази настройка. Активен курс може да бъде приключен.</p>
             {user?.role==='SUPER_ADMIN' && <label className="flex gap-2 text-sm text-foreground-700"><input type="checkbox" checked={!!profile.legal_verified_at} onChange={e=>setField('legal_verified_at',e.target.checked?new Date().toISOString():null)}/>Проверих идентичността и валидността на посоченото разрешение</label>}
             <button

@@ -21,6 +21,7 @@ DECLARE cid uuid:=gen_random_uuid(); foreign_cid uuid:=gen_random_uuid(); duid u
  cash_ride uuid:=gen_random_uuid(); card_ride uuid:=gen_random_uuid(); unpaid_ride uuid:=gen_random_uuid(); partial_ride uuid:=gen_random_uuid();
  cash_op uuid:=gen_random_uuid(); card_op uuid:=gen_random_uuid(); unpaid_op uuid:=gen_random_uuid(); partial_op uuid:=gen_random_uuid();
  collision uuid:=gen_random_uuid(); topup uuid:=gen_random_uuid(); expense uuid:=gen_random_uuid(); handover uuid:=gen_random_uuid(); proof uuid:=gen_random_uuid();
+ card_confirmation uuid:=gen_random_uuid();
  r jsonb; again jsonb; report jsonb; proof_row jsonb; stmt text; i integer;
 BEGIN
  INSERT INTO public.companies(id,name,slug) VALUES(cid,'Checkout test','checkout-'||cid),(foreign_cid,'Foreign checkout','checkout-'||foreign_cid);
@@ -49,6 +50,16 @@ BEGIN
  EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM public.complete_ride_payment(card_op,card_ride,duid,'card');
  EXECUTE 'RESET ROLE';
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',admin_uid,'role','authenticated')::text,true);
+ EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''confirmation'',0,''Wrong proof'',%L,NULL,NULL,%L,''cash_count'')',card_confirmation,admin_uid,card_op));
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_verified(%L,''confirmation'',0,''Legacy wrong proof'',%L,NULL,%L,''cash_book'',''CASH-1'')',card_confirmation,admin_uid,card_op));
+ IF EXISTS(SELECT 1 FROM public.driver_money_entries WHERE id=card_confirmation) THEN RAISE EXCEPTION 'FAIL rejected proof partially committed'; END IF;
+ PERFORM public.record_driver_money_method(card_confirmation,'confirmation',0,'POS checked',admin_uid,NULL,NULL,card_op,'bank_record','POS-1');
+ PERFORM public.record_driver_money_method(card_confirmation,'confirmation',0,'POS checked',admin_uid,NULL,NULL,card_op,'bank_record','POS-1');
+ PERFORM pg_temp.payment_denied(format('SELECT public.record_driver_money_method(%L,''reversal'',0,''Wrong correction proof'',%L,NULL,NULL,%L,''cash_count'')',gen_random_uuid(),admin_uid,card_op));
+ EXECUTE 'RESET ROLE';
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);
  PERFORM pg_temp.insert_checkout_ride(unpaid_ride,cid,customer_uid,did,vt);
  EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM pg_temp.payment_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''unpaid'')',unpaid_op,unpaid_ride,duid));
