@@ -50,9 +50,12 @@ BEGIN
  GET DIAGNOSTICS affected=ROW_COUNT;
  IF affected<>0 THEN RAISE EXCEPTION 'FAIL foreign administrator changes candidacy'; END IF;
  PERFORM pg_temp.open_application_denied(format('SELECT public.open_driver_access(%L)',firm));
+ PERFORM pg_temp.open_application_denied(format('UPDATE public.companies SET price_per_km=-1 WHERE id=%L',closed_firm));
+ PERFORM pg_temp.open_application_denied(format('UPDATE public.companies SET price_per_km=''NaN'' WHERE id=%L',closed_firm));
  RESET ROLE;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',owner_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
  PERFORM pg_temp.open_application_denied(format('UPDATE public.companies SET document_checks_required=false WHERE id=%L',firm));
+ PERFORM pg_temp.open_application_denied(format('UPDATE public.companies SET dispatch_radius_km=0 WHERE id=%L',firm));
  UPDATE public.companies SET price_per_km=1.87,accepts_driver_applications=false WHERE id=firm;
  IF NOT FOUND THEN RAISE EXCEPTION 'FAIL own administrator cannot control firm'; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.audit_log WHERE company_id=firm AND actor_id=owner_id AND action='company_rules_changed'

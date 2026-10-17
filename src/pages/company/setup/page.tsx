@@ -36,7 +36,7 @@ export default function CompanySetup() {
   return <main className="brand-scope min-h-[100dvh] bg-background-50 p-4 sm:p-8"><div className="max-w-2xl mx-auto space-y-5">
     <div className="flex items-center justify-between"><Link to="/" className="font-heading font-semibold">Лески Каручка</Link><button onClick={logout} disabled={pending} className="text-xs underline">Изход</button></div>
     <section className="bg-white border border-background-200 rounded-2xl p-5 space-y-4"><h1 className="font-heading text-xl font-semibold">Настрой твоята фирма</h1>
-      <p className="text-sm text-foreground-600">Поканата е приета. Попълни реалните данни и тарифи; след това добави автомобилите и покани шофьорите от фирмения панел.</p>
+      <p className="text-sm text-foreground-600">Фирменият ти достъп е потвърден. Попълни реалните данни и тарифи; след това добави автомобилите и шофьорите от фирмения панел.</p>
       {!companyId ? <p role="alert">Фирменият достъп не е свързан. <Link to="/company" className="underline">Провери поканата</Link></p> : query.isPending ? <p role="status">Зареждаме твоята фирма…</p> : query.isError ? <p role="alert">Фирмата не се зареди. <button onClick={() => void query.refetch()} className="underline">Опитай отново</button></p> : <form aria-label="Първоначална фирмена настройка" className="space-y-4" onSubmit={async e => {
         e.preventDefault(); if (latch.current) return; latch.current = true; setBusy(true); setError('');
         const f = new FormData(e.currentTarget); const payload = Object.fromEntries(fields.map(([name, , type]) => [name, type === 'number' ? Number(f.get(name)) : String(f.get(name) ?? '').trim()]));

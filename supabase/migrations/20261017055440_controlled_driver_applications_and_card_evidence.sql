@@ -2,6 +2,13 @@
 BEGIN;
 SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='30s';
+-- Match the existing editor's non-negative, finite prices at the database too.
+-- Keep zero/flat legacy tariffs valid; do not invent or rewrite anyone's rates.
+ALTER TABLE public.companies ADD CONSTRAINT companies_valid_tariffs CHECK (
+ base_fare>=0 AND base_fare<'Infinity'::numeric AND min_fare>=0 AND min_fare<'Infinity'::numeric
+ AND price_per_km>=0 AND price_per_km<'Infinity'::numeric
+ AND price_per_minute>=0 AND price_per_minute<'Infinity'::numeric
+ AND dispatch_radius_km>0 AND dispatch_radius_km<'Infinity'::numeric);
 ALTER TABLE public.companies ADD COLUMN accepts_driver_applications boolean NOT NULL DEFAULT false;
 ALTER TABLE public.companies ADD CONSTRAINT open_applications_require_documents
  CHECK (NOT accepts_driver_applications OR document_checks_required);

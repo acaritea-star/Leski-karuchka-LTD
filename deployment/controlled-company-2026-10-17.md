@@ -18,7 +18,10 @@ polling, notification channel or automatic commission deduction is introduced.
   reads at most 50 firms and rechecks the selected firm's state on the server.
   A closed firm cannot accept a new application even from an already-open form.
 - Company administrators retain control over their firm's rates. Drivers cannot
-  edit them. Tariff and candidacy changes append exact old/new values and actor
+  edit them. All firms' prices must be finite and non-negative and their radius
+  positive; the database rejects direct-API negative/NaN values as well as the UI.
+  Zero/flat legacy tariffs are retained. No existing rate is rewritten.
+  Tariff and candidacy changes append exact old/new values and actor
   to the existing company-scoped audit log. Ride fare snapshots remain unchanged.
 - Card receipts cannot be newly confirmed, or confirmed receipts corrected,
   using a cash count/cash book. Require a payment record or terminal document
@@ -44,7 +47,7 @@ does not send an invitation email or create financial records.
 
 ## Verification and release
 
-Migration scaffold: `20261017052952_controlled_driver_applications_and_card_evidence.sql`.
+Migration scaffold: `20261017055440_controlled_driver_applications_and_card_evidence.sql`.
 Keep the filename aligned with the actual production migration version after
 deployment. Run Check and Database regression on the final GitHub PR head.
 
@@ -66,3 +69,16 @@ For frontend rollback, keep the additive column, audit history and financial
 evidence check. Closing `accepts_driver_applications` stops new candidacy without
 deleting applications, receipts, financial entries or files. Restore a matching
 frontend; never erase real financial history to undo an application release.
+
+Production schema applied as migration `20261017055440`. SQL SHA-256: `6c63b87cc50519e76dce7dd40c27581cba6e3dfc4cfb35a6fa6d04383537faac`.
+All five deployed function bodies match the tested source, both constraints are
+validated, anonymous access to the new RPC is denied and staff MFA remains on.
+The implementation Check (39007341441: 628 unit/component and 138 browser cases)
+and Database regression (39007341413: complete SQL/Auth/Storage/concurrency suite)
+passed. The added finite-price guard also passed the local SQL scenarios and all
+three production firms passed its preflight without changing any rates. Final
+release packaging must pass the same gates on its exact PR head.
+
+The requested Leski Karuchka draft is provisioned with a confirmed existing owner,
+COMPANY_ADMIN scope only, document review required and no active service. It has
+no drivers or financial entries. Actual city, legal data and rates await owner setup.
