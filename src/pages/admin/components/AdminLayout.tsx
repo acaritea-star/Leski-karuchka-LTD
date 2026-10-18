@@ -104,14 +104,14 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
                   navigate(link.path);
                   setSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap text-left ${
+                className={`w-full min-w-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer text-left ${
                   location.pathname === link.path
                     ? 'bg-primary-500 text-white'
                     : 'text-foreground-600 hover:bg-background-100'
                 }`}
               >
                 <i className={`${link.icon} text-lg`} />
-                <span>{label}</span>
+                <span className="min-w-0 break-words">{label}</span>
               </button>
             );
           })}</div>)}
@@ -151,7 +151,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
             </button>
             <div className="min-w-0"><h1 className="lg:hidden text-[10px] text-foreground-500 font-semibold">{roleTitle}</h1><h2 className="text-base font-semibold text-foreground-950 font-heading break-words">{title}</h2></div>
           </div>
-          <div className={`flex min-w-0 items-center gap-2 ${!platformPage && companies.length > 1 ? 'w-full sm:w-auto sm:max-w-[60%]' : 'shrink-0'}`}>
+          <div className={`flex min-w-0 items-center gap-2 ${!platformPage && (isSuperAdmin || companies.length > 1) && companies.length > 0 ? 'w-full sm:w-auto sm:max-w-[60%]' : 'shrink-0'}`}>
             {!platformPage && (isSuperAdmin || companies.length > 1) && companies.length > 0 && (
               <div className="relative min-w-0 flex-1">
                 <label htmlFor="admin-company" className="sr-only">Управлявана фирма или подразделение</label>
