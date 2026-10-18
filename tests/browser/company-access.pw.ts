@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const account = '11111111-1111-4111-8111-111111111111';
 const ownCompany = '22222222-2222-4222-8222-222222222222';
+const ownCompanyScope = `(id.eq.${ownCompany},parent_company_id.eq.${ownCompany})`;
 // Model Supabase's preflight too: WebKit checks the cross-origin headers even
 // for synthetic fulfilled requests during page/second-tab navigation.
 const corsHeaders = {
@@ -11,6 +12,7 @@ const corsHeaders = {
   'access-control-expose-headers': 'content-range',
 };
 const company = (id: string, name: string) => ({ id, name, is_active: true, currency: 'EUR',
+  parent_company_id: null, service_city: null, night_base_fare: null, night_price_per_km: null, night_price_per_minute: null, night_min_fare: null,
   base_fare: 2, price_per_km: 1, price_per_minute: 0.2, dispatch_radius_km: 5,
   updated_at: '2026-10-11T09:00:00Z', created_at: '2026-10-11T09:00:00Z', setup_completed_at: '2026-10-11T09:00:00Z', drivers: [{ count: 0 }] });
 const dashboard = {
@@ -54,7 +56,7 @@ async function setup(page: Page, role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'CUSTOM
         state.companies.unshift({ ...company(payload.id, payload.name), ...payload });
         data = { id: payload.id };
       } else {
-        const filter = url.searchParams.get('id'); state.companyFilters.push(filter);
+        const filter = url.searchParams.get('id'); state.companyFilters.push(filter ?? url.searchParams.get('or'));
         data = filter ? state.companies.filter(c => 'eq.' + c.id === filter) : state.companies;
       }
     } else if (url.pathname.endsWith('/resolve_partner_access')) data = role === 'CUSTOMER' ? { status: 'denied', reason: 'invitation_required', message: 'Няма валидна покана за този акаунт. Влезте с точния поканен имейл или поискайте нова покана.' } : { status: 'ready', role, company_id: role === 'COMPANY_ADMIN' ? ownCompany : null, destination: role === 'SUPER_ADMIN' ? '/admin/companies' : '/admin/dashboard' };
@@ -111,7 +113,7 @@ test('company entry uses the assigned firm and shows only company navigation', a
   await expect(page.getByRole('heading', { name: 'Фирмен панел' })).toBeVisible();
   await expectDashboardReady(page);
   expect(state.companyFilters.length).toBeGreaterThan(0);
-  expect(state.companyFilters.every(filter => filter === 'eq.' + ownCompany)).toBe(true);
+  expect(state.companyFilters.every(filter => filter === 'eq.' + ownCompany || filter === ownCompanyScope)).toBe(true);
   expect(state.profileWrites).toBe(0); expect(state.companyWrites).toBe(0);
   expect(state.errors).toEqual([]); expect(state.google).toBe(0);
 });
@@ -167,7 +169,9 @@ test('invited company binds after login, finishes setup and keeps its own prices
       if (role === 'CUSTOMER') { expect(request.postDataJSON().p_invitation).toBe(invite); role = 'COMPANY_ADMIN'; binds++; }
       data = { status: 'ready', role, company_id: ownCompany, destination: setupAt ? '/admin/dashboard' : '/company/setup' };
     } else if (url.pathname.endsWith('/companies')) {
-      expect(url.searchParams.get('id')).toBe('eq.' + ownCompany);
+      const id = url.searchParams.get('id');
+      if (id) expect(id).toBe('eq.' + ownCompany);
+      else expect(url.searchParams.get('or')).toBe(ownCompanyScope);
       if (request.method() === 'PATCH') {
         if (url.searchParams.get('updated_at') !== 'eq.' + values.updated_at) return route.fulfill({ status: 406, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST116', message: 'No matching tariff version' }), headers: corsHeaders });
         Object.assign(values, request.postDataJSON(), { updated_at: new Date().toISOString() });

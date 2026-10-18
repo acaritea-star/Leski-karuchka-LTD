@@ -72,7 +72,7 @@ export async function googleRoutes(req: Request): Promise<Response> {
 
   // Validate pricing inputs before reserving budget or calling a paid API.
   let quoteOptions: Record<string,unknown> | null = null;
-  let quoteCompany: (PricingRow & {id:string}) | null = null;
+  let quoteCompany: (PricingRow & {id:string; tariff_period?: 'day' | 'night'; priced_at?: string}) | null = null;
   let quoteVehicles: Array<{ id: string; multiplier: number }> = [];
   let marketplaceTariffs: MarketplaceTariff[] | null = null;
   if (body.quote) {
@@ -94,12 +94,14 @@ export async function googleRoutes(req: Request): Promise<Response> {
     } else {
     const {data: vehicle,error: vehicleError} = await admin.from('vehicle_types').select('id,company_id,multiplier,is_active').eq('id',quoteOptions.vehicle_type_id).single();
     if (vehicleError || !vehicle?.is_active) return badRequest('Vehicle type unavailable');
-    const {data: company,error: companyError} = await admin.from('companies').select('id,base_fare,price_per_km,price_per_minute,min_fare,currency,is_active').eq('id',vehicle.company_id).single();
-    if (companyError || !company?.is_active || company.currency !== 'EUR') return badRequest('Company unavailable');
+    const {data: company,error: companyError} = await admin.rpc('company_route_pricing', { p_company: vehicle.company_id, p_lat: origin.lat, p_lng: origin.lng });
+    if (companyError || !company || company.id !== vehicle.company_id || company.currency !== 'EUR'
+      || ![company.base_fare,company.price_per_km,company.price_per_minute,company.min_fare].every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0)
+      || !['day','night'].includes(company.tariff_period) || !Number.isFinite(Date.parse(company.priced_at))) return badRequest('Company unavailable');
     quoteCompany = company;
-    const { data: types, error: typesError } = await admin.from('vehicle_types')
-      .select('id,multiplier').eq('company_id', company.id).eq('is_active', true).order('id').limit(32);
-    if (typesError || !types?.length || !types.some(type => type.id === vehicle.id)) return json({success:false,error:'Vehicle tariffs unavailable'},503);
+    const types = company.types as Array<{ id: string; multiplier: number }>;
+    if (!Array.isArray(types) || !types.length || types.length > 32 || !types.some(type => type.id === vehicle.id)
+      || types.some(type => !type || !type.id || typeof type.multiplier !== 'number' || !Number.isFinite(type.multiplier) || type.multiplier <= 0)) return json({success:false,error:'Vehicle tariffs unavailable'},503);
     quoteVehicles = types;
     }
   }
@@ -182,7 +184,8 @@ export async function googleRoutes(req: Request): Promise<Response> {
         return { id:crypto.randomUUID(),customer_id:actor.id,company_id:company.id,vehicle_type_id:type.id,payload:{
           pickup_latitude:origin.lat,pickup_longitude:origin.lng,destination_latitude:destination.lat,destination_longitude:destination.lng,
           pickup_address:String(options.pickup_address ?? '').slice(0,500),destination_address:String(options.destination_address ?? '').slice(0,500),
-          distance_km:breakdown.distanceKm,duration_min:Math.ceil(durationSec/60),total:breakdown.total,breakdown,
+          distance_km:breakdown.distanceKm,duration_min:Math.ceil(durationSec/60),total:breakdown.total,
+          breakdown:{...breakdown,tariff_period:company.tariff_period,priced_at:company.priced_at},
         }};
       });
       const {data: saved,error: quoteError} = await admin.from('ride_quotes').insert(rows).select('id,expires_at');

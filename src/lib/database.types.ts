@@ -89,6 +89,14 @@ export type Database = {
       }
       companies: {
         Row: {
+          parent_company_id: string | null
+          service_latitude: number | null
+          service_longitude: number | null
+          service_radius_km: number | null
+          night_base_fare: number | null
+          night_price_per_km: number | null
+          night_price_per_minute: number | null
+          night_min_fare: number | null
           accepts_driver_applications: boolean
           address: string | null
           base_fare: number
@@ -119,6 +127,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          parent_company_id?: string | null
+          service_latitude?: number | null
+          service_longitude?: number | null
+          service_radius_km?: number | null
+          night_base_fare?: number | null
+          night_price_per_km?: number | null
+          night_price_per_minute?: number | null
+          night_min_fare?: number | null
           accepts_driver_applications?: boolean
           address?: string | null
           base_fare?: number
@@ -149,6 +165,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          parent_company_id?: string | null
+          service_latitude?: number | null
+          service_longitude?: number | null
+          service_radius_km?: number | null
+          night_base_fare?: number | null
+          night_price_per_km?: number | null
+          night_price_per_minute?: number | null
+          night_min_fare?: number | null
           accepts_driver_applications?: boolean
           address?: string | null
           base_fare?: number
@@ -1733,6 +1757,9 @@ export type Database = {
       }
     }
     Functions: {
+      create_company_division: { Args: { p_id: string; p_parent: string; p_data: Json }; Returns: Json }
+      company_group_report: { Args: { p_parent: string; p_from: string; p_until: string }; Returns: Json }
+      company_route_pricing: { Args: { p_company: string; p_lat: number; p_lng: number }; Returns: Json }
       complete_ride_payment: { Args: {p_id:string;p_request_id:string;p_actor:string;p_choice:string;p_partial_amount?:number|null;p_note?:string}; Returns:Json }
       record_driver_money_method: { Args: {p_id:string;p_kind:string;p_amount:number;p_note:string;p_actor:string;p_payment_method:string|null;p_request_id?:string;p_reference_id?:string;p_source?:string;p_evidence_ref?:string}; Returns:string }
       reserve_expense_receipt: { Args: {p_id:string;p_entry_id:string;p_actor:string;p_file_name:string;p_mime_type:string;p_byte_size:number;p_digest:string}; Returns:Json }

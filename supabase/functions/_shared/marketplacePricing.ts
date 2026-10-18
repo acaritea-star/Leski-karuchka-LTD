@@ -1,5 +1,5 @@
 import { calculateFare, applyVehicleMultiplier, pricingFromRow, type PricingRow } from './pricing.ts';
-export type MarketplaceTariff = PricingRow & { company_name?: string; type_name?: string; capacity?: number; id: string; company_id: string; service_class: string; multiplier: number; currency: string };
+export type MarketplaceTariff = PricingRow & { company_name?: string; type_name?: string; capacity?: number; id: string; company_id: string; service_class: string; multiplier: number; currency: string; tariff_period?: 'day' | 'night'; priced_at?: string };
 export function marketplaceQuotes(types: MarketplaceTariff[], input: {
   customer: string; distanceMeters: number; durationSeconds: number;
   origin: { lat: number; lng: number }; destination: { lat: number; lng: number };
@@ -11,11 +11,13 @@ export function marketplaceQuotes(types: MarketplaceTariff[], input: {
   for (const type of types) {
     if (!['standard', 'comfort', 'van'].includes(type.service_class) || type.currency !== 'EUR' || ids.has(type.id)
       || ![type.base_fare, type.price_per_km, type.price_per_minute, type.min_fare].every(n => n != null && Number.isFinite(Number(n)) && Number(n) >= 0)
-      || !Number.isFinite(Number(type.multiplier)) || Number(type.multiplier) <= 0) throw new Error('Invalid marketplace tariff');
+      || !Number.isFinite(Number(type.multiplier)) || Number(type.multiplier) <= 0
+      || type.tariff_period != null && (!['day','night'].includes(type.tariff_period) || !type.priced_at || !Number.isFinite(Date.parse(type.priced_at)))) throw new Error('Invalid marketplace tariff');
     ids.add(type.id);
-    const breakdown = calculateFare({ distanceKm: input.distanceMeters / 1000, durationMin: input.durationSeconds / 60,
+    const breakdown = { ...calculateFare({ distanceKm: input.distanceMeters / 1000, durationMin: input.durationSeconds / 60,
       distanceMeters: input.distanceMeters, durationSeconds: input.durationSeconds,
-      config: applyVehicleMultiplier(pricingFromRow(type), Number(type.multiplier)) });
+      config: applyVehicleMultiplier(pricingFromRow(type), Number(type.multiplier)) }),
+      ...(type.tariff_period ? { tariff_period: type.tariff_period, priced_at: type.priced_at } : {}) };
     const offers = groups.get(type.service_class) ?? [];
     offers.push({ company_id: type.company_id, vehicle_type_id: type.id, total: breakdown.total, breakdown });
     groups.set(type.service_class, offers);
