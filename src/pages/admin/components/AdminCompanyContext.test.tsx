@@ -7,7 +7,7 @@ import { AdminCompanyProvider, useAdminCompany } from './AdminCompanyContext';
 const api = vi.hoisted(() => ({ read: vi.fn(), user: { id: 'admin-a', role: 'SUPER_ADMIN', company_id: null as string | null } }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: api.user }) }));
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => {
-  const chain = { select: () => chain, eq: () => chain, order: () => chain, abortSignal: api.read };
+  const chain = { select: () => chain, eq: () => chain, or: () => chain, order: () => chain, abortSignal: api.read };
   return chain;
 } } }));
 function Consumer() {
@@ -81,4 +81,21 @@ it('continues with memory when browser storage is blocked', async () => {
     fireEvent.click(screen.getByText('B'));
     expect(screen.getByText('b:Б')).toBeTruthy();
   } finally { read.mockRestore(); write.mockRestore(); }
+});
+
+it('allows the parent administrator to switch only between its own direct divisions', async () => {
+  api.user = { id: 'owner', role: 'COMPANY_ADMIN', company_id: 'a' };
+  api.read.mockResolvedValue({ data: [{ id: 'foreign', name: 'Чужда', parent_company_id: 'other' }, { id: 'b', name: 'Горна', parent_company_id: 'a' }, { id: 'a', name: 'Централа', parent_company_id: null }], error: null });
+  render(tree()); await screen.findByText('a:Централа');
+  fireEvent.click(screen.getByText('B')); expect(screen.getByText('b:Горна')).toBeTruthy();
+  fireEvent.click(screen.getByText('invalid')); expect(screen.getByText('b:Горна')).toBeTruthy();
+  expect(api.read).toHaveBeenCalledTimes(1);
+});
+
+it('keeps a local manager inside its division even if the API returns parent and sibling rows', async () => {
+  api.user = { id: 'local', role: 'COMPANY_ADMIN', company_id: 'b' };
+  sessionStorage.setItem('leski:admin-company:' + JSON.stringify(['local', 'COMPANY_ADMIN', 'b']), 'a');
+  api.read.mockResolvedValue({ data: [{ id: 'a', name: 'Централа', parent_company_id: null }, { id: 'c', name: 'Друг град', parent_company_id: 'a' }, { id: 'b', name: 'Горна', parent_company_id: 'a' }], error: null });
+  render(tree()); await screen.findByText('b:Горна');
+  expect(screen.queryByText('a:Централа')).toBeNull(); expect(screen.queryByText('c:Друг град')).toBeNull();
 });

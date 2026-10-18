@@ -15,8 +15,15 @@ interface PricingConfig {
   price_per_minute: number;
   dispatch_radius_km: number;
   currency: string;
+  night_base_fare: number | null;
+  night_price_per_km: number | null;
+  night_price_per_minute: number | null;
+  night_min_fare: number | null;
 }
-const pricingColumns = 'id,base_fare,min_fare,price_per_km,price_per_minute,dispatch_radius_km,currency,updated_at' as const;
+const nightFields = [ ['night_base_fare', 'Начална такса'], ['night_price_per_km', 'Цена на км'], ['night_price_per_minute', 'Цена на минута от маршрута'], ['night_min_fare', 'Минимална цена'] ] as const;
+const emptyNight = { night_base_fare: null, night_price_per_km: null, night_price_per_minute: null, night_min_fare: null };
+const readNight = (row: Partial<PricingConfig>) => Object.fromEntries(nightFields.map(([key]) => [key, row[key] == null ? null : Number(row[key])])) as Pick<PricingConfig, keyof typeof emptyNight>;
+const pricingColumns = 'id,base_fare,min_fare,price_per_km,price_per_minute,dispatch_radius_km,currency,updated_at,night_base_fare,night_price_per_km,night_price_per_minute,night_min_fare' as const;
 
 export default function AdminPricing() {
   const { companyId } = useAdminCompany();
@@ -34,6 +41,7 @@ function PricingEditor() {
     price_per_minute: 0.28,
     dispatch_radius_km: 5,
     currency: DEFAULT_CURRENCY,
+    ...emptyNight,
   });
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -71,6 +79,7 @@ function PricingEditor() {
           price_per_minute: parseFloat(String(data.price_per_minute || 0)),
           dispatch_radius_km: parseFloat(String(data.dispatch_radius_km || 0)),
           currency: data.currency || DEFAULT_CURRENCY,
+          ...readNight(data),
         });
       }
     } catch (err: unknown) {
@@ -89,7 +98,8 @@ function PricingEditor() {
   const handleSave = async () => {
     if (!companyId || !loaded || !version || needsReload || savingRef.current) return;
     if (blankFields.size || ![config.base_fare, config.min_fare, config.price_per_km, config.price_per_minute, config.dispatch_radius_km].every(Number.isFinite)
-      || config.min_fare < 0 || config.base_fare < 0 || config.price_per_km < 0 || config.price_per_minute < 0 || config.dispatch_radius_km <= 0) {
+      || config.min_fare < 0 || config.base_fare < 0 || config.price_per_km < 0 || config.price_per_minute < 0 || config.dispatch_radius_km <= 0
+      || nightFields.some(([key]) => config[key] !== null && (!Number.isFinite(config[key]) || config[key]! < 0))) {
       setError('Въведи неотрицателни цени и радиус по-голям от нула.'); return;
     }
     savingRef.current = true;
@@ -117,14 +127,14 @@ function PricingEditor() {
             const check = await withRequestTimeout(signal => supabase.from('companies').select(pricingColumns)
               .eq('id', companyId).abortSignal(signal).single(), 5000);
             if (!check.error && check.data?.id === companyId && check.data.updated_at && check.data.updated_at !== version
-              && Object.entries(submitted).every(([key, value]) => key === 'currency'
+              && Object.entries(submitted).every(([key, value]) => value === null ? check.data![key as keyof PricingConfig] == null : key === 'currency'
                 ? check.data!.currency === value : Number(check.data![key as keyof PricingConfig]) === value)) data = check.data;
           } catch { /* Keep the original error if the read cannot confirm it. */ }
         }
         if (!data) { setNeedsReload(true); throw cause; }
       }
       setVersion(data.updated_at);
-      setConfig({ base_fare: Number(data.base_fare), min_fare: Number(data.min_fare), price_per_km: Number(data.price_per_km), price_per_minute: Number(data.price_per_minute), dispatch_radius_km: Number(data.dispatch_radius_km), currency: data.currency });
+      setConfig({ base_fare: Number(data.base_fare), min_fare: Number(data.min_fare), price_per_km: Number(data.price_per_km), price_per_minute: Number(data.price_per_minute), dispatch_radius_km: Number(data.dispatch_radius_km), currency: data.currency, ...readNight(data) });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: unknown) {
@@ -173,6 +183,7 @@ function PricingEditor() {
             <p className="text-sm text-foreground-500 mb-6">Цената се запазва при поръчване. Смята се по метри и секунди, с едно крайно закръгляне до евроцент. Множителят за категорията важи и за минималната цена.</p>
 
             <fieldset disabled={saving} className="space-y-5">
+              <p className="text-sm font-semibold">Основни цени · ден 06:00–22:00</p>
               <div>
                 <label htmlFor="admin-pricing-base-fare" className="text-sm font-medium text-foreground-700 block mb-1.5">Начална такса ({config.currency})</label>
                 <input id="admin-pricing-base-fare"
@@ -220,6 +231,12 @@ function PricingEditor() {
                 <p className="text-xs text-foreground-400 mt-1.5">Разстоянието, в което се търсят свободни шофьори.</p>
               </div>
 
+              <div className="border-t border-background-200 pt-5 space-y-4">
+                <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={config.night_base_fare !== null}
+                  onChange={e => { const enabled = e.target.checked; setConfig(old => ({ ...old, ...(enabled ? { night_base_fare: old.base_fare, night_price_per_km: old.price_per_km, night_price_per_minute: old.price_per_minute, night_min_fare: old.min_fare } : emptyNight) })); setBlankFields(old => new Set([...old].filter(key => !String(key).startsWith('night_')))); }} />Отделни нощни цени · 22:00–06:00</label>
+                <p className="text-xs text-foreground-500">Часовете са по българско време. При изключена опция основните цени важат денонощно. „Минута от маршрута“ включва времето в движение; това не е отделна такса за престой.</p>
+                {config.night_base_fare !== null && <div className="grid sm:grid-cols-2 gap-4">{nightFields.map(([key, label]) => <label key={key} className="text-sm font-medium text-foreground-700">{label} — нощ ({config.currency})<input type="number" min="0" step="0.01" value={blankFields.has(key) ? '' : config[key] ?? ''} onChange={e => setNum(key, e.target.value)} className="block w-full mt-1 px-4 py-3 rounded-lg border border-background-200 text-foreground-950" /></label>)}</div>}
+              </div>
               <button
                 onClick={handleSave}
                 disabled={saving || !loaded || needsReload}

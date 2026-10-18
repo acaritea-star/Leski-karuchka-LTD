@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 
-export interface CompanyOption { id: string; name: string; is_active?: boolean; setup_completed_at?: string | null }
+export interface CompanyOption { id: string; name: string; is_active?: boolean; setup_completed_at?: string | null; parent_company_id?: string | null; service_city?: string | null }
 interface AdminCompanyCtx {
   companyId: string | null;
   companies: CompanyOption[];
@@ -37,8 +37,8 @@ export function AdminCompanyProvider({ children }: { children: ReactNode }) {
     enabled, staleTime: 60_000, retry: 1,
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(requestSignal => {
-        let request = supabase.from('companies').select('id, name, is_active, setup_completed_at');
-        if (!isSuperAdmin) request = request.eq('id', user!.company_id!);
+        let request = supabase.from('companies').select('id, name, is_active, setup_completed_at, parent_company_id, service_city');
+        if (!isSuperAdmin) request = request.or(`id.eq.${user!.company_id!},parent_company_id.eq.${user!.company_id!}`);
         return request.order('created_at', { ascending: false }).order('id').abortSignal(requestSignal);
       }, 10_000, signal);
       if (error) throw error;
@@ -47,23 +47,23 @@ export function AdminCompanyProvider({ children }: { children: ReactNode }) {
   });
   // A saved choice is only presentation state; validate it against this account's
   // query result. A company administrator can never switch to a foreign tenant.
-  const companies = enabled ? (query.data ?? []).filter(company => isSuperAdmin || company.id === user?.company_id) : [];
-  const preferredId = isSuperAdmin ? (selection?.scope === scope ? selection.id : readSelection(scope)) : user?.company_id;
+  const companies = useMemo(() => enabled ? (query.data ?? []).filter(company => isSuperAdmin || company.id === user?.company_id || company.parent_company_id === user?.company_id) : [], [enabled, query.data, isSuperAdmin, user?.company_id]);
+  const preferredId = (selection?.scope === scope ? selection.id : readSelection(scope)) ?? (isSuperAdmin ? null : user?.company_id);
   const selected = companies.find(company => company.id === preferredId);
   const company = selected || companies[0];
   const selectedId = company?.id;
   useEffect(() => {
-    if (!isSuperAdmin || !selectedId) return;
+    if (!enabled || !selectedId) return;
     // Pin even the initial choice: adding another company must not change it.
     setSelection(previous => previous?.scope === scope && previous.id === selectedId ? previous : { scope, id: selectedId });
     saveSelection(scope, selectedId);
-  }, [scope, isSuperAdmin, selectedId]);
-  const setCompanyId = (id: string) => {
-    if (isSuperAdmin && companies.some(company => company.id === id)) {
-      setSelection({ scope, id });
+  }, [scope, enabled, selectedId]);
+  const setCompanyId = useCallback((id: string) => {
+    if (enabled && companies.some(company => company.id === id)) {
+      setSelection(previous => previous?.scope === scope && previous.id === id ? previous : { scope, id });
       saveSelection(scope, id);
     }
-  };
+  }, [enabled, companies, scope]);
   return <AdminCompanyContext.Provider value={{
     companyId: company?.id ?? null, companies, companyName: company?.name ?? '', setCompanyId,
     loading: enabled && query.isPending,

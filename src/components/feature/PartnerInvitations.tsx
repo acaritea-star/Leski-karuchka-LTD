@@ -5,14 +5,18 @@ import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { workflowError } from '@/lib/driverDocuments';
 import { invitationUrl, type PartnerKind } from '@/lib/partnerAccess';
+import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 
 export default function PartnerInvitations({ kind, companyId }: { kind: PartnerKind; companyId?: string }) {
   const { user } = useAuth();
+  const { companies = [] } = useAdminCompany();
   const client = useQueryClient();
   const key = ['partner-invitations', user?.id, kind, companyId];
   const [email, setEmail] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const latch = useRef(false), intent = useRef<{ email: string; id: string } | null>(null);
-  const allowed = !!user && (kind === 'company' ? user.role === 'SUPER_ADMIN' : !!companyId && (user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN' && user.company_id === companyId));
+  const selected = companies.find(company => company.id === companyId);
+  const allowed = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN' && !!companyId &&
+    (kind === 'company' ? selected?.parent_company_id === user.company_id : user.company_id === companyId || companies.some(company => company.id === companyId)));
   const query = useQuery({ queryKey: key, enabled: allowed, staleTime: 15_000, retry: 1,
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(abort => {
@@ -37,7 +41,7 @@ export default function PartnerInvitations({ kind, companyId }: { kind: PartnerK
   }
   if (!allowed) return <p role="alert">За покана е необходим достъп до конкретната фирма.</p>;
   return <section className="space-y-4 text-sm">
-    <p>{kind === 'company' ? 'Добави само имейла на представителя. След входа той попълва фирмените данни и тарифите.' : 'Покани шофьора с точния имейл за Google или Facebook. След входа той преминава подготовката и изпраща един комплект за одобрение.'}</p>
+    <p>{kind === 'company' ? companyId ? 'Покани представителя с точния имейл за Google или Facebook. След приемане той получава фирмен достъп до избраната фирма или подразделение.' : 'Добави само имейла на представителя. След входа той попълва фирмените данни и тарифите.' : 'Покани шофьора с точния имейл за Google или Facebook. След входа той преминава подготовката и изпраща един комплект за одобрение.'}</p>
     <form className="flex flex-col sm:flex-row gap-2" onSubmit={e => { e.preventDefault(); void action(async () => {
       const normalized = email.trim().toLowerCase();
       if (!intent.current || intent.current.email !== normalized) intent.current = { email: normalized, id: crypto.randomUUID() };

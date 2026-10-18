@@ -22,6 +22,7 @@ const sidebarLinks = [
   { icon: 'ri-money-dollar-circle-line', label: 'Цени', path: '/admin/pricing', group: 'Финанси' },
   { icon: 'ri-user-line', label: 'nav_customers', path: '/admin/customers', group: 'Управление' },
   { icon: 'ri-settings-line', label: 'nav_settings', path: '/admin/settings', group: 'Управление' },
+  { icon: 'ri-building-4-line', label: 'Градове и подразделения', path: '/admin/divisions', ownerOnly: true, group: 'Управление' },
   { icon: 'ri-building-2-line', label: 'Фирми', path: '/admin/companies', superOnly: true, group: 'Платформа' },
   { icon: 'ri-newspaper-line', label: 'Новини', path: '/admin/news', superOnly: true, group: 'Платформа' },
 ];
@@ -37,7 +38,8 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
   const platformPage = location.pathname === '/admin/companies' || location.pathname.startsWith('/admin/news');
   const roleTitle = isSuperAdmin ? 'Супер администратор' : 'Фирмен панел';
   const menuButton = useRef<HTMLButtonElement>(null);
-  const links = sidebarLinks.filter(link => !link.superOnly || isSuperAdmin);
+  const ownCompany = companies.find(company => company.id === user?.company_id);
+  const links = sidebarLinks.filter(link => (!link.superOnly || isSuperAdmin) && (!link.ownerOnly || isSuperAdmin || ownCompany?.parent_company_id === null));
   useEffect(() => {
     if (!sidebarOpen) return;
     const trigger = menuButton.current;
@@ -149,10 +151,10 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
             </button>
             <div className="min-w-0"><h1 className="lg:hidden text-[10px] text-foreground-500 font-semibold">{roleTitle}</h1><h2 className="text-base font-semibold text-foreground-950 font-heading break-words">{title}</h2></div>
           </div>
-          <div className={`flex min-w-0 items-center gap-2 ${isSuperAdmin && !platformPage && companies.length ? 'w-full sm:w-auto sm:max-w-[60%]' : 'shrink-0'}`}>
-            {isSuperAdmin && !platformPage && companies.length > 0 && (
+          <div className={`flex min-w-0 items-center gap-2 ${!platformPage && companies.length > 1 ? 'w-full sm:w-auto sm:max-w-[60%]' : 'shrink-0'}`}>
+            {!platformPage && (isSuperAdmin || companies.length > 1) && companies.length > 0 && (
               <div className="relative min-w-0 flex-1">
-                <label htmlFor="admin-company" className="sr-only">Управлявана фирма</label>
+                <label htmlFor="admin-company" className="sr-only">Управлявана фирма или подразделение</label>
                 <select
                   id="admin-company"
                   value={companyId || ''}
@@ -164,7 +166,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
                   </option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}{c.is_active === false ? ' (неактивна)' : ''}
+                      {c.name}{c.setup_completed_at === null ? ' (подготовка)' : c.is_active === false ? ' (спряна)' : ''}
                     </option>
                   ))}
                 </select>

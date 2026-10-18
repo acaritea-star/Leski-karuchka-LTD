@@ -3,10 +3,11 @@ const fake=vi.hoisted(()=>({from:vi.fn(),rpc:vi.fn(),authorize:vi.fn(),rows:[] a
 vi.mock('../../supabase/functions/_shared/auth.ts',()=>({admin:{from:fake.from,rpc:fake.rpc},authorize:fake.authorize,
  validPoint:(p:{lat:number;lng:number})=>!!p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)}));
 let handler:(req:Request)=>Promise<Response>;
+const companyPricing=()=>({id:'company',currency:'EUR',base_fare:2,price_per_km:1.1,price_per_minute:.28,min_fare:0,tariff_period:'day',priced_at:'2026-10-18T09:00:00Z',types:[{id:'eco',multiplier:1},{id:'comfort',multiplier:1.1}]});
 beforeEach(async()=>{
  vi.stubGlobal('Deno',{env:{get:()=> 'synthetic-key'},serve:vi.fn()});fake.rows=[];
  fake.authorize.mockResolvedValue({id:'customer',role:'CUSTOMER'});
- fake.rpc.mockResolvedValue({data:{allowed:true},error:null});
+ fake.rpc.mockImplementation(async name=>({data:name==='company_route_pricing'?companyPricing():{allowed:true},error:null}));
  fake.from.mockImplementation((table:string)=>{
   const result=()=>({data:table==='companies'?{id:'company',is_active:true,currency:'EUR',base_fare:2,price_per_km:1.1,price_per_minute:.28,min_fare:0}:
    table==='ride_quotes'?fake.rows.map(r=>({id:r.id,expires_at:'2026-10-08T23:00:00Z'})):
@@ -28,7 +29,7 @@ it('uses one Google result for all categories with raw-unit fares and a server q
  expect(body.breakdown.pricingVersion).toBe('fixed-fare-v2');
 });
 it('does not call Google or save quotes when the reserved budget denies access',async()=>{
- fake.rpc.mockResolvedValue({data:{allowed:false,status:429,code:'daily_budget',retry_after_sec:600},error:null});
+ fake.rpc.mockImplementation(async name=>({data:name==='company_route_pricing'?companyPricing():{allowed:false,status:429,code:'daily_budget',retry_after_sec:600},error:null}));
  const response=await handler(request());expect(response.status).toBe(429);expect(fetch).not.toHaveBeenCalled();expect(fake.rows).toHaveLength(0);
 });
 it('does not generate zero-priced quotes for missing route measurements',async()=>{
@@ -52,4 +53,19 @@ it('preserves navigation instructions with a precise field mask and the API stat
  expect(mask).toContain('routes.legs.steps.staticDuration');
  expect(mask.split(',')).not.toContain('routes.legs');
  expect(body.legs[0].steps[0]).toEqual({ instruction: 'Завийте надясно', distance_meters: 1200, duration: '200s' });
+});
+
+it('uses the server night tariff and saves its timestamp in the immutable quote', async () => {
+ fake.rpc.mockImplementation(async name=>({data:name==='company_route_pricing'?{...companyPricing(),base_fare:3,price_per_km:2,price_per_minute:0,tariff_period:'night',priced_at:'2026-10-18T19:00:00Z'}:{allowed:true},error:null}));
+ const response=await handler(request());const body=await response.json();
+ expect(response.status).toBe(200);expect(body.price).toBe(128.94);
+ expect(body.breakdown).toMatchObject({baseFare:3,perKm:2,perMin:0,tariff_period:'night',priced_at:'2026-10-18T19:00:00Z'});
+ expect(fake.rpc).toHaveBeenCalledWith('company_route_pricing',{p_company:'company',p_lat:43.2,p_lng:25.6});
+ expect(fake.rows[0]).toMatchObject({company_id:'company',payload:{total:128.94,breakdown:{tariff_period:'night'}}});
+});
+
+it('does not buy a route for a company outside its configured pickup zone',async()=>{
+ fake.rpc.mockImplementation(async name=>({data:name==='company_route_pricing'?null:{allowed:true},error:null}));
+ expect((await handler(request())).status).toBe(400);expect(fetch).not.toHaveBeenCalled();expect(fake.rows).toHaveLength(0);
+ expect(fake.rpc).not.toHaveBeenCalledWith('reserve_route_request_v2',expect.anything());
 });

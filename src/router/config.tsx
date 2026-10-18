@@ -46,6 +46,7 @@ const DriverPreparation = lazy(() => import('@/pages/driver/preparation/page'));
 
 // Admin pages
 const AdminCompanies = lazy(() => import('@/pages/admin/companies/page'));
+const AdminDivisions = lazy(() => import('@/pages/admin/divisions/page'));
 const AdminDashboard = lazy(() => import('@/pages/admin/dashboard/page'));
 const AdminMap = lazy(() => import('@/pages/admin/map/page'));
 const AdminDrivers = lazy(() => import('@/pages/admin/drivers/page'));
@@ -114,6 +115,7 @@ const routes: RouteObject[] = [
 
   // ─── Admin ────────────────────────────────────────────────────────────────
   { path: '/admin/companies', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN']}><AdminCompanies /></AuthGuard> },
+  { path: '/admin/divisions', element: <AuthGuard redirectTo="/company/login" companyScoped={false} allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDivisions /></AuthGuard> },
   { path: '/admin/dashboard', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDashboard /></AuthGuard> },
   { path: '/admin/map', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminMap /></AuthGuard> },
   { path: '/admin/drivers', element: <AuthGuard redirectTo="/company/login" allowedRoles={['SUPER_ADMIN', 'COMPANY_ADMIN']}><AdminDrivers /></AuthGuard> },
