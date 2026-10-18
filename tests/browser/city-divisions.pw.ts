@@ -60,13 +60,15 @@ async function fixture(page: Page, local = false, ready = true) {
   return { ui, state };
 }
 
-test('parent sees city management from its draft headquarters and uncertain creation never duplicates a division', async ({ page }) => {
+test('parent sees city management from its draft headquarters and uncertain creation never duplicates a division', async ({ page }, testInfo) => {
   const { ui, state } = await fixture(page); state.loseCreate = true;
   await page.goto('/company/setup?company=' + uiCompany); await page.getByRole('link', { name: 'Отвори подразделенията' }).click();
   await expect(page.getByRole('heading', { name: 'Лески Каручка', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('city-divisions-mobile.png'), fullPage: true });
   await page.getByRole('button', { name: 'Добави подразделение', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Добави градско подразделение' });
   await dialog.getByLabel('Град', { exact: true }).fill('Плевен'); await dialog.getByRole('button', { name: 'Плевен', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('city-division-editor-mobile.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Създай подразделение', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Провери списъка' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Провери списъка' }).click();

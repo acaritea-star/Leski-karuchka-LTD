@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AuthGuard from './AuthGuard';
 const state = vi.hoisted(() => ({ user: { id: 'a', role: 'SUPER_ADMIN' }, companyId: 'one', profileError: null as string | null }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ ...state, loading: false, session: null, refreshProfile: vi.fn() }) }));
-vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: state.companyId }) }));
+vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: state.companyId, companies: [] }) }));
 vi.mock('./LegalAcceptanceNotice', () => ({ default: () => null }));
 function Draft() { const [value, setValue] = useState(''); return <input aria-label="draft" value={value} onChange={event => setValue(event.target.value)} />; }
 const tree = () => <MemoryRouter><AuthGuard><Draft /></AuthGuard></MemoryRouter>;
