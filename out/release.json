@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.19-city-divisions.2",
-  "baseCommit": "61d0fdd463e6037ad6a0f5fcbc7338a8d64b4db6",
-  "databaseMigration": "city_company_divisions",
+  "release": "2026.10.19-customer-push.1",
+  "baseCommit": "c3dadecf899ceb2b37f173bef9698e647b9c50eb",
+  "databaseMigration": "customer_push_recipient_binding",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261019084226",
+  "databaseMigrationVersion": "20261019174904",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "5b45bfd2ba253b3f94f78617da86fd1837c6ef58",
+  "verifiedSourceCommit": "6c4e228d5d6370453f7040a34aa7421f4178ca61",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -30,7 +30,8 @@
     "20261016074354_staff_mfa_public_request_hook",
     "20261016192953_ride_payment_checkout_receipts",
     "20261017055440_controlled_driver_applications_and_card_evidence",
-    "20261019084226_city_company_divisions"
+    "20261019084226_city_company_divisions",
+    "20261019174904_customer_push_recipient_binding"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -153,5 +154,13 @@
   ],
   "cityDivisionTariffsPending": [
     "Левски"
-  ]
+  ],
+  "customerPushVersion": 1,
+  "customerPushMigrationVersion": "20261019174904",
+  "customerPushMigrationApplied": true,
+  "customerPushMigrationSha256": "f1bb7964b60b41b1f5723f2be891f64402aa07192fd81a1058deba5585ca62f8",
+  "customerPushVerifiedSourceCommit": "6c4e228d5d6370453f7040a34aa7421f4178ca61",
+  "pwaDeviceIsolationVersion": 1,
+  "pwaIconsVersion": 1,
+  "customerPushDeploymentStatus": "database-ready-frontend-packaged"
 }

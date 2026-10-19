@@ -8,6 +8,10 @@ content. The delivery worker resolves active subscriptions by the queued recipie
 Production audit found zero notification/outbox recipient mismatches, zero customer
 ride-owner mismatches and zero endpoints with multiple active account owners. These
 checks describe stored data at audit time; they are not proof of end-device delivery.
+The preceding seven days also contained eight skipped customer jobs with
+`NO_SUBSCRIPTION`: those recipients had no active registered delivery endpoint.
+One customer Apple endpoint was registered as active at audit time; an active
+database row does not prove that endpoint still reaches a physical device.
 
 ## Changes
 
@@ -59,3 +63,19 @@ shared endpoint ownership, malformed queued recipients, worker restarts, stale p
 old notice clicks, external logout, opt-out and silent subscription repair. Native
 Supabase CI is authoritative for RLS/Broadcast. Browser fixtures do not send real push.
 A physical iPhone and Android delivery check remains necessary after frontend publish.
+
+## Release verification
+
+Native Supabase regression passed for the unchanged migration SQL, including the
+two-customer isolation suite and existing concurrent booking/payment and MFA tests.
+Production migration version is `20261019174904`; only its filename was aligned with
+the MCP-assigned version. Local unit coverage passed (668 tests before the final
+external-logout case; all 51 focused tests including that case passed). Source
+`6c4e228d5d6370453f7040a34aa7421f4178ca61` is the reference for final GitHub Check/browser results.
+Frontend publication is separate from database application and the GitHub package.
+
+After publishing the frontend, open existing installed PWAs once to initialize the
+new account boundary and renew their device registration. Saved browser permission
+is retained. Until that first open, the updated worker intentionally suppresses
+notifications whose active account is unknown. Then test a real accepted/arrived
+ride with the PWA closed on iPhone and Android, and repeat after switching accounts.
