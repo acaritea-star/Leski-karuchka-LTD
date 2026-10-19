@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), invoke: vi.fn(), from: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), invoke: vi.fn(), from: vi.fn(), identity: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
   auth: { getSession: mocks.session }, rpc: mocks.rpc, functions: { invoke: mocks.invoke }, from: mocks.from,
 } }));
+vi.mock('./pushIdentity', () => ({ writePushIdentity: mocks.identity }));
 let push: typeof import('./pushSubscription');
 let subscription: { endpoint: string; unsubscribe: ReturnType<typeof vi.fn>; toJSON: () => object };
 let manager: { getSubscription: ReturnType<typeof vi.fn>; subscribe: ReturnType<typeof vi.fn> };
@@ -136,6 +137,35 @@ describe('push account and device isolation', () => {
     Object.assign(Notification, { permission: 'denied' });
     expect(await push.enablePush('alice')).toBe(false);
     expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+  it('repairs a lost browser subscription instead of trusting a cached owner', async () => {
+    await push.registerPush('alice');
+    manager.getSubscription.mockResolvedValueOnce(null);
+    await push.registerPush('alice');
+    expect(manager.subscribe).toHaveBeenCalledTimes(2);
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+  });
+  it('inspects a healthy browser endpoint on resume without repeating the server write', async () => {
+    storage.set('leski_push_owner', 'alice');
+    await push.registerPush('alice'); await push.registerPush('alice');
+    expect(manager.getSubscription).toHaveBeenCalledTimes(2); expect(mocks.rpc).toHaveBeenCalledOnce();
+  });
+  it('updates the worker boundary on external logout and a new login', async () => {
+    await push.changePushSession('alice'); await push.changePushSession(null); await push.changePushSession('bob');
+    expect(mocks.identity.mock.calls).toEqual([['alice'], [null], ['bob']]);
+    expect(push.getPushOwner()).toBeNull();
+  });
+  it('keeps device delivery disabled when logout cleanup fails', async () => {
+    await push.registerPush('alice');
+    subscription.unsubscribe.mockRejectedValueOnce(new Error('Browser unavailable'));
+    mocks.from.mockReturnValueOnce({ delete: () => ({ eq: () => ({ eq: () => ({ abortSignal: async () => ({ error: new Error('Offline') }) }) }) }) });
+    await expect(push.detachPush('alice')).rejects.toThrow('Offline');
+    expect(push.getPushOwner()).toBeNull(); expect(mocks.identity).toHaveBeenLastCalledWith(null, 'alice');
+  });
+  it('removes a stale owner marker even when the browser subscription has already gone', async () => {
+    storage.set('leski_push_owner', 'alice'); manager.getSubscription.mockResolvedValueOnce(null);
+    await push.detachPush('alice'); expect(storage.has('leski_push_owner')).toBe(false);
   });
   it('invalidates a registration in flight without saving a logout as an opt-out', async () => {
     let finish!: (value: object) => void;

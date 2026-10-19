@@ -53,7 +53,7 @@ export default function EnableNotificationsBanner() {
         <i className="ri-notification-3-line text-accent-600 text-base" />
       </span>
       <p className="flex-1 min-w-0 text-[14px] font-medium text-foreground-800 leading-snug break-words">
-        {error ? t('enable_notifications_error') : needsSettings ? t('notifications_browser_blocked') : t('enable_notifications_desc')}
+        {error ? t('enable_notifications_error') : permission === 'denied' ? t('notifications_browser_blocked') : !pushSupported() ? t('notifications_browser_unsupported') : t('enable_notifications_desc')}
       </p>
       {(
         <button

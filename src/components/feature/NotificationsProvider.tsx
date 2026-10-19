@@ -63,6 +63,7 @@ function InboxSession({ children, userId, audience, scope }: { children: ReactNo
     const restorePush = () => { if (document.visibilityState !== 'hidden') void registerPush(userId).catch(() => {}); };
     restorePush();
     window.addEventListener('online', restorePush); window.addEventListener('pageshow', restorePush);
+    document.addEventListener('visibilitychange', restorePush);
     poll.current = createRealtimePoll(async signal => {
       const revision = generation.current;
       try { return { revision, state: await readInboxState(signal) }; }
@@ -97,6 +98,7 @@ function InboxSession({ children, userId, audience, scope }: { children: ReactNo
       alive.current = false; poll.current?.stop(); poll.current = null;
       document.removeEventListener('pointerdown', unlock);
       window.removeEventListener('online', restorePush); window.removeEventListener('pageshow', restorePush);
+      document.removeEventListener('visibilitychange', restorePush);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [userId, audience, load, refresh, playCustomerSound, unlockAudio]);

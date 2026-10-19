@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Session } from '@supabase/supabase-js';
 import { AuthProvider, useAuthContext } from './AuthContext';
 import { stopDriverGps } from '@/lib/driverLocation';
-import { detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
+import { changePushSession, detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
 
 const api = vi.hoisted(() => ({ getSession: vi.fn(), signOut: vi.fn(), profile: vi.fn(), changed: null as null | ((event: string, session: Session | null) => void), clear: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ supabase: {
@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: {
 } }));
 vi.mock('@/lib/queryClient', () => ({ queryClient: { clear: api.clear } }));
 vi.mock('@/lib/driverLocation', () => ({ stopDriverGps: vi.fn() }));
-vi.mock('@/lib/pushSubscription', () => ({ detachPush: vi.fn(), startPushSession: vi.fn(), registerPush: vi.fn().mockResolvedValue(true) }));
+vi.mock('@/lib/pushSubscription', () => ({ changePushSession: vi.fn().mockResolvedValue(undefined), detachPush: vi.fn(), startPushSession: vi.fn(), registerPush: vi.fn().mockResolvedValue(true) }));
 vi.mock('@/lib/socialAuth', () => ({ startSocialSignIn: vi.fn() }));
 const session = { user: { id: 'a', email: 'a@example.test' }, access_token: 'test' } as Session;
 const profile = { id: 'a', is_active: true, role: 'CUSTOMER', company_id: null, first_name: 'А', avatar_url: null };
@@ -60,6 +60,7 @@ it('ignores a delayed profile response after sign-out', async () => {
   act(() => api.changed?.('SIGNED_IN', session));
   await waitFor(() => expect(api.profile).toHaveBeenCalledTimes(2));
   act(() => api.changed?.('SIGNED_OUT', null));
+  expect(changePushSession).toHaveBeenLastCalledWith(null);
   await act(async () => resolve({ data: profile, error: null }));
   expect(screen.getByText('signed-out')).toBeTruthy();
 });
@@ -144,6 +145,7 @@ it('never carries the previous account into an unavailable new account', async (
   api.getSession.mockResolvedValue({ data: { session: next } });
   api.profile.mockResolvedValue({ data: null, error: { message: 'offline' }, status: 0 });
   act(() => api.changed?.('SIGNED_IN', next));
+  expect(changePushSession).toHaveBeenLastCalledWith('b');
   expect(screen.queryByText('ready:a')).toBeNull();
   await act(async () => { await vi.advanceTimersByTimeAsync(1700); });
   expect(screen.getByText('signed-out')).toBeTruthy();

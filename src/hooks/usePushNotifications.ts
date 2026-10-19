@@ -29,7 +29,8 @@ export function usePushNotifications() {
   useEffect(() => {
     const read = () => { if ('Notification' in window) setPermission(Notification.permission); };
     read(); window.addEventListener('focus', read);
-    return () => window.removeEventListener('focus', read);
+    document.addEventListener('visibilitychange', read);
+    return () => { window.removeEventListener('focus', read); document.removeEventListener('visibilitychange', read); };
   }, [user?.id]);
   return { register, unregister, enable, permission, enabling, enabled: !!user && permission === 'granted' && owner === user.id };
 }

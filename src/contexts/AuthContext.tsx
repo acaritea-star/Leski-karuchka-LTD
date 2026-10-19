@@ -3,7 +3,7 @@ import { withRequestTimeout } from '@/lib/requestTimeout';
 import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
 import { stopDriverGps } from '@/lib/driverLocation';
-import { detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
+import { changePushSession, detachPush, registerPush, startPushSession } from '@/lib/pushSubscription';
 import { clearRecentLocations } from '@/lib/cookieConsent';
 import { startSocialSignIn, type SocialProvider } from '@/lib/socialAuth';
 import {
@@ -195,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!alive) return;
       const current = ++revision;
       const identityChanged = lastUserId !== next?.user.id;
+      if (identityChanged || !next) void changePushSession(next?.user.id ?? null).catch(() => {});
       if (identityChanged) {
         queryClient.clear(); stopDriverGps(); stopSharedGps(); setUser(null); setProfileError(null);
         currentUser.current = null;
@@ -223,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // boundary even when the OAuth account itself stays the same.
             if (previous && (!verified || previous.role !== verified.role || previous.company_id !== verified.company_id)) {
               queryClient.clear(); stopDriverGps(); stopSharedGps();
+              if (!verified) void changePushSession(null).catch(() => {});
             }
             if (result.user && previous?.id !== result.user.id) startPushSession(result.user.id);
             currentUser.current = result.user;

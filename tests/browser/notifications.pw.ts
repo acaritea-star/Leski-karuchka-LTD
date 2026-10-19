@@ -87,6 +87,7 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
   const toggle = page.getByRole('switch', { name: 'Известия', exact: true }); await expect(toggle).not.toBeChecked();
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBeNull();
   await toggle.click(); await expect(toggle).toBeChecked();
+  expect(await page.evaluate(async () => (await (await caches.open('leski-push-identity-v1')).match('/__leski_push_identity__'))?.json())).toEqual({ userId: uiAccount });
   for (let i = 0; i < 10; i++) { await page.reload(); await expect(toggle).toBeChecked(); }
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBe('1');
   await page.goto('/customer/home');
@@ -99,6 +100,7 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
   await landingRead;
   expect(await page.evaluate(() => localStorage.getItem('sb-127-auth-token'))).toBeNull();
   expect(await page.evaluate(id => localStorage.getItem('leski_push_enabled:' + id), uiAccount)).toBe('true');
+  expect(await page.evaluate(async () => !!(await (await caches.open('leski-push-identity-v1')).match('/__leski_push_identity__')))).toBe(false);
   // The fixture restores a fresh authenticated session on the next navigation.
   await page.goto('/customer/settings'); await expect(toggle).toBeChecked();
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBe('1');
@@ -113,4 +115,41 @@ test('an account cannot open another account notification or follow its supplied
   await page.goto('/notifications/open?id=' + noticeId(404));
   await expect(page.getByRole('alert')).toContainText('Известието не е достъпно');
   expect(page.url()).toContain('/notifications/open'); expect(state.errors).toEqual([]);
+});
+
+
+test('the installed worker reads persistent account ownership before showing a push', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright exposes background service workers in Chromium.');
+  const state = await setupUi(page, 'visitor');
+  await page.goto('/data-deletion.html');
+  const workerPromise = context.waitForEvent('serviceworker');
+  await page.evaluate(async id => {
+    const cache = await caches.open('leski-push-identity-v1');
+    await cache.put('/__leski_push_identity__', new Response(JSON.stringify({ userId: id })));
+    await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+  }, uiAccount);
+  const worker = await workerPromise;
+  await worker.evaluate("globalThis.testNotices=[]; self.registration.showNotification=async (title,options)=>{globalThis.testNotices.push({title,options});};");
+  const deliver = async (recipient: string) => {
+    // Synthetic event, real worker code and Cache Storage; no push provider or OS popup.
+    await worker.evaluate("new Promise((resolve,reject)=>{const event=new PushEvent('push',{data:" +
+      JSON.stringify(JSON.stringify({ title: 'Синтетично известие', data: { recipient_id: recipient, type: 'trip_status' } })) +
+      "});event.waitUntil=promise=>promise.then(resolve,reject);self.dispatchEvent(event);})");
+  };
+  await deliver(uiAccount);
+  expect(await worker.evaluate('globalThis.testNotices.length')).toBe(1);
+  const other = '77777777-7777-4777-8777-777777777777';
+  await page.evaluate(async id => {
+    const cache = await caches.open('leski-push-identity-v1');
+    await cache.put('/__leski_push_identity__', new Response(JSON.stringify({ userId: id })));
+  }, other);
+  await deliver(uiAccount);
+  expect(await worker.evaluate('globalThis.testNotices.length')).toBe(1);
+  await deliver(other);
+  expect(await worker.evaluate('globalThis.testNotices.length')).toBe(2);
+  await page.evaluate(async () => { await (await caches.open('leski-push-identity-v1')).delete('/__leski_push_identity__'); });
+  await deliver(other);
+  expect(await worker.evaluate('globalThis.testNotices.length')).toBe(2);
+  expect(state.errors).toEqual([]);
 });
