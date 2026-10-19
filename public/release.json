@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.17-controlled-company.1",
-  "baseCommit": "0be9db1d1cfb15f17b4180e40af29f9c9e244f7d",
-  "databaseMigration": "controlled_driver_applications_and_card_evidence",
+  "release": "2026.10.19-city-divisions.1",
+  "baseCommit": "669b310acbbed315725e2ea711d8a578bef279fa",
+  "databaseMigration": "city_company_divisions",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261017055440",
-  "googleRoutesVersion": 15,
-  "verifiedSourceCommit": "c98c4c06c34552a9499b2a2715c517aca32057ea",
+  "databaseMigrationVersion": "20261019084226",
+  "googleRoutesVersion": 16,
+  "verifiedSourceCommit": "669b310acbbed315725e2ea711d8a578bef279fa",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -29,7 +29,8 @@
     "20261016073419_customer_safety_staff_mfa",
     "20261016074354_staff_mfa_public_request_hook",
     "20261016192953_ride_payment_checkout_receipts",
-    "20261017055440_controlled_driver_applications_and_card_evidence"
+    "20261017055440_controlled_driver_applications_and_card_evidence",
+    "20261019084226_city_company_divisions"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -104,7 +105,7 @@
   "staffMfaVerifiedSourceCommit": "4e80ad93dc0689ab5a79ca3407f7ca2a9e80c8b5",
   "staffMfaEdgeVersions": {
     "google-geocode": 9,
-    "google-routes": 15,
+    "google-routes": 16,
     "generate-vapid-keys": 12,
     "send-push-notification": 11,
     "expire-stale-requests": 9,
@@ -133,5 +134,15 @@
   "companyCandidacyMigrationSha256": "6c63b87cc50519e76dce7dd40c27581cba6e3dfc4cfb35a6fa6d04383537faac",
   "companyRulesAuditVersion": 1,
   "cardEvidenceRulesVersion": 1,
-  "storedTariffValidationVersion": 1
+  "storedTariffValidationVersion": 1,
+  "cityDivisionsVersion": 1,
+  "cityDivisionsMigrationVersion": "20261019084226",
+  "cityDivisionsMigrationApplied": true,
+  "cityDivisionsMigrationSha256": "f602d3de20bc03b702880f7c4faba78f16cfe54ea541004ab479663a082bda16",
+  "cityDivisionsVerifiedSourceCommit": "669b310acbbed315725e2ea711d8a578bef279fa",
+  "companyGroupReportVersion": 1,
+  "cityLaunchTariffPlan": "2026-10-18-leski-launch.1",
+  "cityLaunchTariffsConfigured": true,
+  "cityLaunchTariffsStatus": "drafts",
+  "cityDivisionsDeploymentStatus": "database-and-edge-ready"
 }
