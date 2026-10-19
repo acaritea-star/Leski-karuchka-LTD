@@ -210,4 +210,102 @@ BEGIN
  RESET ROLE;
  RAISE NOTICE 'PASS city divisions: hierarchy, parent/local access, zones, DST prices, cross-city checkout, documents, reports, notifications, manager invitations and MFA';
 END $test$;
+
+-- Three real city centres, synthetic users and money only in this disposable DB.
+DO $three_cities$
+DECLARE
+ parent uuid:=gen_random_uuid(); foreign_company uuid:=gen_random_uuid(); owner_id uuid:=gen_random_uuid(); customer uuid:=gen_random_uuid();
+ cities text[]:=ARRAY['Велико Търново','Горна Оряховица','Левски'];
+ latitudes double precision[]:=ARRAY[43.0757,43.1278,43.3592]; longitudes double precision[]:=ARRAY[25.6172,25.7017,25.1358];
+ amounts numeric[]:=ARRAY[10.11,20.22,30.33]; company_ids uuid[]:=ARRAY[gen_random_uuid(),gen_random_uuid(),gen_random_uuid()];
+ managers uuid[]:=ARRAY[gen_random_uuid(),gen_random_uuid(),gen_random_uuid()]; users uuid[]:=ARRAY[gen_random_uuid(),gen_random_uuid(),gen_random_uuid()];
+ driver_ids uuid[]:='{}'; type_ids uuid[]:='{}'; ride_ids uuid[]:='{}'; driver uuid; vehicle uuid; vehicle_type uuid; quote uuid; ride uuid; operation uuid;
+ i integer; j integer; next_city integer; report jsonb; ordinary jsonb; tariff jsonb; notice uuid; notice_key text;
+ from_day date:=date_trunc('month',now() AT TIME ZONE 'Europe/Sofia')::date;
+ until_day date:=(date_trunc('month',now() AT TIME ZONE 'Europe/Sofia')+interval '1 month')::date;
+BEGIN
+ UPDATE private.app_security SET staff_mfa_enforced=false WHERE singleton;
+ INSERT INTO public.companies(id,name,slug) VALUES(parent,'Synthetic three-city group','three-city-'||parent),(foreign_company,'Foreign','three-city-foreign-'||foreign_company);
+ INSERT INTO auth.users(id,email,email_confirmed_at) SELECT uid,uid||'@example.invalid',now()
+ FROM unnest(ARRAY[owner_id,customer]||managers||users) ids(uid);
+ UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=parent WHERE id=owner_id;
+ FOR i IN 1..3 LOOP
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',owner_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  PERFORM public.create_company_division(company_ids[i],parent,jsonb_build_object('name','Synthetic — '||cities[i],'service_city',cities[i],
+   'service_latitude',latitudes[i],'service_longitude',longitudes[i],'service_radius_km',5));
+  RESET ROLE;
+  IF private.division_covers_pickup(company_ids[i],latitudes[i],longitudes[i]) THEN RAISE EXCEPTION 'FAIL three-city draft offers a pickup'; END IF;
+  UPDATE public.companies SET setup_completed_at=now(),is_active=true,document_checks_required=false,dispatch_radius_km=30,
+   base_fare=1,price_per_km=.50,price_per_minute=0,min_fare=0,night_base_fare=1.2,night_price_per_km=.60,night_price_per_minute=0,night_min_fare=0
+   WHERE id=company_ids[i];
+  UPDATE public.profiles SET role='COMPANY_ADMIN',company_id=company_ids[i] WHERE id=managers[i];
+  UPDATE public.profiles SET role='DRIVER',company_id=company_ids[i] WHERE id=users[i];
+  SELECT id INTO STRICT driver FROM public.drivers WHERE user_id=users[i]; driver_ids:=array_append(driver_ids,driver);
+  SELECT id INTO STRICT vehicle_type FROM public.vehicle_types WHERE company_id=company_ids[i] AND service_class='standard'; type_ids:=array_append(type_ids,vehicle_type);
+  vehicle:=gen_random_uuid();
+  INSERT INTO public.vehicles(id,company_id,vehicle_type_id,make,model,registration_number)
+  VALUES(vehicle,company_ids[i],vehicle_type,'Synthetic','Three-city','THREE-'||vehicle);
+  UPDATE public.drivers SET vehicle_id=vehicle,is_verified=true,document_verification_required=false WHERE id=driver;
+  INSERT INTO public.driver_locations(driver_id,company_id,latitude,longitude,accuracy,position_at) VALUES(driver,company_ids[i],latitudes[i],longitudes[i],10,clock_timestamp());
+  UPDATE public.drivers SET is_online=true WHERE id=driver;
+ END LOOP;
+ FOR i IN 1..3 LOOP
+  IF (SELECT count(*) FROM private.marketplace_drivers(latitudes[i],longitudes[i]) WHERE company_id=ANY(company_ids))<>1
+   OR NOT EXISTS(SELECT 1 FROM private.eligible_drivers(company_ids[i],type_ids[i],latitudes[i],longitudes[i]) WHERE driver_id=driver_ids[i]) THEN
+   RAISE EXCEPTION 'FAIL three-city offer scope %',cities[i]; END IF;
+  SELECT private.company_tariff(c,'2026-10-19T20:00:00Z') INTO tariff FROM public.companies c WHERE c.id=company_ids[i];
+  IF tariff->>'tariff_period'<>'night' OR (tariff->>'price_per_km')::numeric<>.60 THEN RAISE EXCEPTION 'FAIL three-city night tariff %',cities[i]; END IF;
+  next_city:=i%3+1; quote:=gen_random_uuid(); ride:=gen_random_uuid(); operation:=gen_random_uuid(); ride_ids:=array_append(ride_ids,ride);
+  INSERT INTO public.ride_quotes(id,customer_id,company_id,vehicle_type_id,payload)
+  VALUES(quote,customer,company_ids[i],type_ids[i],jsonb_build_object('pickup_latitude',latitudes[i],'pickup_longitude',longitudes[i],
+   'destination_latitude',latitudes[next_city],'destination_longitude',longitudes[next_city],'pickup_address',cities[i],'destination_address',cities[next_city],
+   'distance_km',12,'duration_min',20,'total',amounts[i],'breakdown',jsonb_build_object('total',amounts[i],'tariff_period','day',
+    'carrier_choice',jsonb_build_object('service_class','standard','company_name','Synthetic — '||cities[i],'type_name','Standard','capacity',4))));
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  PERFORM public.create_taxi_request(quote,ride,'cash'); RESET ROLE;
+  IF (SELECT count(*) FROM public.request_push_recipients(ride))<>1 THEN RAISE EXCEPTION 'FAIL three-city request fan-out %',cities[i]; END IF;
+  FOR j IN 1..3 LOOP
+   IF j=i THEN CONTINUE; END IF;
+   PERFORM set_config('request.jwt.claims',json_build_object('sub',users[j],'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+   IF EXISTS(SELECT 1 FROM public.driver_incoming_requests() r WHERE r.id=ride) THEN RAISE EXCEPTION 'FAIL cross-city request visible'; END IF;
+   PERFORM pg_temp.division_denied(format('SELECT public.accept_taxi_request(%L)',ride)); RESET ROLE;
+  END LOOP;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',users[i],'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  PERFORM public.accept_taxi_request(ride); RESET ROLE;
+  IF EXISTS(SELECT 1 FROM private.eligible_drivers(company_ids[i],type_ids[i],latitudes[i],longitudes[i])) THEN RAISE EXCEPTION 'FAIL busy city driver receives another offer'; END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',users[i],'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  UPDATE public.taxi_requests SET status='arrived',arrived_at=clock_timestamp() WHERE id=ride;
+  UPDATE public.taxi_requests SET status='in_progress',started_at=clock_timestamp() WHERE id=ride;
+  PERFORM public.complete_ride_payment(operation,ride,users[i],CASE WHEN i=1 THEN 'cash' ELSE 'card' END,NULL,'');
+  PERFORM public.complete_ride_payment(operation,ride,users[i],CASE WHEN i=1 THEN 'cash' ELSE 'card' END,NULL,''); RESET ROLE;
+  IF NOT EXISTS(SELECT 1 FROM public.ride_payment_receipts r WHERE r.request_id=ride AND r.company_id=company_ids[i] AND r.received_amount=amounts[i])
+   OR (SELECT count(*) FROM public.driver_money_entries e WHERE e.request_id=ride AND e.company_id=company_ids[i] AND e.kind='income')<>1 THEN
+   RAISE EXCEPTION 'FAIL three-city exact payment or duplicate income %',cities[i]; END IF;
+ END LOOP;
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',owner_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+ report:=public.company_group_report(parent,from_day,until_day);
+ IF jsonb_array_length(report->'companies')<>4 OR (report->'total'->>'completed')::integer<>3
+  OR (report->'total'->>'income')::numeric<>60.66 OR (report->'total'->>'cash_income')::numeric<>10.11
+  OR (report->'total'->>'card_income')::numeric<>50.55 OR public.is_company_admin(foreign_company) THEN RAISE EXCEPTION 'FAIL three-city group accounting'; END IF;
+ FOR i IN 1..3 LOOP
+  ordinary:=public.accounting_report(from_day,until_day,company_ids[i],NULL,0);
+  IF (ordinary->'finances'->>'income')::numeric<>amounts[i] THEN RAISE EXCEPTION 'FAIL three-city local accounting'; END IF;
+ END LOOP;
+ RESET ROLE;
+ FOR i IN 1..3 LOOP
+  notice_key:='three-city-'||company_ids[i];
+  PERFORM private.notify_company(company_ids[i],'application_submitted',notice_key,'Synthetic','Synthetic notice','{}',NULL);
+  SELECT id INTO STRICT notice FROM public.notifications WHERE user_id=owner_id AND company_id=company_ids[i] AND event_key=notice_key;
+  IF NOT EXISTS(SELECT 1 FROM public.notifications WHERE user_id=managers[i] AND company_id=company_ids[i] AND event_key=notice_key)
+   OR EXISTS(SELECT 1 FROM public.notifications WHERE user_id=ANY(array_remove(managers,managers[i])) AND event_key=notice_key) THEN RAISE EXCEPTION 'FAIL three-city notification audience'; END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',owner_id,'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  IF strpos(public.open_notification(notice),'company='||company_ids[i]::text)=0 THEN RAISE EXCEPTION 'FAIL three-city notification context'; END IF; RESET ROLE;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',managers[i],'role','authenticated')::text,true); SET LOCAL ROLE authenticated;
+  IF public.is_company_admin(parent) OR EXISTS(SELECT 1 FROM public.drivers d WHERE d.company_id=ANY(company_ids) AND d.company_id<>company_ids[i])
+   OR EXISTS(SELECT 1 FROM public.driver_money_entries e WHERE e.company_id=ANY(company_ids) AND e.company_id<>company_ids[i])
+   OR (SELECT count(*) FROM public.taxi_requests r WHERE r.company_id=ANY(company_ids))<>1 THEN RAISE EXCEPTION 'FAIL three-city local manager isolation'; END IF;
+  PERFORM pg_temp.division_denied(format('SELECT public.company_group_report(%L,%L,%L)',parent,from_day,until_day)); RESET ROLE;
+ END LOOP;
+ RAISE NOTICE 'PASS three cities: owner/local isolation, pickup-only dispatch, busy driver exclusion, cross-city exact payments, separate totals and notification context';
+END $three_cities$;
 ROLLBACK;

@@ -62,7 +62,10 @@ export default function CompanySetup() {
       }}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{fields.map(([name, label, type]) => {
           const stored = query.data?.[name];
-          const fallback = name === 'dispatch_radius_km' ? String(stored ?? 5) : type === 'number' ? '' : name === 'name' && stored === 'Нова фирма' ? '' : String(stored ?? '');
+          const hasStoredTariff = typeof query.data?.price_per_km === 'number' && Number.isFinite(query.data.price_per_km) && query.data.price_per_km > 0;
+          const fallback = name === 'dispatch_radius_km' ? String(stored ?? 5) : type === 'number'
+            ? hasStoredTariff && typeof stored === 'number' && Number.isFinite(stored) && stored >= 0 ? String(stored) : ''
+            : name === 'name' && stored === 'Нова фирма' ? '' : String(stored ?? '');
           return <label key={name} className="block text-sm">{label}<input required name={name} type={type} value={values[name] ?? fallback} disabled={busy} onChange={e => change(name, e.target.value)}
             min={type === 'number' ? name === 'price_per_km' ? 0.01 : name === 'dispatch_radius_km' ? 0.5 : 0 : undefined} max={name === 'dispatch_radius_km' ? 30 : undefined} step={type === 'number' ? '0.01' : undefined} pattern={name === 'registration_id' ? '([0-9]{9}|[0-9]{13})' : undefined}
             maxLength={name === 'registration_id' ? 13 : 300} className="block w-full mt-1 rounded-xl border border-background-200 p-3" /></label>;

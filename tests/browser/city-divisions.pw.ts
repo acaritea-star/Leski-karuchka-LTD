@@ -94,6 +94,43 @@ test('a parent completes a child setup while headquarters stays a draft and open
   expect(state.setupWrites).toBe(1); expect(state.rows[0].setup_completed_at).toBeNull(); expect(state.rows[1].is_active).toBe(true); expect(ui.errors).toEqual([]);
 });
 
+test('prepared city tariffs stay visible and populate setup, while an unpriced Levski draft stays empty', async ({ page }) => {
+  const { ui, state } = await fixture(page, false, false);
+  Object.assign(state.rows[1], { base_fare: 1.4, price_per_km: .69, min_fare: 0, price_per_minute: 0, night_base_fare: 1.5, night_price_per_km: .79 });
+  Object.assign(state.rows[2], { is_active: false, setup_completed_at: null, base_fare: 0, price_per_km: 0 });
+  await page.goto('/admin/divisions');
+  const tarnovo = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Лески Каручка — Търново', exact: true }) });
+  await expect(tarnovo.getByText('0.69 €', { exact: true })).toBeVisible();
+  await expect(tarnovo.getByText('0.79 €', { exact: true })).toBeVisible();
+  await tarnovo.getByRole('button', { name: 'Довърши настройката' }).click();
+  const form = page.getByRole('form', { name: 'Първоначална фирмена настройка' });
+  await expect(form.getByLabel('Начална такса (EUR)', { exact: true })).toHaveValue('1.4');
+  await expect(form.getByLabel('Цена на км (EUR)', { exact: true })).toHaveValue('0.69');
+  await expect(form.getByLabel('Минимална цена (EUR)', { exact: true })).toHaveValue('0');
+  await expect(form.getByLabel('Цена на минута от маршрута (EUR)', { exact: true })).toHaveValue('0');
+  await form.getByLabel('Начална такса (EUR)', { exact: true }).fill('1.45');
+  await page.reload(); await expect(form.getByLabel('Начална такса (EUR)', { exact: true })).toHaveValue('1.45');
+  await page.goto('/company/setup?company=' + cityB);
+  await expect(form.getByLabel('Цена на км (EUR)', { exact: true })).toHaveValue('');
+  await expect(form.getByLabel('Начална такса (EUR)', { exact: true })).toHaveValue('');
+  expect(state.updates).toHaveLength(0); expect(state.setupWrites).toBe(0); expect(ui.errors).toEqual([]);
+});
+
+test('Levski and Gorna city search uses local centres without a paid address lookup', async ({ page }) => {
+  const { ui, state } = await fixture(page);
+  await page.goto('/admin/divisions'); await page.getByRole('button', { name: 'Добави подразделение', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Добави градско подразделение' });
+  await dialog.getByLabel('Център на обслужването').fill('Левски');
+  await expect(dialog.getByRole('button', { name: 'Левски', exact: true })).toBeVisible();
+  await dialog.getByLabel('Център на обслужването').fill('Горна');
+  await dialog.getByRole('button', { name: 'Горна Оряховица', exact: true }).click();
+  await expect(dialog.getByLabel('Град', { exact: true })).toHaveValue('Горна Оряховица');
+  await dialog.getByRole('button', { name: 'Създай подразделение', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Лески Каручка — Горна Оряховица', exact: true })).toBeVisible();
+  expect(state.creates).toHaveLength(1); expect(state.creates[0].p_data).toMatchObject({ service_latitude: 43.1278, service_longitude: 25.7017 });
+  expect(ui.external.filter(url => /^(maps|places|routes)\.googleapis\.com$/.test(new URL(url).hostname))).toEqual([]); expect(ui.errors).toEqual([]);
+});
+
 test('city prices save only to the selected child, persist after reload, and do not overwrite a sibling', async ({ page }) => {
   const { ui, state } = await fixture(page);
   await page.goto('/admin/divisions');
