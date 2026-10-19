@@ -156,6 +156,12 @@ describe('push account and device isolation', () => {
     expect(mocks.identity.mock.calls).toEqual([['alice'], [null], ['bob']]);
     expect(push.getPushOwner()).toBeNull();
   });
+  it('unsubscribes the previous endpoint on external Auth logout', async () => {
+    storage.set('leski_push_owner', 'alice');
+    await push.registerPush('alice'); await push.changePushSession(null);
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(filters).toContainEqual(['user_id', 'alice']); expect(push.getPushOwner()).toBeNull();
+  });
   it('keeps device delivery disabled when logout cleanup fails', async () => {
     await push.registerPush('alice');
     subscription.unsubscribe.mockRejectedValueOnce(new Error('Browser unavailable'));

@@ -44,10 +44,17 @@ const allowed = (userId: string) => pushSupported() && Notification.permission =
 
 /** Also called for remote logout and account changes, before a profile finishes loading. */
 export function changePushSession(userId: string | null): Promise<void> {
+  const previousOwner = owner ?? localStorage.getItem(OWNER_KEY);
   revision++;
   if (owner !== userId) setOwner(null);
   if (userId) suspended.delete(userId);
-  return bounded(writePushIdentity(userId && getPushPreference(userId) !== false ? userId : null));
+  const boundary = bounded(writePushIdentity(userId && getPushPreference(userId) !== false ? userId : null));
+  // Auth can end outside the logout button. Revoke the old browser endpoint
+  // as well, so providers do not keep sending suppressed, account-mismatched pushes.
+  if (previousOwner && previousOwner !== userId) {
+    return Promise.all([boundary, detachPush(previousOwner)]).then(() => undefined);
+  }
+  return boundary;
 }
 
 export function registerPush(userId: string): Promise<boolean> {
