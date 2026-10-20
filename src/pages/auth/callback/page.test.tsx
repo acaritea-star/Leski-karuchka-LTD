@@ -81,10 +81,10 @@ it('still reports other legal authorization errors instead of treating them as M
   expect(screen.queryByText('Authenticated app')).toBeNull();
 });
 
-it('recovers a transient first-login acceptance rejection using the same session', async () => {
+it.each([401, 503, 0])('recovers a transient first-login acceptance rejection (%s) using the same session', async status => {
   window.history.replaceState({}, '', '/auth/callback?code=new-customer');
   auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'user' } } }, error: null });
-  legal.finish.mockRejectedValueOnce({ code: 'PGRST301', status: 401, message: 'Unauthorized' });
+  legal.finish.mockRejectedValueOnce({ code: 'PGRST301', status, message: 'Temporary rejection' });
   renderCallback();
   expect(await screen.findByText('Authenticated app')).toBeTruthy();
   expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce();

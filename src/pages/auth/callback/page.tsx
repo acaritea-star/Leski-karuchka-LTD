@@ -29,7 +29,7 @@ export default function AuthCallback() {
           // Staff OAuth starts at aal1. Legal acceptance remains required after MFA.
           const failure = error as { code?: string; message?: string; status?: number; name?: string } | null;
           if (failure?.code === '42501' && failure.message?.startsWith('MFA_REQUIRED:')) break;
-          const transient = failure?.status === 401 || (failure?.status ?? 0) >= 500
+          const transient = failure?.status === 0 || failure?.status === 401 || (failure?.status ?? 0) >= 500
             || ['TypeError', 'TimeoutError', 'AbortError'].includes(failure?.name ?? '');
           if (!transient || retry >= 2) throw error;
           // This RPC is idempotent. Retry only login completion, never the
