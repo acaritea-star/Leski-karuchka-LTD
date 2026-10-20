@@ -109,6 +109,68 @@ update; migrating to Tailwind 4 needs a separate visual regression review.
   anon/authenticated denial, enabled SECURITY INVOKER trigger and working distances.
   The migration SQL matches the native-tested source; only its applied timestamp changed.
 
+## Production checkout activation
+
+The live JavaScript graph was inspected before enabling the gate: release
+2026.10.20-customer-welcome.1, entry /assets/index-BTuBb91b.js,
+/assets/RideCheckout-D4aT7NwK.js contains complete_ride_payment and both cash/card
+confirmation actions. All 116 referenced JavaScript assets loaded successfully.
+`deployment/enable-ride-checkout.sql` enabled ride_payment_required at
+2026-10-20T15:20:47.045745Z. A subsequent read confirmed both staff MFA and payment
+checks enabled. No ride, receipt, balance or payment was created or rewritten.
+Legitimate partial/unpaid-with-reason paths remain available and tested.
+
+After deployment the invitation auth_rls_initplan advisor finding is gone.
+The spatial_ref_sys RLS/extension-owner finding remains visible despite the tested
+write guard; do not describe the security advisor as fully clean.
+
+The final source package is 5247c5fcfa86daffedd1b81ac5d824913c89c43b; it only adds
+build-dependency classification, its CI audit gate, the applied migration timestamp,
+and documentation/whitespace to the previously green application code. Both final
+runs completed successfully: 686 unit tests, 165 browser scenarios, one documented
+WebKit capability skip, zero runtime dependency alerts, and native Supabase tests.
+All 135 fresh build files were hash-checked against the packaged GitHub tree;
+retained historical assets were preserved. Final runs:
+- https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39447522847
+- https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39447523038
+
+## Package size and unresolved advisor follow-up
+
+Current initial JavaScript graph: 31 files, 659,716 raw / 210,063 gzip bytes.
+Booking including initial: 43 files, 756,736 raw / 244,418 gzip bytes. Relative to
+the measured baseline, initial gzip increased by 107 bytes and booking by 105
+bytes. No Maps download or network latency is included in this source-size metric.
+The fixes add no runtime dependency, channel, interval or background polling.
+
+- [Hosted extension RLS finding](https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public)
+  is mitigated for writes, with support-assisted relocation still pending.
+- [Extensions in public](https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public)
+  remains for PostGIS/pg_net; do not drop extensions used by live GPS/dispatch.
+- The password-protection configuration warning remains; current UI uses OAuth.
+- Nine missing foreign-key indexes are informational at current scale. Do not add
+  write overhead or remove currently unused indexes without query evidence;
+  production traffic did not establish a bottleneck in those relationships.
+
+## Historical Edge error requiring follow-up
+
+A function_edge_logs HTTP 500 at 2026-10-19T10:52:00.657Z belongs to
+POST /functions/v1/road-geometry (214 ms, request
+01a153ca-2a3b-7230-8d6f-17207f398381). The initially empty path was a log-field
+mismatch: function logs use request.pathname, while API logs use request.path.
+The deployed function and both shared modules match the repository byte for byte.
+No function runtime exception was available in that minute's log sources, so the
+cause is unresolved. The client tolerates unavailable geometry and bounds retries;
+this does not prove recovery of authenticated road lookups. The later 24-hour
+sample had no Edge invocations, so absence of repeated failures is not reliability
+evidence. Include authenticated road loading in the supervised real trip.
+A current, non-mutating endpoint probe returned OPTIONS 204 and anonymous POST
+401 (Authentication required). This confirms startup and anonymous rejection,
+not success of an authenticated upstream road-data request.
+
+The single browser skip is the service-worker test on WebKit: Playwright exposes
+background service workers through its Chromium API. Chromium executes that test;
+physical iOS PWA push remains a separate device check.
+
 ## Primary references
 
 - https://supabase.com/docs/guides/auth/signout — global/local session scopes.

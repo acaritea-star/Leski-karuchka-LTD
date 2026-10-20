@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.20-customer-welcome.1",
-  "baseCommit": "0b20763432dc6d982ce5edc37686e74b6bd08f3e",
-  "databaseMigration": "customer_first_welcome",
+  "release": "2026.10.20-launch-audit.1",
+  "baseCommit": "17068f51c1b6af48bd3113a083f4bac89f9ee927",
+  "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261020083638",
+  "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "d9b991aa0a5a507e7194e983382a78c290863b95",
+  "verifiedSourceCommit": "5247c5fcfa86daffedd1b81ac5d824913c89c43b",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -32,7 +32,8 @@
     "20261017055440_controlled_driver_applications_and_card_evidence",
     "20261019084226_city_company_divisions",
     "20261019174904_customer_push_recipient_binding",
-    "20261020083638_customer_first_welcome"
+    "20261020083638_customer_first_welcome",
+    "20261020151835_launch_api_hardening"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -124,7 +125,7 @@
   "ridePaymentVersion": 1,
   "ridePaymentVerifiedSourceCommit": "3195ee21cd7a11af65844aca3647ab24c2e9b83c",
   "ridePaymentMigrationVersion": "20261016192953",
-  "ridePaymentGateActivation": "after-frontend-publish",
+  "ridePaymentGateActivation": "enforced",
   "expenseEvidenceVersion": 1,
   "operationalHealthUxVersion": 2,
   "ridePaymentMigrationSha256": "6bcf77f815e620ab5eaa3c1914f25f7f5c2f207ce5c0dc99265eaa55973304cf",
@@ -170,5 +171,15 @@
   "customerWelcomeMigrationSha256": "3ab4755613cb2a6298768a9917c646d4acd0be5471c582cc48adb2323bb99e96",
   "customerWelcomeVerifiedSourceCommit": "d9b991aa0a5a507e7194e983382a78c290863b95",
   "customerWelcomeExistingAccounts": "already-onboarded",
-  "customerWelcomeDeploymentStatus": "database-ready-frontend-packaged"
+  "customerWelcomeDeploymentStatus": "database-ready-frontend-packaged",
+  "launchAuditVersion": 1,
+  "launchAuditVerifiedSourceCommit": "5247c5fcfa86daffedd1b81ac5d824913c89c43b",
+  "launchAuditMigrationVersion": "20261020151835",
+  "launchAuditMigrationApplied": true,
+  "launchAuditMigrationSha256": "01f711acc5c6962a540d63cec6323bfe3eedca1937d852c11b3ae11bcb419949",
+  "launchAuditDeploymentStatus": "database-ready-frontend-packaged",
+  "ridePaymentEnforcementEnabled": true,
+  "ridePaymentEnforcedAt": "2026-10-20T15:20:47.045745Z",
+  "launchAuditCheckRun": 39447522847,
+  "launchAuditDatabaseRun": 39447523038
 }
