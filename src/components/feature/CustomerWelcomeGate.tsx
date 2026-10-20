@@ -35,6 +35,6 @@ export default function CustomerWelcomeGate() {
 
   if (!eligible || visibleFor !== userId) return null;
   return <Suspense fallback={null}>
-    <WelcomeOnboarding firstName={user?.first_name ?? ''} onClose={() => setVisibleFor(null)} />
+    <WelcomeOnboarding onClose={() => setVisibleFor(null)} />
   </Suspense>;
 }

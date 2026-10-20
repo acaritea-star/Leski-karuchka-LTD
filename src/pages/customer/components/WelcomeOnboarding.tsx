@@ -7,7 +7,7 @@ const STEPS = [
   { titleKey: 'welcome_step_3_title', descKey: 'welcome_step_3_desc' },
 ];
 
-export default function WelcomeOnboarding({ firstName, onClose }: { firstName: string; onClose: () => void }) {
+export default function WelcomeOnboarding({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   return <Modal label={t('welcome_title')} onClose={onClose} className="max-w-sm">
     <div className="p-5 sm:p-6">
@@ -21,7 +21,7 @@ export default function WelcomeOnboarding({ firstName, onClose }: { firstName: s
         </button>
       </div>
       <h2 className="mt-4 font-heading text-2xl font-bold leading-tight text-foreground-950">
-        {t('welcome_title')}{firstName ? `, ${firstName}` : ''}!
+        {t('welcome_title')}!
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-foreground-600">{t('welcome_subtitle')}</p>
       <ol className="my-5 space-y-4">
@@ -34,7 +34,7 @@ export default function WelcomeOnboarding({ firstName, onClose }: { firstName: s
         </li>)}
       </ol>
       <div className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-3">
-        <span aria-hidden="true" className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700">112 ↗</span>
+        <span aria-hidden="true" className="shrink-0 whitespace-nowrap rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700">112 ↗</span>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-red-800">{t('welcome_emergency_title')}</h3>
           <p className="mt-1 text-xs leading-relaxed text-red-800">{t('welcome_emergency_desc')}</p>
