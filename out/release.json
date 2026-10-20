@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.19-customer-push.1",
-  "baseCommit": "c3dadecf899ceb2b37f173bef9698e647b9c50eb",
-  "databaseMigration": "customer_push_recipient_binding",
+  "release": "2026.10.20-customer-welcome.1",
+  "baseCommit": "0b20763432dc6d982ce5edc37686e74b6bd08f3e",
+  "databaseMigration": "customer_first_welcome",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
-  "databaseMigrationVersion": "20261019174904",
+  "databaseMigrationVersion": "20261020083638",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "6c4e228d5d6370453f7040a34aa7421f4178ca61",
+  "verifiedSourceCommit": "d9b991aa0a5a507e7194e983382a78c290863b95",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -31,7 +31,8 @@
     "20261016192953_ride_payment_checkout_receipts",
     "20261017055440_controlled_driver_applications_and_card_evidence",
     "20261019084226_city_company_divisions",
-    "20261019174904_customer_push_recipient_binding"
+    "20261019174904_customer_push_recipient_binding",
+    "20261020083638_customer_first_welcome"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -162,5 +163,12 @@
   "customerPushVerifiedSourceCommit": "6c4e228d5d6370453f7040a34aa7421f4178ca61",
   "pwaDeviceIsolationVersion": 1,
   "pwaIconsVersion": 1,
-  "customerPushDeploymentStatus": "database-ready-frontend-packaged"
+  "customerPushDeploymentStatus": "database-ready-frontend-packaged",
+  "customerWelcomeVersion": 1,
+  "customerWelcomeMigrationVersion": "20261020083638",
+  "customerWelcomeMigrationApplied": true,
+  "customerWelcomeMigrationSha256": "3ab4755613cb2a6298768a9917c646d4acd0be5471c582cc48adb2323bb99e96",
+  "customerWelcomeVerifiedSourceCommit": "d9b991aa0a5a507e7194e983382a78c290863b95",
+  "customerWelcomeExistingAccounts": "already-onboarded",
+  "customerWelcomeDeploymentStatus": "database-ready-frontend-packaged"
 }

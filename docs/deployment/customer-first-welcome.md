@@ -23,3 +23,12 @@ The modal uses the existing accessible dialog (focus handling, Escape/backdrop,
 scroll lock and short-screen scrolling). Its UI chunk loads only after a
 successful first claim. Tests cover account/role isolation, repeat calls,
 concurrent claims, StrictMode, stale responses, reloads and mobile layout.
+
+Production migration: `20261020083638`. Existing customer accounts were recorded as
+`existing_customer`; this is an exemption, not a claim that they viewed this new
+modal. Native Supabase verified 12 simultaneous connections produce exactly one
+first claim. UI checks cover 360 × 640 screens with the continue button visible.
+
+The private-table [RLS-without-policy informational lint](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+is intentional: app roles have no table grants and only the scoped function can
+insert their own claim. Anonymous RPC access and client resets are denied.
