@@ -197,3 +197,23 @@ it('retains the last known road at arrival without another Google request',async
  expect(view.result.current.path).toBe(path);expect(view.result.current.info?.distance_km).toBe(0);
  expect(computeRoute).toHaveBeenCalledOnce();
 });
+
+it('aborts obsolete route transport on leg changes and unmount', () => {
+  vi.mocked(computeRoute).mockReturnValue(new Promise(() => {}));
+  const view = renderHook(({ target }) => useDrivingRoute(fix(), target, 25), { initialProps: { target: 43.001 } });
+  const first = vi.mocked(computeRoute).mock.calls[0][2]?.signal;
+  view.rerender({ target: 43.002 });
+  expect(first?.aborted).toBe(true);
+  const second = vi.mocked(computeRoute).mock.calls[1][2]?.signal;
+  expect(second?.aborted).toBe(false);
+  view.unmount();
+  expect(second?.aborted).toBe(true);
+});
+it('aborts a hung route transport when its deadline expires', async () => {
+  vi.mocked(computeRoute).mockReturnValue(new Promise(() => {}));
+  const view = renderHook(() => useDrivingRoute(fix(), 43.002, 25));
+  const signal = vi.mocked(computeRoute).mock.calls[0][2]?.signal;
+  await act(async () => vi.advanceTimersByTimeAsync(20_000));
+  expect(signal?.aborted).toBe(true);
+  expect(view.result.current.error).toBe(true);
+});

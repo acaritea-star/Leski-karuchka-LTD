@@ -453,3 +453,30 @@ it('reopens the compact comparison when the category changes after selecting a f
  expect(screen.getByRole('button',{name:/Поръчай каручка/}).textContent).toContain('9.00');
  expect(fake.route).toHaveBeenCalledOnce();expect(fake.rpc).not.toHaveBeenCalled();
 });
+
+it('restores the original offer when addresses are swapped back during a pending quote', async () => {
+  await mount(); await chooseRoute();
+  let finish!: (value: RouteResult) => void;
+  fake.route.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Размени адресите' }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect(fake.route).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Размени адресите' }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(false);
+  expect(fake.route).toHaveBeenCalledTimes(2);
+  await act(async () => finish({ ...quote(), ...offer('standard', 'obsolete', 99), quotes: [offer('standard', 'obsolete', 99)] }));
+  fireEvent.click(screen.getByRole('button', { name: /Поръчай каручка/ }));
+  await act(async () => {});
+  expect(fake.rpc).toHaveBeenCalledWith('create_taxi_request', expect.objectContaining({ p_quote_id: 'quote' }));
+});
+it('can quote the original route after a different route failed', async () => {
+  await mount(); await chooseRoute();
+  fake.route.mockResolvedValueOnce(null).mockResolvedValueOnce(quote());
+  fireEvent.click(screen.getByRole('button', { name: 'Размени адресите' }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  fireEvent.click(screen.getByRole('button', { name: 'Размени адресите' }));
+  await act(async () => vi.advanceTimersByTimeAsync(351));
+  expect((screen.getByRole('button', { name: /Поръчай каручка/ }) as HTMLButtonElement).disabled).toBe(false);
+  expect(fake.route).toHaveBeenCalledTimes(3);
+});

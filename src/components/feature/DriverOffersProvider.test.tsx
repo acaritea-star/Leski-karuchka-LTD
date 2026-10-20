@@ -66,3 +66,17 @@ it('does not replay a queued old-account hint after account switching', async ()
   act(()=>fake.sockets[1].hint?.());
   expect(view.invalidate).toHaveBeenLastCalledWith({queryKey:queryKeys.driverIncomingRequests('two')},{cancelRefetch:false});
 });
+
+it('does not reuse a connected flag when the same account rejoins after losing its driver scope', async () => {
+  const view = setup(); await act(async () => {});
+  act(() => fake.sockets[0].status?.('SUBSCRIBED'));
+  expect(screen.getByText('home: connected')).toBeTruthy();
+  fake.user = { id: 'one', role: 'CUSTOMER' };
+  view.rerender(view.content()); await act(async () => {});
+  fake.user = { id: 'one', role: 'DRIVER' };
+  view.rerender(view.content()); await act(async () => {});
+  expect(fake.sockets).toHaveLength(2);
+  expect(screen.getByText('home: disconnected')).toBeTruthy();
+  act(() => fake.sockets[1].status?.('SUBSCRIBED'));
+  expect(screen.getByText('home: connected')).toBeTruthy();
+});
