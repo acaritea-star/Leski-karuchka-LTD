@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-const legalOperator = JSON.parse(readFileSync(new URL('../../src/config/legalOperator.json', import.meta.url), 'utf8')); 
+const legalOperator = JSON.parse(readFileSync(new URL('../../src/config/legalOperator.json', import.meta.url), 'utf8'));
 import { test, expect } from '@playwright/test';
 import { setupUi, uiAccount } from './helpers/uiFixture';
 

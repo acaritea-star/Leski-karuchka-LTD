@@ -80,6 +80,35 @@ were added. Existing tests cover tenant boundaries, two drivers competing for on
 request, idempotent money posting, lost responses, partial/unpaid fares, expense
 proofs, GPS freshness, notification ownership, mobile layout and accessible actions.
 
+## Dependency review
+
+`tailwindcss-animate` is only loaded by tailwind.config.ts during CSS compilation;
+it is now correctly a devDependency. Lockfile versions, resolved URLs and integrity
+hashes are unchanged. `npm audit --omit=dev` reports zero vulnerabilities (73
+production dependencies). CI now gates high/critical production dependency alerts.
+This classification does not patch or hide the build-tool findings: the full audit
+still reports five high and two moderate affected dependency entries, arising from
+braces GHSA-vfj7-8cjw-p6xm and postcss-selector-parser GHSA-rj75-hqrm-r3gf. These
+packages process repository-owned patterns/selectors at build time; they are not
+imported in the browser or Edge Functions. Braces has no patched version in the
+advisory; selector-parser is patched in 7.1.6, outside Tailwind 3's dependency range.
+Do not expose this build toolchain to user-supplied CSS/globs. Track the upstream
+update; migrating to Tailwind 4 needs a separate visual regression review.
+
+## Confirmed validation and database deployment
+
+- Source cfd2bd6308188d0fa19da6b2a86ba6a3130aa558: 686 unit tests across 104 files,
+  165 Chromium/WebKit browser scenarios passed, one skipped; typecheck, lint,
+  production build, legal-source integrity and Edge Function checks passed.
+- Check: https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39404886473
+- Native Supabase: https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39404886657
+  Company/receipt/file isolation, real Auth/MFA, conflicting driver acceptance,
+  duplicate payment retries, welcome concurrency and geographic guards passed.
+- Production migration 20261020151835_launch_api_hardening was applied successfully.
+  Read-only verification plus rolled-back, zero-row application-role writes confirmed
+  anon/authenticated denial, enabled SECURITY INVOKER trigger and working distances.
+  The migration SQL matches the native-tested source; only its applied timestamp changed.
+
 ## Primary references
 
 - https://supabase.com/docs/guides/auth/signout — global/local session scopes.
@@ -89,3 +118,6 @@ proofs, GPS freshness, notification ownership, mobile layout and accessible acti
   hosted ownership and support-assisted relocation of public PostGIS.
 - https://www.postgresql.org/docs/current/sql-createtrigger.html — TRIGGER privilege,
   statement triggers and INSERT/UPDATE/DELETE/TRUNCATE coverage.
+
+- https://github.com/advisories/GHSA-vfj7-8cjw-p6xm — build-only braces depth exhaustion.
+- https://github.com/advisories/GHSA-rj75-hqrm-r3gf — selector-parser reachability and patch.
