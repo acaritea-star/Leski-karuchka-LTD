@@ -1,3 +1,4 @@
+import CustomerWelcomeGate from '@/components/feature/CustomerWelcomeGate';
 import StaffMfaBoundary from '@/components/feature/StaffMfaBoundary';
 import ErrorBoundary from '@/components/feature/ErrorBoundary';
 import { lazy, Suspense, type ReactNode } from "react";
@@ -36,7 +37,7 @@ function AppAccess() {
   const { pathname } = useLocation();
   // Complete PKCE before requiring the second factor. No staff providers run here.
   if (pathname === '/auth/callback') return <Suspense fallback={<RouteFallback />}><AppRoutes /></Suspense>;
-  return <StaffMfaBoundary><OperationTelemetry /><NotificationScope><DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
+  return <StaffMfaBoundary><CustomerWelcomeGate /><OperationTelemetry /><NotificationScope><DriverGpsProvider><DriverOffersProvider><AdminCompanyProvider>
     <Suspense fallback={<RouteFallback />}><AppRoutes /></Suspense>
   </AdminCompanyProvider></DriverOffersProvider></DriverGpsProvider></NotificationScope></StaffMfaBoundary>;
 }

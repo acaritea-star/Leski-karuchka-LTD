@@ -266,16 +266,19 @@ export default {
   rated: 'Rated',
   how_was_trip: 'How was your trip?',
 
+  welcome_close: "Close welcome",
+  welcome_emergency_title: "In an emergency",
+  welcome_emergency_desc: "For emergency help, use the 112 button at the top right of the map.",
   // Onboarding (first-run welcome)
   welcome_title: 'Welcome',
-  welcome_subtitle: 'Order a carriage in 3 easy steps',
-  welcome_step_1_title: 'Set your pickup',
-  welcome_step_1_desc: 'Tap the pickup address and choose or confirm your location.',
-  welcome_step_2_title: 'Choose your destination',
-  welcome_step_2_desc: 'Set where you are going and see the price instantly.',
-  welcome_step_3_title: 'Order and track live',
-  welcome_step_3_desc: 'Press "Order" and watch your driver on the map in real time.',
-  welcome_cta: 'Got it, let\'s go',
+  welcome_subtitle: "Get started in three simple steps.",
+  welcome_step_1_title: "Choose your route",
+  welcome_step_1_desc: "Set your pickup address and destination.",
+  welcome_step_2_title: "Compare companies and prices",
+  welcome_step_2_desc: "Browse the offers and choose a company.",
+  welcome_step_3_title: "Book and follow your driver",
+  welcome_step_3_desc: "Confirm your request and track its status and the driver on the map.",
+  welcome_cta: "Got it, let us start",
   welcome_skip: 'Skip',
 
   // Driver

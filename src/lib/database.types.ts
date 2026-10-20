@@ -1757,6 +1757,7 @@ export type Database = {
       }
     }
     Functions: {
+      claim_customer_welcome: { Args: Record<string, never>; Returns: boolean }
       create_company_division: { Args: { p_id: string; p_parent: string; p_data: Json }; Returns: Json }
       company_group_report: { Args: { p_parent: string; p_from: string; p_until: string }; Returns: Json }
       company_route_pricing: { Args: { p_company: string; p_lat: number; p_lng: number }; Returns: Json }

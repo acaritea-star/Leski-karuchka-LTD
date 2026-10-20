@@ -1,90 +1,49 @@
 import { useTranslation } from 'react-i18next';
-
-interface WelcomeOnboardingProps {
-  firstName: string;
-  onClose: () => void;
-}
+import Modal from '@/components/feature/Modal';
 
 const STEPS = [
-  { icon: 'ri-map-pin-2-line', titleKey: 'welcome_step_1_title', descKey: 'welcome_step_1_desc' },
-  { icon: 'ri-flag-line', titleKey: 'welcome_step_2_title', descKey: 'welcome_step_2_desc' },
-  { icon: 'ri-radar-line', titleKey: 'welcome_step_3_title', descKey: 'welcome_step_3_desc' },
+  { titleKey: 'welcome_step_1_title', descKey: 'welcome_step_1_desc' },
+  { titleKey: 'welcome_step_2_title', descKey: 'welcome_step_2_desc' },
+  { titleKey: 'welcome_step_3_title', descKey: 'welcome_step_3_desc' },
 ];
 
-export default function WelcomeOnboarding({ firstName, onClose }: WelcomeOnboardingProps) {
+export default function WelcomeOnboarding({ firstName, onClose }: { firstName: string; onClose: () => void }) {
   const { t } = useTranslation();
-
-  return (
-    <div className="fixed inset-0 z-[70] flex flex-col justify-end">
-      <div
-        className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/70"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative mx-auto max-w-md w-full px-4 pb-6">
-        <div className="bg-background-50 rounded-3xl px-5 pt-5 pb-6 relative overflow-hidden animate-in slide-in-from-bottom-8 fade-in duration-500">
-          {/* Skip */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-background-100 text-foreground-500 text-xs font-semibold hover:bg-background-200 transition-colors whitespace-nowrap cursor-pointer"
-          >
-            {t('welcome_skip')}
-          </button>
-
-          {/* Icon */}
-          <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center rise-in">
-            <i className="ri-taxi-line text-2xl text-primary-600" />
+  return <Modal label={t('welcome_title')} onClose={onClose} className="max-w-sm">
+    <div className="p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <span aria-hidden="true" className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 10 7 5h10l2 5M5 10h14v9H5zM9 5V3h6v2M8 19v2m8-2v2M8 14h1m6 0h1" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </span>
+        <button type="button" onClick={onClose} aria-label={t('welcome_close')}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-foreground-500 hover:bg-background-100">
+          <span aria-hidden="true" className="text-2xl">×</span>
+        </button>
+      </div>
+      <h2 className="mt-4 font-heading text-2xl font-bold leading-tight text-foreground-950">
+        {t('welcome_title')}{firstName ? `, ${firstName}` : ''}!
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-foreground-600">{t('welcome_subtitle')}</p>
+      <ol className="my-5 space-y-4">
+        {STEPS.map((step, i) => <li key={step.titleKey} className="flex gap-3">
+          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background-100 text-sm font-bold text-primary-700">{i + 1}</span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-foreground-900">{t(step.titleKey)}</h3>
+            <p className="mt-1 text-xs leading-relaxed text-foreground-600">{t(step.descKey)}</p>
           </div>
-
-          {/* Title */}
-          <h2
-            className="mt-4 text-2xl font-bold text-foreground-950 font-heading leading-tight rise-in"
-            style={{ animationDelay: '60ms' }}
-          >
-            {t('welcome_title')}
-            {firstName ? `, ${firstName}` : ''}!
-          </h2>
-          <p
-            className="mt-1.5 text-sm text-foreground-500 rise-in"
-            style={{ animationDelay: '120ms' }}
-          >
-            {t('welcome_subtitle')}
-          </p>
-
-          {/* Steps */}
-          <div className="mt-5 space-y-3">
-            {STEPS.map((step, i) => (
-              <div
-                key={step.titleKey}
-                className="flex items-start gap-3 rise-in"
-                style={{ animationDelay: `${180 + i * 110}ms` }}
-              >
-                <div className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center flex-shrink-0">
-                  <i className={`${step.icon} text-lg text-accent-600`} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground-900">
-                    {i + 1}. {t(step.titleKey)}
-                  </p>
-                  <p className="text-xs text-foreground-500 mt-0.5 leading-relaxed">
-                    {t(step.descKey)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <button
-            onClick={onClose}
-            className="w-full mt-6 py-3.5 bg-primary-500 text-white font-bold rounded-2xl hover:bg-primary-600 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer rise-in flex items-center justify-center gap-2"
-            style={{ animationDelay: '520ms' }}
-          >
-            {t('welcome_cta')}
-            <i className="ri-arrow-right-line text-lg" />
-          </button>
+        </li>)}
+      </ol>
+      <div className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-3">
+        <span aria-hidden="true" className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700">112 ↗</span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-red-800">{t('welcome_emergency_title')}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-red-800">{t('welcome_emergency_desc')}</p>
         </div>
       </div>
+      <button type="button" onClick={onClose}
+        className="mt-5 min-h-12 w-full rounded-2xl bg-primary-500 px-4 py-3 text-sm font-bold text-white hover:bg-primary-600">
+        {t('welcome_cta')}
+      </button>
     </div>
-  );
+  </Modal>;
 }

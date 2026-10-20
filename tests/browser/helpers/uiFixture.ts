@@ -17,6 +17,7 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
   const state = {
     profile: { id: uiAccount, email: user.email, first_name: 'Александър-Владимир', last_name: 'Атанасов', phone: '0888123456', role, company_id: ['DRIVER', 'COMPANY_ADMIN'].includes(role) ? uiCompany : null, is_active: true },
     profileWrites: [] as Record<string, unknown>[], ratingWrites: [] as Record<string, unknown>[], vehicleWrites: [] as Record<string, unknown>[], contactWrites: [] as string[],
+    welcomeFirst: false, welcomeClaims: 0,
     notices: [] as Record<string, unknown>[], rides: [] as Record<string, unknown>[], ratings: [] as Record<string, unknown>[], cars: [] as Record<string, unknown>[],
     articles: [] as Record<string, unknown>[], articleDeletes: 0, failArticleDelete: false,
     failProfile: false, failPreferences: false, failNotificationReads: false, failNotificationWrites: false, failRating: false, loseRatingResponse: false, failContact: false,
@@ -43,7 +44,8 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
     }
     if (url.origin !== 'http://127.0.0.1:54329') { state.external.push(url.href); return route.abort(); }
     let data: unknown = [];
-    if (url.pathname.endsWith('/auth/v1/user')) data = user;
+    if (url.pathname.endsWith('/rpc/claim_customer_welcome')) { state.welcomeClaims++; data = state.welcomeFirst; state.welcomeFirst = false; }
+    else if (url.pathname.endsWith('/auth/v1/user')) data = user;
     else if (url.pathname.endsWith('/profiles')) {
       if (request.method() === 'PATCH') {
         const body = request.postDataJSON(); state.profileWrites.push(body); await delay();

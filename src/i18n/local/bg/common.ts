@@ -266,16 +266,19 @@ export default {
   rated: 'Оценено',
   how_was_trip: 'Как беше пътуването Ви?',
 
+  welcome_close: "Затвори приветствието",
+  welcome_emergency_title: "При спешен случай",
+  welcome_emergency_desc: "За спешна помощ използвай бутона „112“ горе вдясно на картата.",
   // Onboarding (first-run welcome)
   welcome_title: 'Добре дошъл',
-  welcome_subtitle: 'Поръчай каручка за 3 лесни стъпки',
-  welcome_step_1_title: 'Задай откъде тръгваш',
-  welcome_step_1_desc: 'Докосни адреса за вземане и избери или потвърди локацията си.',
-  welcome_step_2_title: 'Избери накъде отиваш',
-  welcome_step_2_desc: 'Задай дестинацията и виж цената веднага.',
-  welcome_step_3_title: 'Поръчай и следи на живо',
-  welcome_step_3_desc: 'Натисни „Поръчай“ и виж шофьора на картата в реално време.',
-  welcome_cta: 'Ясно, тръгвам',
+  welcome_subtitle: "Поръчката става в три лесни стъпки.",
+  welcome_step_1_title: "Избери откъде и докъде",
+  welcome_step_1_desc: "Посочи адреса за вземане и своята дестинация.",
+  welcome_step_2_title: "Сравни фирмите и цените",
+  welcome_step_2_desc: "Разгледай офертите и избери подходящата фирма.",
+  welcome_step_3_title: "Поръчай и следи шофьора",
+  welcome_step_3_desc: "Потвърди заявката и следи статуса и пристигането на картата.",
+  welcome_cta: "Ясно, започваме",
   welcome_skip: 'Пропусни',
 
   // Driver

@@ -21,6 +21,8 @@ run('supabase/tests/run.sql');
 const offlineDispatch = spawnSync('psql', [url, '-X', '-v', 'ON_ERROR_STOP=1', '-c',
  "CREATE OR REPLACE FUNCTION private.dispatch_push_outbox() RETURNS integer LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$ SELECT 0 $$;"], {stdio:'inherit'});
 if(offlineDispatch.status!==0) process.exit(offlineDispatch.status||1);
+const welcome = spawnSync(process.execPath,['scripts/test-welcome-concurrency.mjs'],{stdio:'inherit'});
+if(welcome.status!==0) process.exit(welcome.status||1);
 const concurrency = spawnSync(process.execPath,['scripts/test-money-concurrency.mjs'],{stdio:'inherit'});
 if(concurrency.status!==0) process.exit(concurrency.status||1);
 const checkout = spawnSync(process.execPath,['scripts/test-checkout-concurrency.mjs'],{stdio:'inherit'});
