@@ -6,6 +6,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import bg from '@/i18n/local/bg/common';
 import AuthCallback from './page';
 
+const legal = vi.hoisted(() => ({ finish: vi.fn() }));
+vi.mock('@/lib/legalAcceptance', () => ({ finishLegalIntent: legal.finish }));
 const auth = vi.hoisted(() => ({ exchangeCodeForSession: vi.fn(), getSession: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({ supabase: { auth } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => {
@@ -14,6 +16,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => {
 } }) }));
 beforeEach(() => {
   vi.clearAllMocks();
+  legal.finish.mockResolvedValue(undefined);
   window.history.replaceState({}, '', '/auth/callback');
   auth.exchangeCodeForSession.mockResolvedValue({ data: { session: { user: { id: 'user' } } }, error: null });
   auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -60,4 +63,20 @@ describe('Google and Facebook PKCE callback', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(bg.auth_callback_missing));
     expect(screen.getByRole('link', { name: bg.auth_callback_back }).getAttribute('href')).toBe('/auth/login');
   });
+});
+
+it('continues staff OAuth to MFA when legal acceptance requires the second factor', async () => {
+  window.history.replaceState({}, '', '/auth/callback?code=staff-code');
+  legal.finish.mockRejectedValue({ code: '42501', message: 'MFA_REQUIRED: complete two-factor authentication' });
+  renderCallback();
+  expect(await screen.findByText('Authenticated app')).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('still reports other legal authorization errors instead of treating them as MFA', async () => {
+  window.history.replaceState({}, '', '/auth/callback?code=staff-code');
+  legal.finish.mockRejectedValue({ code: '42501', message: 'Permission denied' });
+  renderCallback();
+  expect(await screen.findByRole('alert')).toBeTruthy();
+  expect(screen.queryByText('Authenticated app')).toBeNull();
 });

@@ -34,3 +34,14 @@ it('surfaces a failed driver offline operation before sign-out', async () => {
   expect(hook.result.current.error).toBeTruthy();
   expect(api.signOut).not.toHaveBeenCalled();
 });
+
+it('does not navigate after the account screen was unmounted during logout', async () => {
+ let finish!: () => void;
+ api.signOut.mockReturnValueOnce(new Promise<void>(resolve => { finish = resolve; }));
+ const hook = renderHook(() => useSignOut());
+ let pending!: Promise<void>;
+ act(() => { pending = hook.result.current.logout(); });
+ hook.unmount();
+ await act(async () => { finish(); await pending; });
+ expect(api.navigate).not.toHaveBeenCalled();
+});

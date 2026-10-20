@@ -36,3 +36,17 @@ test('an existing customer goes straight to booking without a welcome', async ({
  await expect(page.getByRole('dialog', { name: 'Добре дошъл', exact: true })).toHaveCount(0);
  expect(state.errors).toEqual([]);
 });
+
+
+test('an unavailable welcome module never prevents booking or emergency help', async ({ page }) => {
+ const state = await setupUi(page, 'CUSTOMER'); state.welcomeFirst = true;
+ let blocked = false;
+ await page.route('**/src/pages/customer/components/WelcomeOnboarding.tsx*', route => { blocked = true; return route.abort('failed'); });
+ await page.goto('/customer/home');
+ await expect.poll(() => blocked).toBe(true);
+ await expect.poll(() => state.welcomeClaims).toBe(1);
+ await expect(page.getByRole('button', { name: 'Известия', exact: true })).toBeVisible();
+ await expect(page.getByText('Не успяхме да заредим този екран')).toHaveCount(0);
+ await page.getByRole('button', { name: /112/ }).first().click();
+ await expect(page.getByRole('link', { name: /112/ })).toHaveAttribute('href', 'tel:112');
+});

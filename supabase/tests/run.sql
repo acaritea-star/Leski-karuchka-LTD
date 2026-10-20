@@ -85,3 +85,5 @@ ROLLBACK;
 \ir city_company_divisions.sql
 
 \ir staff_mfa.sql
+
+\ir launch_api_hardening.sql

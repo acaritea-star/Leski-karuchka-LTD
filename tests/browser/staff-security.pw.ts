@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+const legalOperator = JSON.parse(readFileSync(new URL('../../src/config/legalOperator.json', import.meta.url), 'utf8')); 
 import { test, expect } from '@playwright/test';
 import { setupUi, uiAccount } from './helpers/uiFixture';
 
@@ -89,4 +91,25 @@ test('customer emergency dialing stays reachable while the profile service is of
   await page.getByRole('button', { name: 'Назад към приложението', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Профилът не е достъпен');
   await expect(help).toBeVisible();
+});
+
+
+test('staff OAuth can reach MFA after a deferred legal acceptance', async ({ page }) => {
+ const state = await setupUi(page, 'DRIVER', 'aal1');
+ await page.addInitScript(operator => sessionStorage.setItem('leski:oauth-legal-intent', JSON.stringify({
+  terms: operator.termsVersion, privacy: operator.privacyVersion, method: 'google', created: Date.now(),
+ })), legalOperator);
+ let legalAttempts = 0;
+ await page.route('**/rpc/accept_legal_versions', async route => {
+  if (route.request().method() === 'OPTIONS') return route.fallback();
+  legalAttempts++;
+  await route.fulfill({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+   body: JSON.stringify({ code: '42501', message: 'MFA_REQUIRED: complete two-factor authentication' }) });
+ });
+ await page.goto('/auth/callback');
+ await expect(page.getByRole('button', { name: 'Настрой двуфакторен вход', exact: true })).toBeVisible();
+ expect(legalAttempts).toBe(1);
+ await expect(page).not.toHaveURL(/auth\/callback/);
+ await expect(page.getByText('Не успяхме да заредим този екран')).toHaveCount(0);
+ expect(state.errors).toEqual([]);
 });

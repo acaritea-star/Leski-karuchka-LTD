@@ -16,6 +16,16 @@ export default function AuthCallback() {
     if (startedRef.current) return;
     startedRef.current = true;
 
+    const finishLogin = async () => {
+      try { await finishLegalIntent(); }
+      catch (error) {
+        // Staff OAuth starts at aal1. Reach the existing MFA boundary first;
+        // the legal notice still requires server-confirmed acceptance afterward.
+        const failure = error as { code?: string; message?: string } | null;
+        if (failure?.code !== '42501' || !failure.message?.startsWith('MFA_REQUIRED:')) throw error;
+      }
+      navigate(consumeAuthReturn(), { replace: true });
+    };
     const run = async () => {
       try {
         const query = new URLSearchParams(window.location.search);
@@ -41,14 +51,13 @@ export default function AuthCallback() {
             return;
           }
           if (!data.session) { setErrorKey('auth_callback_missing'); return; }
-          await finishLegalIntent();
-          navigate(consumeAuthReturn(), { replace: true });
+          await finishLogin();
           return;
         }
 
         const { data, error } = await supabase.auth.getSession();
         if (error) { setErrorKey(socialAuthErrorKey(error)); return; }
-        if (data.session) { await finishLegalIntent(); navigate(consumeAuthReturn(), { replace: true }); return; }
+        if (data.session) { await finishLogin(); return; }
         setErrorKey('auth_callback_missing');
       } catch (error) {
         setErrorKey(socialAuthErrorKey(error));

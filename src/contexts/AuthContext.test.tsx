@@ -150,3 +150,44 @@ it('never carries the previous account into an unavailable new account', async (
   await act(async () => { await vi.advanceTimersByTimeAsync(1700); });
   expect(screen.getByText('signed-out')).toBeTruthy();
 });
+
+it('does not let a delayed logout clear a newly signed-in account', async () => {
+  let finish!: (value: unknown) => void;
+  api.signOut.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await screen.findByText('ready:a');
+  fireEvent.click(screen.getByText('logout'));
+  await waitFor(() => expect(api.signOut).toHaveBeenCalled());
+  const next = { ...session, user: { ...session.user, id: 'b' } };
+  api.getSession.mockResolvedValue({ data: { session: next } });
+  api.profile.mockResolvedValue({ data: { ...profile, id: 'b' }, error: null });
+  act(() => api.changed?.('SIGNED_IN', next));
+  await screen.findByText('ready:b');
+  const clears = api.clear.mock.calls.length;
+  await act(async () => finish({ error: null }));
+  expect(screen.getByText('ready:b')).toBeTruthy();
+  expect(api.clear).toHaveBeenCalledTimes(clears);
+});
+
+it('does not let an old logout clear a new login to the same account', async () => {
+  let finish!: (value: unknown) => void;
+  api.signOut.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await screen.findByText('ready:a');
+  fireEvent.click(screen.getByText('logout'));
+  await waitFor(() => expect(api.signOut).toHaveBeenCalled());
+  act(() => api.changed?.('SIGNED_OUT', null));
+  act(() => api.changed?.('SIGNED_IN', { ...session, access_token: 'new-login' }));
+  await screen.findByText('ready:a');
+  await act(async () => finish({ error: null }));
+  expect(screen.getByText('ready:a')).toBeTruthy();
+});
+
+it('signs out only the current device', async () => {
+  api.signOut.mockResolvedValueOnce({ error: null });
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await screen.findByText('ready:a');
+  fireEvent.click(screen.getByText('logout'));
+  await screen.findByText('signed-out');
+  expect(api.signOut).toHaveBeenCalledWith({ scope: 'local' });
+});

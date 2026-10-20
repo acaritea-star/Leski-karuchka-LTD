@@ -1,10 +1,18 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 
 const WelcomeOnboarding = lazy(() => import('@/pages/customer/components/WelcomeOnboarding'));
+
+// An optional introduction must never take down booking when its lazy chunk
+// fails to download (offline transition or an interrupted deployment).
+class WelcomeBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? null : this.props.children; }
+}
 
 /** One account-level claim; route changes and StrictMode share the pending request. */
 export default function CustomerWelcomeGate() {
@@ -34,7 +42,7 @@ export default function CustomerWelcomeGate() {
   }, [eligible, userId]);
 
   if (!eligible || visibleFor !== userId) return null;
-  return <Suspense fallback={null}>
+  return <WelcomeBoundary key={userId}><Suspense fallback={null}>
     <WelcomeOnboarding onClose={() => setVisibleFor(null)} />
-  </Suspense>;
+  </Suspense></WelcomeBoundary>;
 }

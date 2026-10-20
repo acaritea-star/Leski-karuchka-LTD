@@ -61,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentUser = useRef(user);
   currentUser.current = user;
   const currentSession = useRef<Session | null>(null);
+  const identityRevision = useRef(0);
   const applySessionRef = useRef<((next: Session | null) => Promise<void>) | null>(null);
 
   const enrichWithDriverCompany = useCallback(
@@ -197,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const identityChanged = lastUserId !== next?.user.id;
       if (identityChanged || !next) void changePushSession(next?.user.id ?? null).catch(() => {});
       if (identityChanged) {
+        identityRevision.current++;
         queryClient.clear(); stopDriverGps(); stopSharedGps(); setUser(null); setProfileError(null);
         currentUser.current = null;
         if (lastUserId) clearRecentLocations();
@@ -264,28 +266,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    if (session?.user.id) {
-      try { await withRequestTimeout(() => detachPush(session.user.id)); }
+    const owner = session?.user.id;
+    const revision = identityRevision.current;
+    const stillCurrent = () => currentSession.current?.user.id === owner && identityRevision.current === revision;
+    if (owner) {
+      try { await withRequestTimeout(() => detachPush(owner)); }
       catch { console.warn('Push cleanup failed; notification permission can be revoked in browser settings.'); }
     }
-    if (currentSession.current?.user.id !== session?.user.id) return;
+    if (!stillCurrent()) return;
     try {
-      const { error } = await withRequestTimeout(() => supabase.auth.signOut());
+      // An ordinary logout must not terminate sessions on the driver's other devices.
+      const { error } = await withRequestTimeout(() => supabase.auth.signOut({ scope: 'local' }));
       if (error) throw error;
     } catch (error) {
-      if (session?.user.id && currentSession.current?.user.id === session.user.id) {
-        startPushSession(session.user.id);
-        void registerPush(session.user.id).catch(() => {});
+      if (owner && stillCurrent()) {
+        startPushSession(owner);
+        void registerPush(owner).catch(() => {});
       }
       throw error;
     }
-    stopDriverGps(); stopSharedGps();
-    clearRecentLocations();
-    queryClient.clear();
-    setUser(null);
-    setSession(null);
-    currentUser.current = null;
-    currentSession.current = null;
+    // SIGNED_OUT may arrive before this response. A subsequent login (including
+    // the same account) owns its state; an old logout must not clear its maps/cache.
+    if (currentSession.current && !stillCurrent()) return;
+    await applySessionRef.current?.(null);
   }, [session?.user.id]);
 
   const updateProfile = useCallback(
