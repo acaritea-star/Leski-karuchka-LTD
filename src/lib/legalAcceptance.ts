@@ -16,10 +16,10 @@ export function pendingLegalIntent(): Intent | null {
  } catch { return null; }
 }
 export async function acceptCurrentLegal(method: 'google'|'facebook'|'continue') {
- const {data,error}=await withRequestTimeout(signal=>supabase.rpc('accept_legal_versions',{
+ const {data,error,status}=await withRequestTimeout(signal=>supabase.rpc('accept_legal_versions',{
   p_terms:legalOperator.termsVersion,p_privacy:legalOperator.privacyVersion,p_method:method,
  }).abortSignal(signal),10_000);
- if (error) throw error;
+ if (error) throw Object.assign(error, { status });
  if (typeof data!=='string') throw new Error('Приемането на условията не е потвърдено.');
  return data;
 }

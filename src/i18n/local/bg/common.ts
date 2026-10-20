@@ -149,6 +149,7 @@ export default {
   auth_callback_missing: 'Входът не е завършен. Опитайте отново.',
   auth_callback_working: 'Завършваме входа…',
   auth_callback_back: 'Към входа',
+  auth_callback_retry: 'Опитай отново',
   select_role: 'Изберете роля',
   role_customer: 'Клиент',
   role_driver: 'Шофьор',

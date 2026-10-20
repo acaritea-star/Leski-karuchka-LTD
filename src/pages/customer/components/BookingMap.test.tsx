@@ -121,3 +121,14 @@ it('keeps the route beside the sidebar in desktop and landscape layouts',async()
  resizeObservers.find(o=>o.targets.includes(frame))!.notify([{target:frame}],{} as ResizeObserver);
  expect(fitBounds).toHaveBeenLastCalledWith(expect.anything(),{top:32,bottom:32,left:456,right:32});
 });
+
+it('does not move the camera again for unchanged chrome size notifications', async () => {
+  render(<div className="customer-experience"><header className="customer-header" />
+    <div className="customer-map"><BookingMap pickup={pickup} destination={destination} route={null} /></div></div>);
+  await act(async () => {});
+  const header = document.querySelector('.customer-header')!;
+  const observer = resizeObservers.find(o => o.targets.includes(header))!;
+  const fits = fitBounds.mock.calls.length;
+  act(() => { for (let i = 0; i < 5; i++) observer.notify([{ target: header }], {} as ResizeObserver); });
+  expect(fitBounds).toHaveBeenCalledTimes(fits);
+});

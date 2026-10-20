@@ -2,7 +2,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 import { queryKeys } from './queryKeys';
 import { withRequestTimeout } from './requestTimeout';
-import { mergeDriverActiveRead } from './requestSnapshot';
+import { mergeDriverActiveRead, mergeRequestSnapshot } from './requestSnapshot';
 import type { Tables } from './database.types';
 
 // Pages and the GPS owner observe the same full row and in-flight request.
@@ -19,7 +19,13 @@ export function driverActiveRequestOptions(client: QueryClient, driverId: string
         .select('*').eq('driver_id', driverId).in('status', ['accepted', 'arrived', 'in_progress'])
         .order('created_at', { ascending: false }).limit(1).abortSignal(abort).maybeSingle(), 10_000, signal);
       if (error) throw error;
-      return mergeDriverActiveRead(started, client.getQueryData<Tables<'taxi_requests'> | null>(queryKey), data);
+      const merged = mergeDriverActiveRead(started, client.getQueryData<Tables<'taxi_requests'> | null>(queryKey), data);
+      if (!merged) return null;
+      // A terminal event can leave the active cache null both before and after
+      // this read. Its per-ride snapshot must still defeat a stale active row.
+      const snapshot = client.getQueryData<Tables<'taxi_requests'>>(queryKeys.driverRequestSnapshot(driverId, merged.id));
+      const latest = snapshot ? mergeRequestSnapshot(snapshot, merged) : merged;
+      return latest && !['completed', 'cancelled'].includes(latest.status) ? latest : null;
     },
   });
 }

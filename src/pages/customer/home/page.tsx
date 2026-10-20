@@ -217,7 +217,7 @@ export default function CustomerHome() {
   const canRequest = step === 'offers' && !!selectedCarrier && !!currentRoute?.quote_id && !!currentRoute.quote_expires_at && Date.parse(currentRoute.quote_expires_at) > Date.now()
     && !!fare && Number.isFinite(fare.total) && fare.total >= 0
     && availableOffers.has(carrierOfferKey(selectedCarrier))
-    && !!pickup && !!destination && !locating && !resolvingPickup && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
+    && !!pickup && !!destination && !calculating && !locating && !resolvingPickup && requestStatus !== 'creating' && !activeRequest && !recovering && !recoveryError;
 
   const isTracking =
     !!activeRequest &&
@@ -456,11 +456,13 @@ export default function CustomerHome() {
     if (!pickup || !destination || !quoteReady || activeRequestId) { setCalculating(false); return; }
     const quoteKey = JSON.stringify([quoteInput, quoteRefresh]);
     // A temporary availability loss must not buy the same valid route again.
-    if (lastQuotedInput.current === quoteKey) return;
+    if (lastQuotedInput.current === quoteKey) { setCalculating(false); return; }
     let active = true;
     const controller = new AbortController();
     const vehicleTypeForQuote = requestedType.current;
-    setRoute(null); setRequestError(''); setCalculating(true);
+    // routeInput hides the previous offer for another route. Retain it so
+    // returning to the original addresses can reuse its still-valid quote.
+    setRequestError(''); setCalculating(true);
     bookingId.current = crypto.randomUUID();
     const timer = setTimeout(() => {
       computeRoute(pickup, destination, {signal:controller.signal,quote:{vehicle_type_id:vehicleTypeForQuote,marketplace:true,carrier_choice:true,pickup_address:pickup.address,destination_address:destination.address}})
@@ -468,6 +470,7 @@ export default function CustomerHome() {
           if (!active) return;
           setCalculating(false);
           if (!result?.quote_id || !result.quote_expires_at || !result.breakdown || !Number.isFinite(result.breakdown.total)) {
+            lastQuotedInput.current = '';
             setRoute(null);
             setRequestError(t(result?.code==='ROUTE_DAILY_LIMIT'?'route_daily_limit':result?.code==='ROUTE_USER_LIMIT'?'route_user_limit':result?.status===429?'route_rate_limit':'route_failed'));
           } else {

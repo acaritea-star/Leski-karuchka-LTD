@@ -108,3 +108,56 @@ test('changing a route aborts the old request and ignores its late cheaper offer
   await expect.poll(() => aborted).toBe(1);
   expect(calls).toBe(2); expect(state.errors).toEqual([]);
 });
+
+test('returning to the original addresses restores the valid offer without a third route request', async ({ page }) => {
+  const state = await setupUi(page, 'CUSTOMER');
+  await page.addInitScript(locations => localStorage.setItem('leski_recent_locations', JSON.stringify(locations)), locations);
+  await page.route('**/rpc/marketplace_availability', route => route.fulfill({ headers: cors, json: {
+    company_id: 'marketplace', sampled_at: new Date().toISOString(), categories: [{ id: 'standard', drivers: 1, configured: true }],
+    carriers: [{ company_id: uiCompany, vehicle_type_id: 'type', service_class: 'standard' }],
+  } }));
+  let calls = 0, aborted = 0;
+  page.on('requestfailed', request => { if (request.url().endsWith('/google-routes')) aborted++; });
+  await page.route('**/functions/v1/google-routes', async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const call = ++calls;
+    if (call === 2) await new Promise(resolve => setTimeout(resolve, 2500));
+    const quote = { company_id: uiCompany, company_name: 'ОРИОН', vehicle_type_id: 'type', service_class: 'standard', type_name: 'Стандарт',
+      capacity: 4, quote_id: 'quote-' + call, quote_expires_at: new Date(Date.now() + 120000).toISOString(), price: call === 1 ? 7 : 99, breakdown: { total: call === 1 ? 7 : 99 } };
+    await route.fulfill({ headers: cors, json: { success: true, ...quote, quotes: [quote], distance_km: 2, duration_min: 5,
+      duration_sec: 300, polyline: '', legs: [], alternatives_count: 0 } }).catch(() => {});
+  });
+  await page.goto('/customer/home');
+  await page.getByRole('button', { name: /Начало.*Иван Вазов/ }).click();
+  await page.getByRole('button', { name: /Край.*Гара/ }).click();
+  const order = page.getByRole('button', { name: /Поръчай каручка/ });
+  await expect(order).toBeEnabled(); await expect(order).toContainText('7.00');
+  await page.getByRole('button', { name: 'Размени адресите' }).click();
+  await expect.poll(() => calls).toBe(2); await expect(order).toBeDisabled();
+  await page.getByRole('button', { name: 'Размени адресите' }).click();
+  await expect(order).toBeEnabled(); await expect(order).toContainText('7.00');
+  await expect.poll(() => aborted).toBe(1);
+  expect(calls).toBe(2); expect(state.errors).toEqual([]);
+});
+
+test('a mobile viewport event burst applies only its final layout', async ({ page }) => {
+  const state = await setupUi(page, 'CUSTOMER');
+  await page.goto('/customer/home');
+  await expect(page.getByRole('button', { name: 'От моята локация' })).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const root = document.querySelector<HTMLElement>('.customer-experience')!;
+    let changes = 0;
+    const observer = new MutationObserver(records => { changes += records.length; });
+    observer.observe(root, { attributes: true, attributeFilter: ['style'] });
+    for (let i = 0; i < 10; i++) {
+      Object.defineProperty(window.visualViewport!, 'height', { configurable: true, value: 429 - i });
+      window.visualViewport!.dispatchEvent(new Event('resize'));
+      window.visualViewport!.dispatchEvent(new Event('scroll'));
+    }
+    await new Promise(requestAnimationFrame);
+    await Promise.resolve(); observer.disconnect();
+    return { changes, height: root.getBoundingClientRect().height, short: root.dataset.shortViewport };
+  });
+  expect(result).toEqual({ changes: 1, height: 420, short: 'true' });
+  expect(state.errors).toEqual([]);
+});

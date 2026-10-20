@@ -108,6 +108,7 @@ function BookingMap({ pickup, destination, route, initialCenter, previewOwner, v
     const frame = container.current;
     const experience = frame?.closest('.customer-experience');
     const chrome = [...(experience?.querySelectorAll<HTMLElement>('.customer-header, .customer-route-controls, .customer-notice') ?? [])];
+    let lastFrame = '';
     const fit = () => {
       if (!points.length) return;
       const bounds = frame?.getBoundingClientRect();
@@ -120,6 +121,11 @@ function BookingMap({ pickup, destination, route, initialCenter, previewOwner, v
       const size = { width: container.current?.clientWidth ?? 0, height: container.current?.clientHeight ?? 0 };
       // Keep the last useful camera while a keyboard leaves no usable map area.
       if (size.width > 0 && size.height > 0 && (size.width - padding.left - padding.right < 80 || size.height - padding.top - padding.bottom < 64)) return;
+      // ResizeObserver also delivers initial and duplicate chrome notices.
+      // Restarting fitBounds for the same viewport interrupts Maps animation.
+      const nextFrame = JSON.stringify([size, padding]);
+      if (lastFrame === nextFrame) return;
+      lastFrame = nextFrame;
       frameMapPoints(currentMap, points, size, padding);
     };
     fit();

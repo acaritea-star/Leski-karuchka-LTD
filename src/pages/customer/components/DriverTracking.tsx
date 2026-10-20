@@ -155,11 +155,12 @@ export default function DriverTracking({
   // ── Real road route (pickup -> destination) ──
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setRouteInfo(null);
     computeRoute(
       { lat: request.pickup_latitude, lng: request.pickup_longitude },
       { lat: request.destination_latitude, lng: request.destination_longitude },
-      { travelMode: 'DRIVE', language: 'bg', units: 'METRIC', requestId: request.id, purpose: 'context' },
+      { travelMode: 'DRIVE', language: 'bg', units: 'METRIC', requestId: request.id, purpose: 'context', signal: controller.signal },
     )
       .then((res) => {
         if (active && res?.success) setRouteInfo(res);
@@ -169,6 +170,7 @@ export default function DriverTracking({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [
     request.id,

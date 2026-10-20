@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import bg from '@/i18n/local/bg/common';
 import AuthCallback from './page';
@@ -78,5 +78,36 @@ it('still reports other legal authorization errors instead of treating them as M
   legal.finish.mockRejectedValue({ code: '42501', message: 'Permission denied' });
   renderCallback();
   expect(await screen.findByRole('alert')).toBeTruthy();
+  expect(screen.queryByText('Authenticated app')).toBeNull();
+});
+
+it('recovers a transient first-login acceptance rejection using the same session', async () => {
+  window.history.replaceState({}, '', '/auth/callback?code=new-customer');
+  auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'user' } } }, error: null });
+  legal.finish.mockRejectedValueOnce({ code: 'PGRST301', status: 401, message: 'Unauthorized' });
+  renderCallback();
+  expect(await screen.findByText('Authenticated app')).toBeTruthy();
+  expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce();
+  expect(legal.finish).toHaveBeenCalledTimes(2);
+});
+
+it('retries completion without reusing a consumed OAuth code or requiring logout', async () => {
+  window.history.replaceState({}, '', '/auth/callback?code=consumed');
+  legal.finish.mockRejectedValueOnce({ code: '42501', status: 403, message: 'Permission denied' });
+  renderCallback();
+  await screen.findByRole('alert');
+  auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'user' } } }, error: null });
+  fireEvent.click(screen.getByRole('button', { name: 'Опитай отново' }));
+  expect(await screen.findByText('Authenticated app')).toBeTruthy();
+  expect(auth.exchangeCodeForSession).toHaveBeenCalledOnce();
+});
+
+it('does not retry acceptance for another account after a session changes', async () => {
+  window.history.replaceState({}, '', '/auth/callback?code=new-customer');
+  auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'other' } } }, error: null });
+  legal.finish.mockRejectedValueOnce({ status: 401, message: 'Unauthorized' });
+  renderCallback();
+  await screen.findByRole('alert');
+  expect(legal.finish).toHaveBeenCalledOnce();
   expect(screen.queryByText('Authenticated app')).toBeNull();
 });

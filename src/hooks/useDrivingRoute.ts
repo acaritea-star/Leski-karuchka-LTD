@@ -25,6 +25,7 @@ export function useDrivingRoute(origin: VehicleFix | null, targetLat: number, ta
     let path: RoutePoint[] = [];
     let measured = measureRoute(path);
     let sourceInfo: RouteResult | null = null;
+    let requestController: AbortController | null = null;
     const target = { lat: targetLat, lng: targetLng };
     setRoute(emptyRoute());
     const refresh = async () => {
@@ -68,12 +69,14 @@ export function useDrivingRoute(origin: VehicleFix | null, targetLat: number, ta
         return;
       }
       pending = true; attempts++;
+      const controller = new AbortController();
+      requestController = controller;
       const routeOrigin = { lat: fix.lat, lng: fix.lng };
       let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         const result = await Promise.race([
-          computeRoute(routeOrigin, target, { travelMode: 'DRIVE', language: 'bg', units: 'METRIC', requestId, purpose }),
-          new Promise<null>(resolve => { timeout = setTimeout(() => resolve(null), 20_000); }),
+          computeRoute(routeOrigin, target, { travelMode: 'DRIVE', language: 'bg', units: 'METRIC', requestId, purpose, signal: controller.signal }),
+          new Promise<null>(resolve => { timeout = setTimeout(() => { controller.abort(); resolve(null); }, 20_000); }),
         ]);
         if (!active || nearTarget) return;
         const decoded = result?.success && result.polyline ? measureRoute(decodePolyline(result.polyline)).points : [];
@@ -93,6 +96,7 @@ export function useDrivingRoute(origin: VehicleFix | null, targetLat: number, ta
         if (active) setRoute(previous => ({ ...previous, error: true, blocked: attempts >= MAX_ATTEMPTS_PER_LEG }));
       } finally {
         if (timeout) clearTimeout(timeout);
+        if (requestController === controller) requestController = null;
         pending = false;
       }
     };
@@ -104,6 +108,7 @@ export function useDrivingRoute(origin: VehicleFix | null, targetLat: number, ta
     window.addEventListener('online', run);
     return () => {
       active = false;
+      requestController?.abort();
       refreshRef.current = () => {};
       clearInterval(timer);
       document.removeEventListener('visibilitychange', run);

@@ -23,3 +23,9 @@ it('ignores expired or changed-version intents instead of accepting unseen text'
  sessionStorage.setItem('leski:oauth-legal-intent',JSON.stringify({terms:'old',privacy:legalOperator.privacyVersion,method:'google',created:Date.now()}));
  await finishLegalIntent();expect(mocks.rpc).not.toHaveBeenCalled();
 });
+it('preserves the HTTP status for bounded first-login recovery without losing the intent', async () => {
+ beginLegalIntent('google');
+ mocks.rpc.mockReturnValue({abortSignal:()=>Promise.resolve({data:null,error:{code:'PGRST301',message:'Unauthorized'},status:401})});
+ await expect(finishLegalIntent()).rejects.toMatchObject({code:'PGRST301',status:401});
+ expect(pendingLegalIntent()?.method).toBe('google');
+});

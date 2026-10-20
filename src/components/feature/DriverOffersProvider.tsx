@@ -14,6 +14,7 @@ export default function DriverOffersProvider({ children }: { children: ReactNode
   const [socket, setSocket] = useState<{ owner: string | null; connected: boolean }>({ owner: null, connected: false });
   const removal = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
+    setSocket({ owner: uid, connected: false });
     if (!uid) return;
     let active = true;
     let channel: RealtimeChannel | undefined;

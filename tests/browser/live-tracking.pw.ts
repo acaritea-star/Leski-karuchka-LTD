@@ -146,3 +146,23 @@ test('Online grants GPS once, unavailable active ride keeps sharing, completion 
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('synthetic-gps', { detail: 43.352 }))); expect(writes).toBe(stopped);
   expect(state.errors).toEqual([]);
 });
+
+test('a completed trip aborts its pending customer context route', async ({ page }) => {
+  const state = await setupUi(page, 'CUSTOMER'); state.rides = [ride()];
+  await installDevice(page); const socket = await socketHarness(page);
+  let calls = 0, aborted = 0, release!: () => void;
+  const waiting = new Promise<void>(resolve => { release = resolve; });
+  page.on('requestfailed', request => { if (request.url().endsWith('/google-routes')) aborted++; });
+  await page.route('**/functions/v1/google-routes', async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ headers: cors, status: 204 });
+    calls++; await waiting;
+    await route.fulfill({ headers: cors, json: { success: false } }).catch(() => {});
+  });
+  try {
+    await page.goto('/customer/home');
+    await expect.poll(() => calls).toBe(1); await expect.poll(socket.requestCount).toBeGreaterThan(0);
+    state.rides[0].status = 'completed'; socket.request(state.rides[0]);
+    await expect.poll(() => aborted).toBe(1);
+    expect(state.errors).toEqual([]);
+  } finally { release(); }
+});

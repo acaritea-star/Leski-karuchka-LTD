@@ -5,26 +5,42 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { socialAuthErrorKey } from '@/lib/socialAuth';
 import { finishLegalIntent } from '@/lib/legalAcceptance';
+import { withRequestTimeout } from '@/lib/requestTimeout';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [errorKey, setErrorKey] = useState('');
-  const startedRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
+  const startedRef = useRef<number | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (startedRef.current === attempt) return;
+    startedRef.current = attempt;
+    setErrorKey('');
 
-    const finishLogin = async () => {
-      try { await finishLegalIntent(); }
-      catch (error) {
-        // Staff OAuth starts at aal1. Reach the existing MFA boundary first;
-        // the legal notice still requires server-confirmed acceptance afterward.
-        const failure = error as { code?: string; message?: string } | null;
-        if (failure?.code !== '42501' || !failure.message?.startsWith('MFA_REQUIRED:')) throw error;
+    const finishLogin = async (owner: string) => {
+      for (let retry = 0; ; retry++) {
+        if (!mounted.current) return;
+        try { await finishLegalIntent(); break; }
+        catch (error) {
+          // Staff OAuth starts at aal1. Legal acceptance remains required after MFA.
+          const failure = error as { code?: string; message?: string; status?: number; name?: string } | null;
+          if (failure?.code === '42501' && failure.message?.startsWith('MFA_REQUIRED:')) break;
+          const transient = failure?.status === 401 || (failure?.status ?? 0) >= 500
+            || ['TypeError', 'TimeoutError', 'AbortError'].includes(failure?.name ?? '');
+          if (!transient || retry >= 2) throw error;
+          // This RPC is idempotent. Retry only login completion, never the
+          // one-use OAuth code, and never carry acceptance into another account.
+          await new Promise(resolve => setTimeout(resolve, retry === 0 ? 400 : 1200));
+          if (!mounted.current) return;
+          const current = await withRequestTimeout(() => supabase.auth.getSession());
+          if (current.error || current.data.session?.user.id !== owner) throw error;
+        }
       }
-      navigate(consumeAuthReturn(), { replace: true });
+      if (mounted.current) navigate(consumeAuthReturn(), { replace: true });
     };
     const run = async () => {
       try {
@@ -43,7 +59,8 @@ export default function AuthCallback() {
 
         if (code) {
           // detectSessionInUrl remains false: this is the only code exchange.
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          const { data, error } = await withRequestTimeout(() => supabase.auth.exchangeCodeForSession(code), 20_000);
+          if (!mounted.current) return;
           if (error) { setErrorKey(socialAuthErrorKey(error)); return; }
           const redirectType = (data as { redirectType?: string } | null)?.redirectType;
           if (redirectType === 'recovery') {
@@ -51,26 +68,29 @@ export default function AuthCallback() {
             return;
           }
           if (!data.session) { setErrorKey('auth_callback_missing'); return; }
-          await finishLogin();
+          await finishLogin(data.session.user.id);
           return;
         }
 
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await withRequestTimeout(() => supabase.auth.getSession());
+        if (!mounted.current) return;
         if (error) { setErrorKey(socialAuthErrorKey(error)); return; }
-        if (data.session) { await finishLogin(); return; }
+        if (data.session) { await finishLogin(data.session.user.id); return; }
         setErrorKey('auth_callback_missing');
       } catch (error) {
-        setErrorKey(socialAuthErrorKey(error));
+        if (mounted.current) setErrorKey(socialAuthErrorKey(error));
       }
     };
 
     void run();
-  }, [navigate]);
+  }, [navigate, attempt]);
 
   return <main className="brand-scope min-h-[100dvh] flex items-center justify-center p-6 bg-background-50">
     <div className="max-w-sm text-center">
       {errorKey ? <>
         <p role="alert" className="mb-4 text-foreground-800">{t(errorKey)}</p>
+        <button type="button" className="mb-4 min-h-11 rounded-xl bg-primary-500 px-5 py-3 text-white" onClick={() => setAttempt(value => value + 1)}>{t('auth_callback_retry')}</button>
+        <br />
         <Link className="underline text-primary-700" to="/auth/login">{t('auth_callback_back')}</Link>
       </> : <div role="status" className="flex flex-col items-center gap-3">
         <div className="size-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />

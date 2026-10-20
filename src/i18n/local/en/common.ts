@@ -149,6 +149,7 @@ export default {
   auth_callback_missing: 'Sign-in is incomplete. Please try again.',
   auth_callback_working: 'Completing sign-in…',
   auth_callback_back: 'Back to sign-in',
+  auth_callback_retry: 'Try again',
   select_role: 'Select Role',
   role_customer: 'Customer',
   role_driver: 'Driver',
