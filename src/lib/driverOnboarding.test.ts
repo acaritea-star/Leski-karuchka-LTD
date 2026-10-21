@@ -1,15 +1,34 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import document from '@/config/driverPreparation.json';
-import { acceptApplicationPreparation, parseOnboarding, pendingApplicationUpload, prepareApplicationUpload, uploadApplicationDocument } from './driverOnboarding';
+import { acceptApplicationPreparation, onboardingOptions, parseOnboarding, pendingApplicationUpload, prepareApplicationUpload, uploadApplicationDocument } from './driverOnboarding';
+import { QueryClient, QueryObserver, focusManager } from '@tanstack/react-query';
 import { webcrypto } from 'node:crypto';
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), upload: vi.fn() }));
 vi.mock('./supabase', () => ({ supabase: { rpc: mock.rpc, storage: { from: () => ({ upload: mock.upload }) } } }));
 const account = '11111111-1111-4111-8111-111111111111', company = '22222222-2222-4222-8222-222222222222', application = '33333333-3333-4333-8333-333333333333';
 const base = () => ({ application: { id: application, user_id: account, company_id: company, status: 'pending', has_vehicle: true, onboarding_revision: 1, submitted_at: null }, company_name: 'Test', documents: [], preparation: { document, content_hash: 'a'.repeat(64), receipt: null } });
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); vi.stubGlobal('crypto', webcrypto); });
-afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
+afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); focusManager.setFocused(undefined); vi.useRealTimers(); });
 describe('onboarding identity and network recovery', () => {
+  it('refreshes a waiting application automatically, pauses in the background and stops after approval', async () => {
+    vi.useFakeTimers(); focusManager.setFocused(true);
+    const data = { ...base(), application: { ...base().application, submitted_at: '2026-10-21T10:00:00Z' } };
+    mock.rpc.mockImplementation(() => ({ abortSignal: async () => ({ data: structuredClone(data), error: null }) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); client.mount();
+    const observer = new QueryObserver(client, onboardingOptions(application));
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      await vi.advanceTimersByTimeAsync(1); expect(mock.rpc).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(15_000); expect(mock.rpc).toHaveBeenCalledTimes(2);
+      focusManager.setFocused(false);
+      await vi.advanceTimersByTimeAsync(30_000); expect(mock.rpc).toHaveBeenCalledTimes(2);
+      data.application.status = 'approved'; focusManager.setFocused(true);
+      await vi.advanceTimersByTimeAsync(1); expect(mock.rpc).toHaveBeenCalledTimes(3);
+      expect(observer.getCurrentResult().data?.application.status).toBe('approved');
+      await vi.advanceTimersByTimeAsync(45_000); expect(mock.rpc).toHaveBeenCalledTimes(3);
+    } finally { unsubscribe(); client.unmount(); client.clear(); }
+  });
   it('rejects another company’s personal receipt instead of treating training as complete', () => {
     const data = base();
     const receipt = { id: application, application_id: application, user_id: account, company_id: application, terms_version: document.termsVersion, training_version: document.trainingVersion, content_hash: 'a'.repeat(64), accepted_at: '2026-10-10T00:00:00Z', training_completed_at: '2026-10-10T00:00:00Z' };

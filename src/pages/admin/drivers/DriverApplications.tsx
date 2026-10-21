@@ -23,8 +23,10 @@ export default function DriverApplications({ companyId, showInvitations = true }
   const [reviewId, setReviewId] = useState<string | null>(null);
   const latch = useRef(false);
   const key = ['admin-driver-applications', user?.id, companyId, target];
-  const query = useQuery({
+  const query = useQuery<Tables<'driver_applications'>[]>({
     queryKey: key,
+    refetchInterval: query => query.state.data?.length ? 15_000 : false,
+    refetchIntervalInBackground: false,
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(abort => {
         let read = supabase.from('driver_applications').select('*').eq('company_id', companyId).eq('status', 'pending');
@@ -62,7 +64,7 @@ export default function DriverApplications({ companyId, showInvitations = true }
   }
   return <div className="space-y-4 text-sm">
     {showInvitations && <PartnerInvitations key={companyId} kind="driver" companyId={companyId} />}
-    <p className="text-foreground-500">При готов пакет използвайте „Прегледай целия пакет“ и едно общо одобрение.</p>
+    <p className="text-foreground-500">Изберете кандидат, прегледайте документите и натиснете „Одобри шофьора“. Докато списъкът е отворен, статусът се обновява автоматично.</p>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {notice && <p role="status" className="text-accent-700">{notice}</p>}
     <button disabled={busy || query.isFetching} onClick={() => void query.refetch()} className="underline text-primary-700">Обнови кандидатурите</button>

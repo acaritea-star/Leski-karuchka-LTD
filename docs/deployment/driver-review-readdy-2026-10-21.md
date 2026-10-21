@@ -5,12 +5,18 @@ The GitHub source still used CommonJS `require` inside the Tailwind TS/ESM confi
 ## Review flow
 
 - Driver list → **Кандидатури за одобрение** opens submitted applications directly, without the invitation form.
-- Review documents → select/check vehicle → confirm review → one server-side verification operation. The server continues to own role changes, firm isolation, revision checks, immutable private file validation, policy acceptance, vehicle allocation and audit records.
-- The previous application form was keyed by every onboarding revision. A company insurance upload increments that revision; this remounted the form and erased the selected vehicle, already opened files and confirmation. The form now remains mounted for the same application. A file's reviewed status is keyed by its immutable ID, private path and expiry. A changed/new file must be opened again. Final confirmation is always tied to the current revision and is cleared after a failed/ambiguous submission or a vehicle/category change.
+- Review documents → select/check vehicle → **Одобри шофьора**, one explicit server-side verification operation. The server continues to own role changes, firm isolation, revision checks, immutable private file validation, policy acceptance, vehicle allocation and audit records.
+- The previous application form was keyed by every onboarding revision. A company insurance upload increments that revision; this remounted the form and erased the selected vehicle, already opened files and confirmation. The form now remains mounted for the same application. A file's reviewed status is keyed by its immutable ID, private path and expiry. A changed/new file must be opened again. The final **Одобри шофьора** action explicitly confirms the displayed package. There is no separate hidden checkbox. Each click pins the current revision; the server still checks the revision and records the explicit review confirmation.
 - Company insurance upload starts after vehicle selection; its expiry defaults to the selected vehicle's recorded insurance date. Uploading/refreshing disables approval. A failed preview or blocked popup never marks a file reviewed.
 - Missing documents, unreviewed documents, training, category/vehicle selection, expired permits/vehicle dates and mismatched insurance dates are shown next to the disabled approval button. Refresh actions preserve vehicle/note but reload authoritative requirements.
 - Existing drivers open the complete checklist through **Верифицирай** or **Детайли**. Document approval and final driver verification are in the same dialog. Document updates match driver, company, previous status and previous expiry; unsaved date edits block verification. Conflicting edits require another review. Confirmed verification is reflected in the open dialog; lost write responses are reconciled once, without automatically toggling again.
 - Review dialogs use normal scroll flow. Controls must remain clickable on mobile; the checklist does not float over document or refresh buttons.
+
+## Driver path
+
+The driver sees the signed-in email and company before starting. Existing profile name and phone stay prefilled; saved applications resume at their real current stage. The company-car path asks the driver only for their licence; the firm supplies the vehicle and insurance. Own-car drivers provide the car details, licence, insurance and registration. Training/policy acceptance and server verification remain mandatory.
+
+Submitted packages refresh every 15 seconds only while the view is visible, through the existing shared query. Drafts do not poll. Approval stops polling and shows **Готов си за работа** with **Към шофьорския панел**; logout/login is unnecessary. Open company application lists also reconcile pending statuses. No new realtime channel, SDK or background worker is added. MFA, verification and GPS remain required before taking requests.
 
 ## Session and invitation incident
 

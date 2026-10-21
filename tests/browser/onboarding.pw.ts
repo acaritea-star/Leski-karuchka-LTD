@@ -30,11 +30,11 @@ async function train(page: Page) {
   await page.getByRole('button', { name: 'Приеми условията и завърши подготовката' }).click();
 }
 
-for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole === 'DRIVER' ? 'orphan driver recovers through its personal invitation and' : 'invited candidate'} prepares a complete own-car package before verification, recovering a lost training reply`, async ({ page, context }, testInfo) => {
+for (const { startingRole, hasVehicle } of [{ startingRole: 'CUSTOMER', hasVehicle: true }, { startingRole: 'DRIVER', hasVehicle: true }, { startingRole: 'CUSTOMER', hasVehicle: false }] as const) test(`${startingRole === 'DRIVER' ? 'orphan driver recovers through its personal invitation and' : 'invited candidate'} prepares a complete ${hasVehicle ? 'own-car' : 'company-car'} package before verification, recovering a lost training reply`, async ({ page, context }, testInfo) => {
   // This end-to-end flow also captures five screens for visual review.
   testInfo.setTimeout(60_000);
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-  const user = await session(page, account); let a: ReturnType<typeof app> | null = null, r: ReturnType<typeof receipt> | null = null;
+  const user = await session(page, account); if (!hasVehicle) await page.clock.install(); let a: ReturnType<typeof app> | null = null, r: ReturnType<typeof receipt> | null = null;
   const docs: Record<string, unknown>[] = []; let accepts = 0, submits = 0, google = 0;
   let profileRole: string = startingRole, profileWrites = 0;
   await context.route('**/*', async route => {
@@ -56,7 +56,7 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
       profileRole = 'CUSTOMER';
       data = { status: 'preparation', destination: '/driver/access', role: profileRole, company_id: company, company_name: 'Поканилата фирма', application_id: a?.id };
     }
-    else if (url.pathname.endsWith('/begin_driver_onboarding')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); return route.abort(); }
+    else if (url.pathname.endsWith('/begin_driver_onboarding')) { expect(route.request().postDataJSON().p_company).toBe(company); a = app(); a.has_vehicle = hasVehicle; return route.abort(); }
     else if (url.pathname.endsWith('/driver_onboarding')) data = { application: a, company_name: 'Поканилата фирма', documents: docs, preparation: { document, content_hash: contentHash, receipt: r } };
     else if (url.pathname.endsWith('/accept_application_preparation')) { accepts++; r = receipt(); a!.onboarding_revision++; return route.abort(); }
     else if (url.pathname.endsWith('/save_application_vehicle')) { a!.vehicle_details = route.request().postDataJSON().p_details; a!.onboarding_revision++; data = application; }
@@ -66,7 +66,7 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
       if (b.p_type === 'vehicle_registration') expect(b.p_expires).toBeNull();
       docs.push({ id: b.p_id, application_id: application, user_id: account, company_id: company, type: b.p_type, expires_at: b.p_expires, file_url: 'storage://driver-documents/' + b.p_path });
       a!.onboarding_revision++; data = b.p_id;
-    } else if (url.pathname.endsWith('/submit_driver_onboarding')) { submits++; expect(docs).toHaveLength(3); expect(r).not.toBeNull(); a!.submitted_at = new Date().toISOString(); data = application; }
+    } else if (url.pathname.endsWith('/submit_driver_onboarding')) { submits++; expect(docs).toHaveLength(hasVehicle ? 3 : 1); expect(r).not.toBeNull(); a!.submitted_at = new Date().toISOString(); data = application; }
     else if (url.pathname.includes('/storage/v1/object/')) data = { Key: 'fixture', Id: driver };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data), headers: { 'access-control-allow-origin': '*' } });
   });
@@ -75,20 +75,22 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
   await expect(page.getByRole('heading', { name: 'Добре дошъл!' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Фирма, към която кандидатстваш' })).toHaveCount(0);
   if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-01-welcome.png'), fullPage: true });
-  await page.locator('select[name=experience]').selectOption('1–3'); await page.locator('select[name=vehicle]').selectOption('own');
+  await page.locator('select[name=experience]').selectOption('1–3'); await page.locator('select[name=vehicle]').selectOption(hasVehicle ? 'own' : 'company');
   await page.getByRole('button', { name: 'Запази и продължи към обучението' }).click();
   await expect(page.getByRole('form', { name: 'Качване: Шофьорска книжка' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Как работи приложението', exact: true })).toBeVisible();
   if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-02-training.png'), fullPage: true });
   await train(page);
   await expect(page.getByRole('heading', { name: 'Документи и автомобил' })).toBeVisible();
+  if (hasVehicle) {
   await page.getByLabel('Марка', { exact: true }).fill('Тест'); await page.getByLabel('Модел', { exact: true }).fill('Автомобил');
   await page.getByLabel('Регистрационен номер', { exact: true }).fill('A1234BC');
   await page.getByLabel('Застраховка до', { exact: true }).fill('2099-01-01'); await page.getByLabel('Технически преглед до', { exact: true }).fill('2099-02-01');
   await page.getByRole('button', { name: 'Запази избора и данните' }).click();
+  }
   await expect(page.getByRole('form', { name: /^Качване:/ })).toHaveCount(1);
   if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-03-document.png'), fullPage: true });
-  for (const name of ['Шофьорска книжка', 'Застраховка на автомобила', 'Свидетелство за регистрация на автомобила']) {
+  for (const name of hasVehicle ? ['Шофьорска книжка', 'Застраховка на автомобила', 'Свидетелство за регистрация на автомобила'] : ['Шофьорска книжка']) {
     const form = page.getByRole('form', { name: 'Качване: ' + name });
     if (name !== 'Свидетелство за регистрация на автомобила') await form.getByLabel('Валиден до').fill('2099-01-01');
     await form.getByLabel('Файл').setInputFiles({ name: 'fixture.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF synthetic') });
@@ -101,6 +103,12 @@ for (const startingRole of ['CUSTOMER', 'DRIVER'] as const) test(`${startingRole
   await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
   if (startingRole === 'CUSTOMER') await page.screenshot({ path: testInfo.outputPath('invitation-05-waiting.png'), fullPage: true });
   await page.reload(); await expect(page.getByText('Пакетът е изпратен.', { exact: false })).toBeVisible();
+  if (!hasVehicle) {
+    a!.status = 'approved';
+    await page.clock.fastForward(16_000);
+    await expect(page.getByRole('heading', { name: 'Готов си за работа', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Към шофьорския панел', exact: true })).toBeEnabled();
+  }
   expect(profileRole).toBe('CUSTOMER'); expect(profileWrites).toBe(0);
   expect(accepts).toBe(1); expect(submits).toBe(1); expect(google).toBe(0); expect(errors).toEqual([]);
 });
@@ -136,7 +144,7 @@ test('company admin reviews files and verifies a complete package with one actio
   await expect(page.getByLabel('Имейл на шофьора')).toBeVisible();
   await expect(page.getByLabel('Фирмен линк за присъединяване')).toHaveCount(0);
   await page.getByRole('button', { name: 'Прегледай целия пакет' }).click();
-  const approve = page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' });
+  const approve = page.getByRole('button', { name: 'Одобри шофьора' });
   await expect(approve).toBeDisabled();
   // Wait for each signed document to be confirmed before selecting the next.
   const unopened = page.getByRole('button', { name: 'Прегледай', exact: true });
@@ -145,7 +153,7 @@ test('company admin reviews files and verifies a complete package with one actio
     await unopened.first().click();
     await expect(unopened).toHaveCount(remaining - 1);
   }
-  await page.getByRole('checkbox', { name: /Проверих документите и разрешенията/ }).check();
+  await expect(page.getByRole('region', { name: 'Верификация на кандидат', exact: true }).getByRole('checkbox')).toHaveCount(0);
   await expect(approve).toBeEnabled(); await approve.click();
   await expect(page.getByText('Верифициран', { exact: true })).toBeVisible();
   expect(writes).toBe(1);

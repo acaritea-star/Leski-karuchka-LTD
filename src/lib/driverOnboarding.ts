@@ -36,7 +36,9 @@ export function parseOnboarding(value: unknown, applicationId: string): Onboardi
   return value as unknown as Onboarding;
 }
 export function onboardingOptions(applicationId: string) {
-  return queryOptions({ queryKey: onboardingKey(applicationId), staleTime: 15_000, retry: 1,
+  return queryOptions<Onboarding>({ queryKey: onboardingKey(applicationId), staleTime: 15_000, retry: 1,
+    refetchInterval: query => query.state.data?.application.status === 'pending' && query.state.data.application.submitted_at ? 15_000 : false,
+    refetchIntervalInBackground: false,
     queryFn: async ({ signal }) => {
       const { data, error } = await withRequestTimeout(abort => supabase.rpc('driver_onboarding', { p_application: applicationId }).abortSignal(abort), 10_000, signal);
       if (error) throw error;

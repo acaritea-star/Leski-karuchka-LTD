@@ -15,7 +15,6 @@ const validDate = (date: string | null | undefined) => !!date && !documentExpire
 function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboarding; refresh: () => Promise<unknown>; refreshing: boolean; onComplete: () => void }) {
   const a = bundle.application;
   const client = useQueryClient();
-  const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [category, setCategory] = useState(''), [vehicle, setVehicle] = useState(''), [note, setNote] = useState('');
   const [opened, setOpened] = useState<string[]>([]), [opening, setOpening] = useState<string | null>(null);
@@ -35,7 +34,6 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
   const chosenCategory = category || (options.data?.categories.length === 1 ? options.data.categories[0].id : '');
   const chosenVehicle = options.data?.vehicles.find(c => c.id === vehicle);
   const details = a.vehicle_details as Record<string, string> | null;
-  const checked = confirmedRevision === a.onboarding_revision;
   const allOpened = bundle.documents.length > 0 && bundle.documents.every(x => opened.includes(fileKey(x)));
   const reviewed = bundle.documents.filter(x => opened.includes(fileKey(x))).length;
   const required = a.has_vehicle ? ['license', 'insurance', 'vehicle_registration'] as const : ['license', 'insurance'] as const;
@@ -65,7 +63,6 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
     }
   }
   if (!allOpened) remaining.push('Прегледайте всички качени документи (' + reviewed + ' от ' + bundle.documents.length + ').');
-  if (!checked) remaining.push('Потвърдете проверката с отметката по-долу.');
 
   async function open(doc: ApplicationDocument) {
     if (opening) return;
@@ -83,15 +80,15 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
     if (latch.current || remaining.length || uploading || refreshing || options.isFetching || !!opening) return;
     latch.current = true; setBusy(true); setError('');
     try {
+      // Clicking the explicitly labelled approval action confirms the review.
       const { data, error } = await withRequestTimeout(signal => supabase.rpc('verify_driver_application', {
         p_application: a.id, p_revision: a.onboarding_revision, p_vehicle: a.has_vehicle ? null : vehicle,
-        p_category: a.has_vehicle ? chosenCategory : null, p_checks_confirmed: checked, p_note: note,
+        p_category: a.has_vehicle ? chosenCategory : null, p_checks_confirmed: true, p_note: note,
       }).abortSignal(signal));
       if (error) throw error;
       if (typeof data !== 'string' || !/^[0-9a-f-]{36}$/i.test(data)) throw new Error('Одобрението не е потвърдено. Обновете пакета.');
       onComplete();
     } catch (e) {
-      setConfirmedRevision(null);
       setError(workflowError(e, 'Одобрението не е потвърдено. Обновете пакета преди повторен опит.'));
       await refresh();
       // Vehicle allocation may have changed in another administrator's tab.
@@ -119,9 +116,9 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
       {a.has_vehicle ? <>
         <p className="text-sm">Собствен автомобил: {details?.make} {details?.model} · {details?.registration_number}</p>
         <p className="text-xs text-foreground-600">Застраховка до {details?.insurance_expiry_date} · Преглед до {details?.inspection_expiry_date}</p>
-        <label className="block text-sm">Категория<select disabled={options.isPending || busy} value={chosenCategory} onChange={e => { setCategory(e.target.value); setConfirmedRevision(null); }} className="block w-full rounded-xl border border-background-200 p-3 mt-1"><option value="">Изберете категория</option>{options.data?.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label className="block text-sm">Категория<select disabled={options.isPending || busy} value={chosenCategory} onChange={e => { setCategory(e.target.value); }} className="block w-full rounded-xl border border-background-200 p-3 mt-1"><option value="">Изберете категория</option>{options.data?.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       </> : <>
-        <label className="block text-sm">Назначете свободен фирмен автомобил<select value={vehicle} disabled={options.isPending || busy || uploading} onChange={e => { setVehicle(e.target.value); setConfirmedRevision(null); }} className="block w-full rounded-xl border border-background-200 p-3 mt-1"><option value="">Изберете автомобил</option>{options.data?.vehicles.map(c => <option key={c.id} value={c.id}>{c.registration_number} · {c.make} {c.model}</option>)}</select></label>
+        <label className="block text-sm">Назначете свободен фирмен автомобил<select value={vehicle} disabled={options.isPending || busy || uploading} onChange={e => { setVehicle(e.target.value); }} className="block w-full rounded-xl border border-background-200 p-3 mt-1"><option value="">Изберете автомобил</option>{options.data?.vehicles.map(c => <option key={c.id} value={c.id}>{c.registration_number} · {c.make} {c.model}</option>)}</select></label>
         {options.isSuccess && !options.data.vehicles.length && <p className="text-sm text-amber-800">Няма свободен активен автомобил. <Link to="/admin/vehicles" className="underline">Добавете или освободете автомобил</Link>, после обновете проверката.</p>}
         {chosenVehicle && <p className="text-xs text-foreground-600">За {chosenVehicle.registration_number}: застраховка до {chosenVehicle.insurance_expiry_date || 'не е въведена'} · преглед до {chosenVehicle.inspection_expiry_date || 'не е въведен'}.</p>}
         {chosenVehicle && <fieldset disabled={busy} className="min-w-0"><ApplicationDocumentCard key={chosenVehicle.id} bundle={bundle} type="insurance" defaultExpiry={chosenVehicle.insurance_expiry_date ?? ''} onSaved={refresh} onBusyChange={setUploading} /></fieldset>}
@@ -132,14 +129,14 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
     <section aria-label="Потвърждение на проверката" className="space-y-3">
       <h4 className="font-semibold">3. Потвърдете и верифицирайте</h4>
       <p className="text-sm text-foreground-600">{bundle.preparation.receipt ? '✓ Условията са приети лично и подготовката е завършена.' : 'Подготовката още не е завършена.'}</p>
-      <label className="flex items-start gap-3 rounded-xl bg-background-50 p-3 text-sm leading-relaxed"><input type="checkbox" checked={checked} disabled={busy || !allOpened} onChange={e => setConfirmedRevision(e.target.checked ? a.onboarding_revision : null)} className="mt-1 h-5 w-5 shrink-0 accent-primary-500" />Проверих документите и разрешенията за работа на този шофьор и автомобил.</label>
+      <p className="rounded-xl bg-background-50 p-3 text-sm leading-relaxed">С „Одобри шофьора“ потвърждавате, че сте проверили документите и разрешенията за работа на този шофьор и автомобил.</p>
       <details className="text-xs leading-relaxed text-foreground-600"><summary className="cursor-pointer min-h-8">Какво включва проверката?</summary><p className="mt-2">Четливост, самоличност, валидност, удостоверение за таксиметров водач, психологическа годност и приложимите фирмени и общински разрешения.</p></details>
       <label className="block text-sm">Бележка за проверката (по избор)<textarea maxLength={500} value={note} disabled={busy} onChange={e => setNote(e.target.value)} className="block w-full border border-background-200 rounded-xl p-3 mt-1" /></label>
     </section>
     <div className="space-y-3 rounded-xl border border-background-200 bg-white p-3">
       {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
       {remaining.length ? <div aria-label="Остава за верификация" className="text-sm"><p className="font-semibold">За да активирате бутона:</p><ul className="mt-2 list-disc pl-5 space-y-1 text-foreground-600">{remaining.map(reason => <li key={reason}>{reason}</li>)}</ul></div> : <p role="status" className="text-sm font-medium text-primary-700">Всичко е готово за верификация.</p>}
-      <button type="button" disabled={busy || uploading || refreshing || !!remaining.length || options.isFetching || !!opening} onClick={() => void verify()} className="min-h-12 w-full py-3 rounded-xl bg-primary-500 text-white font-semibold disabled:bg-background-200 disabled:text-foreground-500 disabled:cursor-not-allowed">{busy ? 'Потвърждаваме…' : uploading ? 'Изчакваме документа…' : refreshing ? 'Обновяваме пакета…' : 'Одобри и верифицирай наведнъж'}</button>
+      <button type="button" disabled={busy || uploading || refreshing || !!remaining.length || options.isFetching || !!opening} onClick={() => void verify()} className="min-h-12 w-full py-3 rounded-xl bg-primary-500 text-white font-semibold disabled:bg-background-200 disabled:text-foreground-500 disabled:cursor-not-allowed">{busy ? 'Потвърждаваме…' : uploading ? 'Изчакваме документа…' : refreshing ? 'Обновяваме пакета…' : 'Одобри шофьора'}</button>
       <p className="text-xs text-foreground-500">Одобрението записва документите и автомобила заедно. Шофьорът сам включва „Онлайн“, когато е готов.</p>
     </div>
   </section>;
@@ -151,7 +148,7 @@ export default function ApplicationReview({ applicationId, onComplete }: { appli
   if (query.data.application.status === 'approved') return <p role="status">Одобрението е записано. Шофьорът е добавен.</p>;
   if (query.data.application.status !== 'pending' || !query.data.application.submitted_at) return <p role="status">Пакетът е променен или още не е изпратен. Изчакайте кандидатът да го подготви.</p>;
   // Preserve vehicle/note and reviews of immutable, unchanged files across uploads.
-  // The final confirmation is tied to the current revision, so changed packages
-  // still require a fresh explicit confirmation and server-side revision check.
+  // The explicit approval button confirms the displayed revision. Changed files
+  // require another preview; the server also rejects stale revisions atomically.
   return <ReviewForm key={applicationId} bundle={query.data} refresh={() => query.refetch()} refreshing={query.isFetching} onComplete={onComplete} />;
 }

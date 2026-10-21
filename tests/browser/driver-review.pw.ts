@@ -57,12 +57,12 @@ async function openAll(page: Page) {
 for (const lost of [false, true]) test(`company-car review preserves selection and reviewed files after upload; verification reply lost=${lost}`, async ({ page }, testInfo) => {
   const state = await setupReview(page); state.loseVerificationReply = lost;
   const review = page.getByRole('region', { name: 'Верификация на кандидат', exact: true });
-  const approve = page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' });
+  const approve = page.getByRole('button', { name: 'Одобри шофьора' });
   await expect(approve).toBeDisabled();
   await expect(page.getByLabel('Остава за верификация')).toContainText('Изберете свободен фирмен автомобил');
   await page.getByLabel('Назначете свободен фирмен автомобил').selectOption(car);
   await openAll(page);
-  await page.getByRole('checkbox', { name: /Проверих документите/ }).check();
+  await expect(page.getByRole('region', { name: 'Верификация на кандидат', exact: true }).getByRole('checkbox')).toHaveCount(0);
   const form = page.getByRole('form', { name: 'Качване: Застраховка на автомобила' });
   await expect(form.getByLabel('Валиден до')).toHaveValue('2099-01-01');
   await form.getByLabel('Файл').setInputFiles({ name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF synthetic') });
@@ -70,8 +70,8 @@ for (const lost of [false, true]) test(`company-car review preserves selection a
   await expect(form).toHaveCount(0);
   await expect(page.getByLabel('Назначете свободен фирмен автомобил')).toHaveValue(car);
   await expect(review.getByText('Прегледани документи: 1 от 2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: /Проверих документите/ })).not.toBeChecked();
-  await openAll(page); await page.getByRole('checkbox', { name: /Проверих документите/ }).check();
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeDisabled();
+  await openAll(page); await expect(page.getByRole('region', { name: 'Верификация на кандидат', exact: true }).getByRole('checkbox')).toHaveCount(0);
   await expect(approve).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath('driver-review-ready.png'), fullPage: true });
   await approve.evaluate((el: HTMLButtonElement) => { el.click(); el.click(); });
@@ -83,21 +83,21 @@ test('a replaced document requires review and confirmation again while keeping t
   const state = await setupReview(page); state.docs.push(doc('insurance', '88888888-8888-4888-8888-888888888882'));
   await page.getByRole('button', { name: 'Обнови пакета', exact: true }).click();
   await page.getByLabel('Назначете свободен фирмен автомобил').selectOption(car);
-  await openAll(page); await page.getByRole('checkbox', { name: /Проверих документите/ }).check();
-  await expect(page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' })).toBeEnabled();
+  await openAll(page); await expect(page.getByRole('region', { name: 'Верификация на кандидат', exact: true }).getByRole('checkbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeEnabled();
   state.docs[0] = doc('license', '88888888-8888-4888-8888-888888888883'); state.a.onboarding_revision++;
   await page.getByRole('button', { name: 'Обнови пакета', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Верификация на кандидат', exact: true }).getByText('Прегледани документи: 1 от 2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: /Проверих документите/ })).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeDisabled();
   await expect(page.getByLabel('Назначете свободен фирмен автомобил')).toHaveValue(car);
-  await expect(page.getByRole('button', { name: 'Одобри и верифицирай наведнъж' })).toBeDisabled(); expect(state.verificationWrites).toBe(0);
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeDisabled(); expect(state.verificationWrites).toBe(0);
 });
 
 test('a failed document preview and expired company permit explain the blocked approval', async ({ page }) => {
   const state = await setupReview(page); state.failSignedUrl = true;
   await page.getByRole('button', { name: 'Прегледай', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Файлът не се отвори');
-  await expect(page.getByRole('checkbox', { name: /Проверих документите/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Прегледай', exact: true })).toHaveCount(1);
   state.failSignedUrl = false; state.permit = '2020-01-01';
   await page.getByRole('button', { name: 'Обнови автомобилите и изискванията' }).click();
@@ -110,7 +110,7 @@ test('blocked popup keeps the document unreviewed and tells the administrator ho
   await page.evaluate(() => { window.open = () => null; });
   await page.getByRole('button', { name: 'Прегледай', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Разрешете отварянето на документите');
-  await expect(page.getByRole('checkbox', { name: /Проверих документите/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Одобри шофьора' })).toBeDisabled();
   expect(state.verificationWrites).toBe(0);
 });
 
