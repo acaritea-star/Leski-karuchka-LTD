@@ -87,3 +87,5 @@ ROLLBACK;
 \ir staff_mfa.sql
 
 \ir launch_api_hardening.sql
+
+\ir stripe_sandbox_receipts.sql

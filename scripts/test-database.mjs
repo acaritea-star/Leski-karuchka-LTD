@@ -27,6 +27,8 @@ const concurrency = spawnSync(process.execPath,['scripts/test-money-concurrency.
 if(concurrency.status!==0) process.exit(concurrency.status||1);
 const checkout = spawnSync(process.execPath,['scripts/test-checkout-concurrency.mjs'],{stdio:'inherit'});
 if(checkout.status!==0) process.exit(checkout.status||1);
+const stripe = spawnSync(process.execPath,['scripts/test-stripe-concurrency.mjs'],{stdio:'inherit'});
+if(stripe.status!==0) process.exit(stripe.status||1);
 const acceptance = spawnSync(process.execPath,['scripts/test-acceptance-concurrency.mjs'],{stdio:'inherit'});
 if(acceptance.status!==0) process.exit(acceptance.status||1);
 
