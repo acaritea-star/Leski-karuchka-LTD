@@ -18,8 +18,28 @@ async function checkAccount() {
  }).catch(error => { accountCheck=undefined; throw error; });
  await accountCheck;
 }
-const sandboxVerify=(body:string,signature:string)=>stripe.webhooks.constructEventAsync(body,signature,(Deno.env.get('STRIPE_WEBHOOK_API')??'').trim(),undefined,Stripe.createSubtleCryptoProvider());
-const liveVerify=(body:string,signature:string)=>rideStripe.webhooks.constructEventAsync(body,signature,(Deno.env.get('STRIPE_LIVE_WEBHOOK_SECRET')??'').trim(),undefined,Stripe.createSubtleCryptoProvider());
+function verifier(client:Stripe,variable:string,environment:'sandbox'|'live') {
+ return async(body:string,signature:string)=>{
+  const secret=(Deno.env.get(variable)??'').trim();
+  try{return await client.webhooks.constructEventAsync(body,signature,secret,undefined,Stripe.createSubtleCryptoProvider());}
+  catch(error){
+   // Never log the key, signing secret, signature, raw body or SDK error message.
+   // A fixed category distinguishes configuration failures from malformed input.
+   const detail=error && typeof error==='object'?error as {name?:unknown;type?:unknown;message?:unknown}:{};
+   const name=typeof detail.type==='string'?detail.type:typeof detail.name==='string'?detail.name:'';
+   const message=typeof detail.message==='string'?detail.message:'';
+   const failure=message.startsWith('No signatures found matching')?'signature_mismatch':
+    message.startsWith('Timestamp outside')?'timestamp_outside_tolerance':
+    ['StripeSignatureVerificationError','TypeError','ReferenceError'].includes(name)?name:'verification_error';
+   console.warn(JSON.stringify({code:'stripe_webhook_verification_failed',environment,
+    signing_secret_configured:secret.startsWith('whsec_'),
+    failure}));
+   throw error;
+  }
+ };
+}
+const sandboxVerify=verifier(stripe,'STRIPE_WEBHOOK_API','sandbox');
+const liveVerify=verifier(rideStripe,'STRIPE_LIVE_WEBHOOK_SECRET','live');
 const sandboxHandler=createStripeSandboxHandler({
  verify: sandboxVerify,
  retrievePayment: async id => {

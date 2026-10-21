@@ -192,7 +192,7 @@
   "customerSafetyUxVersion": 2,
   "customerSafetyUxVerifiedSourceCommit": "79ea092daf660df2a7e6c2e620d1b7d0d21b3b56",
   "customerSafetyUxDeploymentStatus": "frontend-packaged",
-  "stripeSandboxWebhookVersion": 4,
+  "stripeSandboxWebhookVersion": 5,
   "stripeSandboxMigrationVersion": "20261021074427",
   "stripeCheckoutFrontendEnabled": true,
   "driverReviewUxVersion": 2,
@@ -203,7 +203,7 @@
   "driverOnboardingUxVersion": 2,
   "driverOnboardingUxVerifiedSourceCommit": "9b4f5d2031ce28fc0a50ff769675c2154f23fc4c",
   "stripeLivePaymentsEnabled": false,
-  "stripeWebhookVersion": 4,
+  "stripeWebhookVersion": 5,
   "rideCheckoutEdgeVersion": 1,
   "postTripPaymentVersion": 1,
   "postTripPaymentMigrationVersion": "20261021174851",
@@ -212,5 +212,7 @@
   "postTripPaymentVerifiedSourceCommit": "d6b78e5b9250a9317fd3699850b0a8b420ac4d92",
   "postTripPaymentDeploymentStatus": "database-and-edge-ready-live-activation-pending",
   "onlinePaymentMerchantScope": "leski-root-and-direct-city-divisions",
-  "onlinePaymentSandboxIsolated": true
+  "onlinePaymentSandboxIsolated": true,
+  "stripeSandboxSignedDeliveryStatus": "verification-failed",
+  "stripeSandboxCheckoutTestStatus": "stripe-paid-ledger-pending"
 }

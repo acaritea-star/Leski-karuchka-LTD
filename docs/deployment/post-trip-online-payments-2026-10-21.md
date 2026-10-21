@@ -81,14 +81,19 @@ return after payment, no start confirmation, and a missed realtime event.
 ## Deployment record
 
 On 2026-10-21 migration `20261021174851_post_trip_stripe_payments` was applied.
-The existing `stripe-webhook` URL now serves version 4, with independent raw-body
+The existing `stripe-webhook` URL now serves version 5, with independent raw-body
 signature verification and isolated storage for sandbox and live events.
 `ride-checkout` version 1 was deployed with authentication enforced in its body.
 Smoke checks returned 405 for webhook GET, 400 for an unsigned webhook POST, and
 401 for an unauthenticated checkout request. The sandbox endpoint includes
 `checkout.session.expired`. No live merchant is enabled and no live payment was
-made. A registered 1.23 EUR sandbox Checkout awaits the owner's phone test; an
-open Checkout is not evidence of a successful payment.
+made. The registered 1.23 EUR sandbox Checkout completed successfully in Stripe using
+the official test card and a synthetic non-deliverable contact address. Stripe
+reported `status=complete` and `payment_status=paid`, but the signed deliveries
+returned 400 and the isolated sandbox ledger remained pending. Therefore end-to-end
+webhook delivery is not yet accepted. Sanitized verification diagnostics record
+only the environment, a signing-secret format boolean and a fixed error category;
+keys, signatures, SDK error messages and request bodies are never logged.
 
 Database role checks confirm RLS on all three new private tables, no direct reads
 for anon/authenticated, and no authenticated ledger inserts or service-only RPC
