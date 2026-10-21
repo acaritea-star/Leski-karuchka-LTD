@@ -16,8 +16,8 @@ the ride/customer/company/merchant/amount/currency bound before Stripe. A single
 active order and deterministic Stripe idempotency key survive repeated clicks,
 tabs and lost responses. Redirects use the canonical `/customer/home` route.
 
-`stripe-webhook` verifies the raw-body signature, rejects sandbox and foreign
-account events, retrieves the current Checkout and PaymentIntent/charge, validates
+The live branch of `stripe-webhook` verifies the raw-body signature, rejects sandbox
+and foreign account events, retrieves the current Checkout and PaymentIntent/charge, validates
 all bindings and records a transaction only after full capture. Authentication,
 processing or delayed payment never means paid. Webhook-before-attachment and
 Stripe/database errors return 503 for retry. Reconciliation from an authenticated
@@ -39,7 +39,7 @@ and company administrators cannot write provider confirmations.
 ## Deployment and activation
 
 1. Run migration/role tests against disposable Supabase, then apply migration
-   `20261021141843_post_trip_stripe_payments.sql`. No merchant is enabled by DDL.
+   `20261021174851_post_trip_stripe_payments.sql`. No merchant is enabled by DDL.
 2. Set the restricted **live** key as `STRIPE_LIVE_SECRET_KEY` in Supabase's secure
    Edge Function secrets. It needs account-read, Checkout create/read/expire,
    PaymentIntent read and charge/refund read. The runtime verifies the account
@@ -77,3 +77,20 @@ settlement, cash races, double-income prevention, refunds and accounting. Browse
 tests cover the disabled-to-enabled client button, arrival at both screens,
 return after payment, no start confirmation, and a missed realtime event.
 
+
+## Deployment record
+
+On 2026-10-21 migration `20261021174851_post_trip_stripe_payments` was applied.
+The existing `stripe-webhook` URL now serves version 4, with independent raw-body
+signature verification and isolated storage for sandbox and live events.
+`ride-checkout` version 1 was deployed with authentication enforced in its body.
+Smoke checks returned 405 for webhook GET, 400 for an unsigned webhook POST, and
+401 for an unauthenticated checkout request. The sandbox endpoint includes
+`checkout.session.expired`. No live merchant is enabled and no live payment was
+made. A registered 1.23 EUR sandbox Checkout awaits the owner's phone test; an
+open Checkout is not evidence of a successful payment.
+
+Database role checks confirm RLS on all three new private tables, no direct reads
+for anon/authenticated, and no authenticated ledger inserts or service-only RPC
+execution. Advisor findings for the new private tables are informational deny-all
+RLS notices; the existing PostGIS/public-schema and Auth advisories remain.
