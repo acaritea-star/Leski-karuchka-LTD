@@ -72,7 +72,7 @@ BEGIN
  SELECT request_id INTO rid FROM private.ride_stripe_orders WHERE id=p_order_id;
  PERFORM 1 FROM public.taxi_requests WHERE id=rid FOR UPDATE;
  SELECT * INTO o FROM private.ride_stripe_orders WHERE id=p_order_id FOR UPDATE;
- IF NOT FOUND OR p_session_id IS NULL OR p_session_id !~ (CASE WHEN o.livemode THEN '^cs_live_[a-zA-Z0-9]+ OR p_url IS NULL OR p_url !~ '^https://checkout[.]stripe[.]com/'
+ IF NOT FOUND OR p_session_id IS NULL OR p_session_id !~ (CASE WHEN o.livemode THEN '^cs_live_[a-zA-Z0-9]+$' ELSE '^cs_test_[a-zA-Z0-9]+$' END) OR p_url IS NULL OR p_url !~ '^https://checkout[.]stripe[.]com/'
   OR o.checkout_session_id IS NOT NULL AND o.checkout_session_id<>p_session_id OR o.state='canceled' THEN RAISE EXCEPTION 'Checkout binding rejected'; END IF;
  UPDATE private.ride_stripe_orders SET checkout_session_id=p_session_id,checkout_url=p_url,state=CASE WHEN state='creating' THEN 'open' ELSE state END,updated_at=clock_timestamp() WHERE id=o.id RETURNING * INTO o;
  UPDATE public.taxi_requests SET online_payment_state=o.state,updated_at=clock_timestamp() WHERE id=o.request_id AND status='in_progress';
