@@ -27,11 +27,11 @@ BEGIN
  IF (o->>'livemode')::boolean OR NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride AND payment_environment='test') THEN RAISE EXCEPTION 'FAIL test reservation';END IF;
  PERFORM pg_temp.test_ride_denied(format('SELECT private.attach_ride_checkout(%L,''cs_live_wrong'',''https://checkout.stripe.com/c/pay/cs_live_wrong'')',o->>'id'));
  PERFORM private.attach_ride_checkout((o->>'id')::uuid,'cs_test_ride','https://checkout.stripe.com/c/pay/cs_test_ride');
- PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_test_ride','evt_test_paid','paid',1234,1234,0);
- PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_test_ride','evt_test_paid','paid',1234,1234,0);
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_paid','paid',1234,1234,0);
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_paid','paid',1234,1234,0);
  IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride AND status='completed' AND payment_environment='test' AND payment_status='paid') THEN RAISE EXCEPTION 'FAIL test lifecycle completion';END IF;
  IF EXISTS(SELECT 1 FROM public.payment_transactions WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.driver_money_entries WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.trips WHERE request_id=ride) THEN RAISE EXCEPTION 'FAIL simulated money entered real accounting';END IF;
- PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_test_ride','evt_test_refund','paid',1234,1234,100);
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_refund','paid',1234,1234,100);
  IF EXISTS(SELECT 1 FROM public.payment_transactions WHERE request_id=ride) THEN RAISE EXCEPTION 'FAIL test refund posted';END IF;
  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);EXECUTE 'SET LOCAL ROLE authenticated';
  report:=public.accounting_report(current_date,current_date+1,city,did,0);
