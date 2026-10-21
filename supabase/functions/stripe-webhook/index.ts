@@ -1,4 +1,4 @@
-import Stripe from 'npm:stripe@17.7.0';
+import Stripe from 'npm:stripe@22.6.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { createStripeSandboxHandler, SANDBOX_ACCOUNT } from '../_shared/stripeSandbox.ts';
 import { createStripeWebhookDispatcher } from '../_shared/stripeWebhookDispatcher.ts';
@@ -13,7 +13,7 @@ let accountCheck: Promise<void> | undefined;
 async function checkAccount() {
  // The webhook signing secret authenticates the sender. This extra check binds
  // reconciliation API reads to the same dedicated sandbox, never the live key.
- if (!accountCheck) accountCheck = stripe.accounts.retrieve().then(account => {
+ if (!accountCheck) accountCheck = stripe.accounts.retrieve(null).then(account => {
   if (account.id!==SANDBOX_ACCOUNT) throw Error('Stripe key is for another account');
  }).catch(error => { accountCheck=undefined; throw error; });
  await accountCheck;
