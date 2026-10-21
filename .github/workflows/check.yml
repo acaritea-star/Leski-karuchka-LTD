@@ -18,7 +18,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
       - run: node scripts/check-legal-source.mjs
-      - run: npx --yes deno@2.5.4 check supabase/functions/*/index.ts
+      - run: npx --yes deno@2.5.4 check --node-modules-dir=auto supabase/functions/*/index.ts
       - run: npx playwright install --with-deps chromium webkit
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
