@@ -1404,6 +1404,8 @@ export type Database = {
           cancelled_at: string | null
           cancelled_by: Database["public"]["Enums"]["cancelled_by"] | null
           company_id: string
+          trip_ended_at?: string | null
+          online_payment_state?: string
           completed_at: string | null
           created_at: string
           customer_id: string
@@ -1436,6 +1438,8 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: Database["public"]["Enums"]["cancelled_by"] | null
           company_id: string
+          trip_ended_at?: string | null
+          online_payment_state?: string
           completed_at?: string | null
           created_at?: string
           customer_id: string
@@ -1468,6 +1472,8 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: Database["public"]["Enums"]["cancelled_by"] | null
           company_id?: string
+          trip_ended_at?: string | null
+          online_payment_state?: string
           completed_at?: string | null
           created_at?: string
           customer_id?: string
@@ -1761,6 +1767,8 @@ export type Database = {
       create_company_division: { Args: { p_id: string; p_parent: string; p_data: Json }; Returns: Json }
       company_group_report: { Args: { p_parent: string; p_from: string; p_until: string }; Returns: Json }
       company_route_pricing: { Args: { p_company: string; p_lat: number; p_lng: number }; Returns: Json }
+      ride_payment_state: { Args: {p_request_id:string}; Returns:Json }
+      end_ride_trip: { Args: {p_request_id:string}; Returns:Database["public"]["Tables"]["taxi_requests"]["Row"] }
       complete_ride_payment: { Args: {p_id:string;p_request_id:string;p_actor:string;p_choice:string;p_partial_amount?:number|null;p_note?:string}; Returns:Json }
       record_driver_money_method: { Args: {p_id:string;p_kind:string;p_amount:number;p_note:string;p_actor:string;p_payment_method:string|null;p_request_id?:string;p_reference_id?:string;p_source?:string;p_evidence_ref?:string}; Returns:string }
       reserve_expense_receipt: { Args: {p_id:string;p_entry_id:string;p_actor:string;p_file_name:string;p_mime_type:string;p_byte_size:number;p_digest:string}; Returns:Json }

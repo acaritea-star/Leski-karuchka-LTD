@@ -45,6 +45,8 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
     if (url.origin !== 'http://127.0.0.1:54329') { state.external.push(url.href); return route.abort(); }
     let data: unknown = [];
     if (url.pathname.endsWith('/rpc/claim_customer_welcome')) { state.welcomeClaims++; data = state.welcomeFirst; state.welcomeFirst = false; }
+    else if(url.pathname.endsWith('/rpc/end_ride_trip')){const id=request.postDataJSON().p_request_id;const ride=state.rides.find(r=>r.id===id);if(!ride)return reply({message:'not found'},404);ride.trip_ended_at=new Date().toISOString();ride.final_price=ride.estimated_price;ride.updated_at=new Date().toISOString();data=ride;}
+    else if(url.pathname.endsWith('/rpc/ride_payment_state')){const id=request.postDataJSON().p_request_id;const ride=state.rides.find(r=>r.id===id);data={request_id:id,eligible:false,ended_at:ride?.trip_ended_at??null,amount:ride?.estimated_price??null,state:'none',payment_status:'pending',payment_method:'cash'};}
     else if (url.pathname.endsWith('/auth/v1/user')) data = user;
     else if (url.pathname.endsWith('/profiles')) {
       if (request.method() === 'PATCH') {

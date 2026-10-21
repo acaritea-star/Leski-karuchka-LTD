@@ -27,7 +27,7 @@ export default function DriverHistory() {
     queryFn: async ({ signal }) => {
       let query = supabase
         .from('taxi_requests')
-        .select('id,status,completed_at,cancelled_at,pickup_address,destination_address,estimated_distance_km,estimated_duration_min,final_price,estimated_price')
+        .select('id,status,payment_method,payment_status,completed_at,cancelled_at,pickup_address,destination_address,estimated_distance_km,estimated_duration_min,final_price,estimated_price')
         .eq('driver_id', driverId!);
       if (filter === 'completed') {
         query = query.eq('status', 'completed');
@@ -119,7 +119,7 @@ export default function DriverHistory() {
                     {t(STATUS_LABELS[trip.status] || trip.status)}
                   </span>
                   <span className="text-xs text-foreground-400">
-                    {formatDate(trip.completed_at || trip.cancelled_at)}
+                    {formatDate(trip.completed_at || trip.cancelled_at)}{trip.payment_method==='online'&&<span className="ml-2 text-primary-700">{trip.payment_status==='paid'?'Платено онлайн':trip.payment_status==='refunded'?'Възстановено онлайн':''}</span>}
                   </span>
                 </div>
 

@@ -4,6 +4,8 @@ import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
+import { endRideTrip } from '@/lib/ridePayment';
+import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
@@ -82,6 +84,7 @@ export default function DriverRequests() {
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
+  const paidNotice=useDriverPaymentNotice(user?.id,driver?.id,activeRequest?.id);
 
   // Reset nav info when active request changes (pickup → destination switch)
   useEffect(() => {
@@ -229,6 +232,16 @@ export default function DriverRequests() {
     },
   });
 
+  const endMutation=useMutation({retry:false,
+    mutationFn:(request:TaxiRequest)=>endRideTrip(request.id,driver!.id),
+    onSuccess:updated=>{
+      if(driver?.id)cacheDriverRequest(queryClient,driver.id,updated);
+      setError('');setPaymentNotice('');setCheckoutOwner(user?.id??'');setCheckoutRequest(updated);
+    },
+    onError:cause=>{setError(cause instanceof Error?cause.message:'Краят не е потвърден. Обнови курса и опитай пак.');
+      if(driver?.id)void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)});},
+  });
+
   // ── Realtime: taxi_requests ──
   useEffect(() => {
     if (!user?.id || !driver?.id) return;
@@ -246,6 +259,7 @@ export default function DriverRequests() {
             cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
+            if(newRow.payment_status==='paid'&&newRow.payment_method==='online'){setPaymentNotice('Платено онлайн');setCheckoutRequest(null);void queryClient.invalidateQueries({queryKey:['accounting']});}
             cacheDriverRequest(queryClient, driver.id, newRow);
           }
         },
@@ -435,7 +449,7 @@ export default function DriverRequests() {
             </div>
 
             {/* Live in-app navigation map */}
-            {navTarget && navTarget.lat != null && navTarget.lng != null && (
+            {!activeRequest.trip_ended_at && navTarget && navTarget.lat != null && navTarget.lng != null && (
               <div
                 className="mb-4 rounded-xl overflow-hidden border border-background-100"
                 style={{ height: '360px' }}
@@ -521,12 +535,14 @@ export default function DriverRequests() {
               {activeRequest.status === 'in_progress' && (
                 <>
                   <button
-                    onClick={() => { setPaymentNotice(''); setCheckoutOwner(user?.id ?? ''); setCheckoutRequest(activeRequest); }}
+                    disabled={endMutation.isPending}
+                    onClick={() => {if(activeRequest.trip_ended_at){setCheckoutOwner(user?.id??'');setCheckoutRequest(activeRequest);}else if(!endMutation.isPending)endMutation.mutate(activeRequest);}}
                     className="w-full py-3.5 rounded-xl bg-foreground-950 text-white text-sm font-semibold hover:bg-foreground-800 transition-colors whitespace-nowrap cursor-pointer active:scale-[0.98] flex items-center justify-center gap-2"
                   >
                     <i className="ri-flag-line" />
-                    {t('end_trip')}
+                    {endMutation.isPending?'Записване на края…':activeRequest.trip_ended_at?'Плащане по курса':t('end_trip')}
                   </button>
+                  {activeRequest.trip_ended_at&&<p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Пътуването приключи · Очаква плащане. Клиентът може да плати от телефона си или в брой.</p>}
                   <div className="bg-primary-50 rounded-xl p-3">
                     <p className="text-xs text-primary-700 font-medium flex items-center gap-1">
                       <i className="ri-map-pin-line text-primary-500" />
@@ -539,7 +555,7 @@ export default function DriverRequests() {
           </div>
         )}
 
-        {paymentNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paymentNotice}</p>}
+        {(paymentNotice||paidNotice) && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paymentNotice||paidNotice}</p>}
         {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => { setCheckoutRequest(null); void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)}); }} onFinished={ride => {
           if (activeOwner.current !== user.id) return;
           cacheDriverRequest(queryClient, driver.id, ride); setCheckoutRequest(null); setError('');

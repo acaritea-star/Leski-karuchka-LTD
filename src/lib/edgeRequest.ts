@@ -15,7 +15,7 @@ export class EdgeRequestError extends Error {
  * Keep its authenticated JSON request shape, with a cancellable transport.
  */
 export async function invokeEdge<T>(
-  name: 'google-geocode' | 'google-routes' | 'road-geometry',
+  name: 'google-geocode' | 'google-routes' | 'road-geometry' | 'ride-checkout',
   body: Record<string, unknown>,
   milliseconds: number,
   parent?: AbortSignal,

@@ -4,6 +4,8 @@ import { money, parseMoney } from '@/lib/accounting';
 import { clearCheckout, completeRidePayment, findCheckout, prepareCheckout, readCheckout, type CheckoutCommand, type PaymentChoice } from '@/lib/rideCheckout';
 import { isAmbiguousWrite } from '@/lib/rideOperations';
 import type { Tables } from '@/lib/database.types';
+import { useQuery } from '@tanstack/react-query';
+import { loadRidePayment,ridePaymentAction } from '@/lib/ridePayment';
 const button = 'min-h-12 rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-40';
 const input = 'mt-1 w-full min-h-11 rounded-xl border border-background-200 px-3 py-2 text-sm';
 export default function RideCheckout({ owner, driverId, request, onClose, onFinished }: {
@@ -29,6 +31,16 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
   return () => { mounted.current = false; };
  }, [owner, driverId]);
  const requestId = request?.id;
+ const payment=useQuery({queryKey:['ride-payment-state',owner,requestId],enabled:!!requestId,
+  queryFn:({signal})=>loadRidePayment(requestId!,signal),refetchInterval:10000,refetchIntervalInBackground:false,retry:1});
+ const onlineBusy=!!payment.data&&['creating','open','processing'].includes(payment.data.state);
+ const onlinePaid=payment.data?.payment_status==='paid'&&payment.data.payment_method==='online';
+ const cancelOnline=async()=>{
+  if(inFlight.current||!requestId)return;inFlight.current=true;setBusy(true);setError('');
+  try{await ridePaymentAction(requestId,'cancel');await payment.refetch();}
+  catch(cause){setError(cause instanceof Error?cause.message:'Онлайн плащането не е проверено.');}
+  finally{inFlight.current=false;if(mounted.current)setBusy(false);}
+ };
  useEffect(() => { if (requestId) { setHidden(false); setProblem(false); setPartial(''); setNote(''); } }, [requestId]);
  const finish = (command: CheckoutCommand, ride: Tables<'taxi_requests'>) => {
   if (!mounted.current) return;
@@ -74,7 +86,12 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={() => void run()}>Повтори същия запис</button>
     </div> : request && <>
      <div className="rounded-2xl bg-primary-50 p-5 text-center"><p className="text-xs text-foreground-600">Цена от заявката</p><p className="mt-1 text-4xl font-bold tabular-nums">{money(request.estimated_price == null ? null : Number(request.estimated_price))}</p><p className="mt-2 text-xs">Курс {request.id.slice(0,8)}</p></div>
-     {!problem ? <>
+     {onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">Платено онлайн</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
+      <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">Клиентът плаща онлайн. Изчакай потвърждението от Stripe.</p>
+      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>Провери и премини към плащане в брой</button>
+      <p className="text-xs text-foreground-500">Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.</p>
+     </>:!problem ? <>
+      {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">Клиентът вече може да плати от собствения си телефон. След потвърждение тук ще се появи „Платено онлайн“.</p>}
       <p className="text-sm text-foreground-600">Как получи парите? Потвърждението приключва курса и добавя плащането в отчета.</p>
       <button className={`${button} w-full bg-primary-500 text-white`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('cash')}>Получих в брой · приключи</button>
       <button className={`${button} w-full border border-primary-300 text-primary-800`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('card')}>Получих с карта · приключи</button>

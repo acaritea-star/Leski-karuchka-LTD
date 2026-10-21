@@ -24,6 +24,7 @@ export function AccountingOverview({ report, company, onTrips }: { report: Accou
         </div>)}
       </dl>
     </div>
+    {report.online_funds&&<div className="rounded-xl bg-primary-50 p-4 text-sm"><p>Онлайн към фирмата: <strong>{money(report.online_funds.net)}</strong></p><p className="mt-1 text-xs text-foreground-600">Потвърдени чрез Stripe: {money(report.online_funds.received)} · Възстановени: {money(report.online_funds.refunded)}. Отделно от парите у шофьора; това не е банково извлечение.</p></div>}
     {payment && <p className="text-xs text-foreground-600 px-1">Предадени в брой на фирмата: <strong>{money(payment.cash_handover)}</strong>. Картовите плащания са потвърдени от шофьора и подлежат на сверяване с терминала.</p>}
     {payment && (payment.unknown_income !== 0 || payment.unknown_expenses !== 0 || payment.unknown_handover !== 0 || payment.unknown_closing !== 0) && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Има записи без посочен начин на плащане. Те са отделно от касата: получени {money(payment.unknown_income)}, разходи {money(payment.unknown_expenses)}, предадени {money(payment.unknown_handover)}. Провери историята преди сверяване.</p>}
     <button type="button" onClick={onTrips} className="w-full min-h-12 flex items-center justify-between gap-3 rounded-xl border border-background-200 bg-white px-4 py-3 text-left text-sm">
@@ -105,15 +106,16 @@ export function AccountingTrips({ report, company, driver, blocked, onPayment }:
     {!report.outcomes.length && <p className="py-6 text-sm text-foreground-500">Няма приключени заявки за този месец.</p>}
     <div className="divide-y divide-background-100">{report.outcomes.map(o => {
       const payment = reconciliation.get(o.request_id);
-      const unpaid = o.outcome === 'completed' && (payment?.declared_income == null || (payment.outstanding ?? 0) > 0);
+      const unpaid = o.outcome === 'completed' && (payment?.declared_income == null && !(payment?.online_received??0) || (payment?.outstanding ?? 0) > 0);
       return <article key={o.id} className="py-4 space-y-2">
         <div className="flex justify-between gap-3"><p className="text-sm font-semibold">{o.outcome === 'completed' ? 'Завършен курс' : o.previous_status === 'in_progress' ? 'Прекратено пътуване' : 'Отменена заявка'}</p>
           <strong className="text-sm text-right tabular-nums">{o.outcome === 'completed' ? money(o.booked_amount) : 'Без начислен оборот'}</strong></div>
         <p className="text-xs text-foreground-500">{reportDate(o.occurred_at)}{company && ` · ${o.driver_name || 'Без назначен шофьор'}`}</p>
         {payment && <div className="space-y-1">
           <span className={`${badge} ${unpaid ? 'bg-amber-50 text-amber-800' : payment.company_confirmed ? 'bg-emerald-50 text-emerald-800' : 'bg-background-100 text-foreground-600'}`}>
-            {unpaid ? payment.declared_income == null ? 'Без отчетено плащане' : 'Частично платен' : payment.company_confirmed ? 'Сверено плащане' : 'Отчетено · за сверяване'}
+            {payment.online_received?'Платено онлайн':unpaid ? payment.declared_income == null ? 'Без отчетено плащане' : 'Частично платен' : payment.company_confirmed ? 'Сверено плащане' : 'Отчетено · за сверяване'}
           </span>
+          {!!payment.online_received&&<p className="text-xs text-foreground-600">Получено онлайн: {money(payment.online_received)} · Възстановено: {money(payment.online_refunded??0)}</p>}
           {payment.declared_income != null && <p className="text-xs text-foreground-600">{paymentMethodLabel(payment.payment_method)} · Получено: {money(payment.declared_income)} · Разлика спрямо заявката: {money(payment.difference)}</p>}
           {(payment.outstanding ?? 0)>0 && <p className="text-xs font-semibold text-amber-800">Остава за плащане: {money(payment.outstanding!)}</p>}
           {payment.payment_note && <p className="text-xs text-foreground-600 break-words">Причина при приключване: {payment.payment_note}</p>}

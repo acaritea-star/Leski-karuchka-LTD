@@ -18,9 +18,10 @@ export interface MoneyEntry {
  payment_method?: 'cash' | 'card' | null; effective_method?: 'cash' | 'card' | null;
  evidence_source?: string; evidence_reference?: string | null;
 }
-export const paymentMethodLabel = (method: string | null | undefined) => method === 'cash' ? 'В брой' : method === 'card' ? 'С карта' : method === 'mixed' ? 'Смесено плащане' : 'Без посочен начин';
+export const paymentMethodLabel = (method: string | null | undefined) => method === 'cash' ? 'В брой' : method === 'card' ? 'С карта' : method === 'online' ? 'Платено онлайн' : method === 'mixed' ? 'Смесено плащане' : 'Без посочен начин';
 export interface PaymentBreakdown { cash_income:number;card_income:number;unknown_income:number;cash_expenses:number;card_expenses:number;unknown_expenses:number;cash_handover:number;unknown_handover:number;cash_opening:number;cash_movement:number;cash_closing:number;unknown_closing:number }
 export interface AccountingReport {
+ online_funds?: {received:number;refunded:number;net:number};
  payment_breakdown?: PaymentBreakdown;
  report_version: 2; currency: 'EUR'; generated_at: string;
  period: { from: string; until: string; timezone: 'Europe/Sofia' }; scope: { company_id: string; driver_id: string | null };
@@ -28,7 +29,7 @@ export interface AccountingReport {
  finances: { income: number; expenses: number; handed_over: number; confirmed_handover: number; confirmed_income: number; net_income: number };
  balance: { opening: number; movement: number; closing: number; unconfirmed_handover: number; unconfirmed_income: number };
  driver_count: number; outcome_count: number; entry_count: number; outcomes: Outcome[]; entries: MoneyEntry[];
- reconciliation: { request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; outstanding?:number|null;payment_method?:string|null;checkout_choice?:string|null;payment_note?:string|null; difference:number|null }[];
+ reconciliation: { online_received?:number;online_refunded?:number;request_id:string; estimated_amount:number|null; declared_income:number|null; income_recorded_at:string|null; company_confirmed:boolean; outstanding?:number|null;payment_method?:string|null;checkout_choice?:string|null;payment_note?:string|null; difference:number|null }[];
  drivers: { driver_id: string | null; driver_name: string; trips: number; cancelled: number; booked: number; cash_income?:number;card_income?:number;unknown_income?:number;cash_closing?:number;income: number; expenses: number; handed_over: number; confirmed_income: number; confirmed_handover: number; closing: number }[];
 }
 export function sofiaMonth(now = new Date()): string {
@@ -143,13 +144,15 @@ export function parseAccountingReport(value: unknown, month: string, scope: { co
   if (!Object.hasOwn(evidenceLabels, String(e.evidence_source))) throw invalidReport();
   textValue(e.evidence_reference, true);
  }
+ if(r.online_funds!==undefined){const o=object(r.online_funds);for(const key of ['received','refunded','net'])amountValue(o[key]);if(cents(o.net as number)!==cents(o.received as number)-cents(o.refunded as number))throw invalidReport();}
  const outcomes = r.outcomes as Outcome[];
  if (!Array.isArray(r.reconciliation) || r.reconciliation.length !== outcomes.filter(o => o.outcome === 'completed').length) throw invalidReport();
  const recIds = new Set<string>();
  for (const row of r.reconciliation) {
   const rec = object(row);
   if (typeof rec.request_id !== 'string' || recIds.has(rec.request_id) || !outcomes.some(o => o.request_id === rec.request_id && o.outcome === 'completed') || typeof rec.company_confirmed !== 'boolean') throw invalidReport();
-  if (rec.outstanding != null && amountValue(rec.outstanding) < 0 || rec.payment_method != null && !['cash','card','mixed'].includes(String(rec.payment_method))) throw invalidReport();
+  if (rec.outstanding != null && amountValue(rec.outstanding) < 0 || rec.payment_method != null && !['cash','card','mixed','online'].includes(String(rec.payment_method))) throw invalidReport();
+  if(rec.online_received!==undefined)amountValue(rec.online_received);if(rec.online_refunded!==undefined)amountValue(rec.online_refunded);
   if (rec.payment_note != null) textValue(rec.payment_note);
   recIds.add(rec.request_id); dateValue(rec.income_recorded_at, true);
   for (const key of ['estimated_amount','declared_income','difference']) if (rec[key] !== null) amountValue(rec[key]);
@@ -176,6 +179,7 @@ export function csvCell(value: unknown): string {
 export function reportCsv(outcomes: Outcome[], entries: MoneyEntry[], report?: AccountingReport): string {
  const rows: unknown[][] = [];
  if (report) {
+  if(report.online_funds)rows.push(['Онлайн към фирмата',report.online_funds.received],['Възстановени онлайн',report.online_funds.refunded],['Нетно онлайн',report.online_funds.net]);
   if (report.payment_breakdown) rows.push(['Получени в брой',report.payment_breakdown.cash_income],['Получени с карта',report.payment_breakdown.card_income],['Приходи без посочен начин',report.payment_breakdown.unknown_income],['Изчислен остатък в брой',report.payment_breakdown.cash_closing]);
   rows.push(['Отчет',report.period.from,report.period.until,'Крайна дата — без включване','EUR','Europe/Sofia'],
    ['Фирма',report.scope.company_id],

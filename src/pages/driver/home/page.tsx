@@ -1,3 +1,4 @@
+import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
 import { loadDriverDay } from '@/lib/serverSummaries';
@@ -76,6 +77,7 @@ export default function DriverHome() {
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
+  const paidNotice=useDriverPaymentNotice(user?.id,driver?.id,activeRequest?.id);
 
   // ── Today stats ──
   const todayStatsQuery = useQuery({
@@ -552,6 +554,7 @@ export default function DriverHome() {
       </div>
 
       {/* Bottom Navigation */}
+      {paidNotice&&<p role="status" className="mx-4 mb-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{paidNotice}</p>}
       <BottomNav
         items={[
           { path: '/driver/home', labelKey: 'nav_home', icon: 'ri-home-4-line', iconActive: 'ri-home-4-fill' },

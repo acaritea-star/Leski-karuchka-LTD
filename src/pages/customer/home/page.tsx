@@ -50,6 +50,10 @@ interface ActiveRequest {
   destination_longitude: number;
   destination_address: string;
   estimated_price: number | null;
+  final_price?: number|null;
+  trip_ended_at?: string|null;
+  payment_status?: string;
+  payment_method?: string;
   fare_breakdown?: import('@/lib/database.types').Json | null;
   cancelled_by?: string | null;
   updated_at?: string;
@@ -406,6 +410,10 @@ export default function CustomerHome() {
           .order('created_at', { ascending: false }).limit(1).abortSignal(signal).maybeSingle(), 10_000, controller.signal);
         if (!active) return;
         if (error) throw error;
+        if(!data){
+          const returned=new URLSearchParams(window.location.search).get('payment_return');
+          if(returned&&/^[0-9a-f-]{36}$/i.test(returned)){const result=await withRequestTimeout(signal=>supabase.from('taxi_requests').select('*').eq('id',returned).eq('customer_id',user.id).abortSignal(signal).maybeSingle(),8000,controller.signal);if(result.error)throw result.error;if(active&&result.data){setActiveRequest(result.data as ActiveRequest);setRequestStatus('created');}}
+        }
         if (data) {
           setActiveRequest(data as ActiveRequest);
           setRequestStatus('created');

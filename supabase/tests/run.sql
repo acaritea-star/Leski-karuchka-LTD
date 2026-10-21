@@ -89,3 +89,5 @@ ROLLBACK;
 \ir launch_api_hardening.sql
 
 \ir stripe_sandbox_receipts.sql
+
+\ir post_trip_stripe_payments.sql

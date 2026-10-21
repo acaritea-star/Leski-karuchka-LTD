@@ -68,7 +68,7 @@ export async function setDivisionActive(division: CompanyDivision, active: boole
   return result;
 }
 
-export const divisionMetricKeys = ['completed','cancelled','income','expenses','handed_over','cash_income','card_income','unknown_income','cash_closing'] as const;
+export const divisionMetricKeys = ['online_income','completed','cancelled','income','expenses','handed_over','cash_income','card_income','unknown_income','cash_closing'] as const;
 export type DivisionMetrics = Record<typeof divisionMetricKeys[number], number>;
 export interface DivisionReport {
   parent_company_id: string; currency: 'EUR'; generated_at: string;
@@ -77,6 +77,7 @@ export interface DivisionReport {
 }
 function metrics(value: unknown): DivisionMetrics {
   const row = object(value);
+  if(row.online_income===undefined)row.online_income=0;
   for (const key of divisionMetricKeys) {
     const v = row[key];
     if (typeof v !== 'number' || !Number.isFinite(v) || !Number.isSafeInteger(Math.round(v * 100))

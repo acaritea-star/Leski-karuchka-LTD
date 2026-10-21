@@ -258,3 +258,6 @@
 @media(min-width:600px) and (max-height:480px) {
   .customer-safety { left:328px; bottom:24px; }
 }
+
+.tracking-payment-actions { flex-direction: column; }
+.tracking-payment-actions > * { flex: none; }

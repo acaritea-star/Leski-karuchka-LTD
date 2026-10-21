@@ -343,7 +343,7 @@ export default function CustomerOrders() {
                       )}
                       <span className="flex items-center gap-1">
                         <i className="ri-wallet-3-line text-foreground-400" />
-                        {t(`payment_${order.payment_method}`)}
+                        {order.payment_method==='online'?(order.payment_status==='paid'?'Платено онлайн':order.payment_status==='refunded'?'Възстановено онлайн':'Онлайн плащане'):t(`payment_${order.payment_method}`)}
                       </span>
                       {order.vehicle_type_id && vehicleTypeMap.get(order.vehicle_type_id) && (
                         <span className="flex items-center gap-1 text-primary-600">

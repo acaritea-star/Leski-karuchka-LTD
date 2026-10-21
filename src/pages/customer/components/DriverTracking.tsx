@@ -19,7 +19,7 @@ import { measureRoute } from '@/lib/routeGeometry';
 import { remainingRouteEstimate } from '@/lib/routeProgress';
 import CustomerLayout from './CustomerLayout';
 import AppMenu from './AppMenu';
-import RideStartConfirmation from './RideStartConfirmation';
+import CustomerRidePayment from './CustomerRidePayment';
 
 export interface TrackingRequest {
   id: string;
@@ -31,6 +31,10 @@ export interface TrackingRequest {
   destination_latitude: number;
   destination_longitude: number;
   destination_address: string;
+  estimated_price?: number|null;
+  final_price?: number|null;
+  trip_ended_at?: string|null;
+  updated_at?: string;
 }
 
 const NO_ROUTE: import('@/lib/googleMaps').RoutePoint[] = [];
@@ -54,7 +58,7 @@ export default function DriverTracking({
   const driverQuery = useQuery(trackingDriverOptions(user?.id, request.id, request.driver_id));
   const info = driverQuery.data?.info;
   const driverInfo = info ? { ...info, name: info.name || t('role_driver') } : null;
-  const location = useDriverPosition(request.driver_id, true, `${user?.id}:${request.id}`);
+  const location = useDriverPosition(request.driver_id, !request.trip_ended_at, `${user?.id}:${request.id}`);
   const positionStale = !usePositionFreshness(location);
   const loadingInfo = driverQuery.isPending;
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
@@ -341,8 +345,8 @@ export default function DriverTracking({
       <div className="booking-status-heading" role="status">
         <div className="booking-status-icon"><i className={isWaiting ? 'ri-map-pin-user-line' : 'ri-taxi-line'} aria-hidden="true" /></div>
         <div className="min-w-0">
-          <h2>{isWaiting ? t('driver_waiting') : headingToPickup ? t('heading_to_you') : t('status_in_progress')}</h2>
-          <p>{location && !positionStale && etaMinutes != null && !isWaiting
+          <h2>{request.trip_ended_at?'Пристигнахте':isWaiting ? t('driver_waiting') : headingToPickup ? t('heading_to_you') : t('status_in_progress')}</h2>
+          <p>{request.trip_ended_at?'Пътуването приключи. Остава плащането.':location && !positionStale && etaMinutes != null && !isWaiting
             ? `${t('arriving_in')} ~${etaMinutes} ${t('min')}`
             : isWaiting ? t('booking_meet_driver') : t('booking_waiting_location')}</p>
         </div>
@@ -368,10 +372,10 @@ export default function DriverTracking({
           </div>
         </>}
         {cancelError && <p className="booking-error" role="alert">{cancelError}</p>}
-        {request.status==='in_progress' && <RideStartConfirmation key={request.id} requestId={request.id} />}
       </div>
-      <div className="booking-status-actions">
-        {driverInfo?.phone && <a className="booking-primary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
+      <div className="booking-status-actions tracking-payment-actions">
+        <CustomerRidePayment key={request.id} requestId={request.id} price={request.final_price??request.estimated_price??null} endedAt={request.trip_ended_at} revision={request.updated_at} />
+        {driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
         {canCancel && onCancel && !cancelConfirm && <button type="button" className="booking-secondary" onClick={() => setCancelConfirm(true)}>{t('cancel_request')}</button>}
       </div>
     </div>

@@ -5,6 +5,7 @@ import { carrierChoiceName, displayPriceRange, type PriceRange } from '@/lib/mar
 export interface RequestData {
   id: string; company_id?: string; status: string; pickup_address: string; destination_address: string;
   estimated_price: number | null; cancelled_by?: string | null;
+  payment_status?:string;payment_method?:string;
   fare_breakdown?: import('@/lib/database.types').Json | null;
 }
 interface RequestStatusCardProps {
@@ -44,7 +45,7 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
         <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
         <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
       </div>}
-      {props.price != null && <div className="booking-meta"><span>{t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
+      {props.price != null && <div className="booking-meta"><span>{request.payment_method==='online'?(request.payment_status==='paid'?'Платено онлайн':request.payment_status==='refunded'?'Възстановено онлайн':'Онлайн плащане'):t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
       <CarrierIdentity companyId={request.company_id} />
       {props.requestError && <p className="booking-error" role="alert">{props.requestError}</p>}
     </div>
