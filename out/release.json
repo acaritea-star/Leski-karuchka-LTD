@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.21-reverse-debug.1",
-  "baseCommit": "17efeb812d437ad0dcf3b61e7f91b7178844e041",
+  "release": "2026.10.21-customer-safety.1",
+  "baseCommit": "95b426253487042f97e4f7fd603b064b19dcd42b",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "5c742cc1506be5631265884f62f2ca93eed4c3cd",
+  "verifiedSourceCommit": "79ea092daf660df2a7e6c2e620d1b7d0d21b3b56",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -33,7 +33,8 @@
     "20261019084226_city_company_divisions",
     "20261019174904_customer_push_recipient_binding",
     "20261020083638_customer_first_welcome",
-    "20261020151835_launch_api_hardening"
+    "20261020151835_launch_api_hardening",
+    "20261021074427_stripe_sandbox_receipts"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -186,5 +187,11 @@
   "reverseDebugVerifiedSourceCommit": "5c742cc1506be5631265884f62f2ca93eed4c3cd",
   "reverseDebugDeploymentStatus": "frontend-packaged",
   "reverseDebugCheckRun": 39493012450,
-  "reverseDebugDatabaseRun": 39493012493
+  "reverseDebugDatabaseRun": 39493012493,
+  "customerSafetyUxVersion": 2,
+  "customerSafetyUxVerifiedSourceCommit": "79ea092daf660df2a7e6c2e620d1b7d0d21b3b56",
+  "customerSafetyUxDeploymentStatus": "frontend-packaged",
+  "stripeSandboxWebhookVersion": 2,
+  "stripeSandboxMigrationVersion": "20261021074427",
+  "stripeCheckoutFrontendEnabled": false
 }
