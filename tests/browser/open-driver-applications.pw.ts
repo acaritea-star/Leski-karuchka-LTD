@@ -53,7 +53,7 @@ for (const closes of ['never', 'selection', 'submission'] as const) test(`open c
       await expect(page.getByText('В момента няма фирми с отворено кандидатстване.', { exact: false })).toBeVisible();
     } else {
       await page.reload();
-      await expect(page.getByRole('heading', { name: 'Продължи подготовката' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Твоят шофьорски профил' })).toBeVisible();
     }
     expect(selections).toBe(1);
   }
