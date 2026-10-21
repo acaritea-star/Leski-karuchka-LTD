@@ -6,7 +6,7 @@ import { LIVE_RIDE_ACCOUNT, type RideOrder, type RideStripeSnapshot } from './ri
 export const rideStripe=new Stripe(Deno.env.get('STRIPE_LIVE_SECRET_KEY')??Deno.env.get('STRIPE_API_KEY')??'not_configured',{timeout:6000,maxNetworkRetries:0});
 let ready:Promise<void>|undefined;
 export async function requireRideStripe() {
- if(!ready)ready=rideStripe.accounts.retrieve().then(account=>{
+ if(!ready)ready=rideStripe.accounts.retrieve(null).then(account=>{
   if(account.id!==LIVE_RIDE_ACCOUNT || !account.charges_enabled)throw Error('Live merchant is not ready');
  }).catch(error=>{ready=undefined;throw error;});
  await ready;

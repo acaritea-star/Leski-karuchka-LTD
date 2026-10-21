@@ -125,7 +125,7 @@ BEGIN
   OR p_received_minor NOT BETWEEN 0 AND o.amount_minor OR p_refunded_minor NOT BETWEEN 0 AND p_received_minor
   OR p_state IS NULL OR p_state NOT IN ('open','processing','canceled','paid') OR p_state='paid' AND (p_received_minor<>o.amount_minor OR p_payment_id IS NULL)
   OR p_state='canceled' AND p_received_minor<>0 OR r.company_id<>o.company_id OR r.customer_id<>o.customer_id OR r.driver_id<>o.driver_id
-  OR r.trip_ended_at IS NULL OR r.final_price*100<>o.amount_minor THEN RAISE EXCEPTION 'Payment binding rejected'; END IF;
+  OR r.status NOT IN ('in_progress','completed') OR r.trip_ended_at IS NULL OR r.final_price*100<>o.amount_minor THEN RAISE EXCEPTION 'Payment binding rejected'; END IF;
  SELECT order_id INTO old_event FROM private.ride_stripe_events WHERE account_id=p_account_id AND event_id=p_event_id;
  IF FOUND AND old_event<>o.id THEN RAISE EXCEPTION 'Payment event collision'; END IF;
  received:=greatest(o.received_minor,p_received_minor); refunded:=greatest(o.refunded_minor,p_refunded_minor);
@@ -179,6 +179,14 @@ BEGIN
 END $f$;
 CREATE TRIGGER prevent_online_cash_income BEFORE INSERT ON public.driver_money_entries FOR EACH ROW EXECUTE FUNCTION private.prevent_online_cash_income();
 REVOKE ALL ON FUNCTION private.prevent_online_cash_income() FROM PUBLIC,anon,authenticated,service_role;
+CREATE FUNCTION private.prevent_cancel_during_online_payment() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $f$
+BEGIN
+ IF NEW.status='cancelled' AND OLD.status='in_progress' AND EXISTS(SELECT 1 FROM private.ride_stripe_orders WHERE request_id=OLD.id AND state<>'canceled') THEN
+  RAISE EXCEPTION 'Cancel and reconcile the online payment before canceling this ride'; END IF;
+ RETURN NEW;
+END $f$;
+CREATE TRIGGER prevent_cancel_during_online_payment BEFORE UPDATE ON public.taxi_requests FOR EACH ROW EXECUTE FUNCTION private.prevent_cancel_during_online_payment();
+REVOKE ALL ON FUNCTION private.prevent_cancel_during_online_payment() FROM PUBLIC,anon,authenticated,service_role;
 ALTER FUNCTION private.accounting_report_v3(date,date,uuid,uuid,integer,boolean,boolean) RENAME TO accounting_report_before_online;
 CREATE FUNCTION private.accounting_report_v3(p_from date,p_until date,p_company_id uuid,p_driver_id uuid,p_page integer,p_export boolean,p_summary boolean)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $f$

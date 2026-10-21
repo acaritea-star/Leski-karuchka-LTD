@@ -6,7 +6,7 @@ DO $t$
 DECLARE root uuid:=gen_random_uuid();city uuid:=gen_random_uuid();foreign_city uuid:=gen_random_uuid();duid uuid:=gen_random_uuid();customer uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();did uuid;vt uuid:=gen_random_uuid();ride uuid:=gen_random_uuid();ride2 uuid:=gen_random_uuid();op uuid:=gen_random_uuid();o jsonb;r jsonb;report jsonb;aid text:='acct_1USiOkPYGWX41ye8';
 BEGIN
  INSERT INTO public.companies(id,name,slug)VALUES(root,'Synthetic root','stripe-root-'||root),(foreign_city,'Foreign','stripe-foreign-'||foreign_city);
- INSERT INTO public.companies(id,name,slug,parent_company_id)VALUES(city,'Synthetic branch','stripe-city-'||city,root);
+ INSERT INTO public.companies(id,name,slug,parent_company_id,service_city,service_latitude,service_longitude,service_radius_km)VALUES(city,'Synthetic branch','stripe-city-'||city,root,'Synthetic City',43.2,25.6,5);
  INSERT INTO private.ride_stripe_merchants(account_id,root_company_id,enabled)VALUES(aid,root,true);
  INSERT INTO auth.users(id,email)SELECT u,'stripe-'||u||'@example.invalid' FROM unnest(ARRAY[duid,customer,outsider])t(u);
  UPDATE public.profiles SET role='DRIVER',company_id=city WHERE id=duid;SELECT id INTO STRICT did FROM public.drivers WHERE user_id=duid;

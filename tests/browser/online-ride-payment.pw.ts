@@ -9,7 +9,7 @@ test('driver ends trip; client pay unlocks; a verified server update reaches dri
   await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:true,ended_at:row.trip_ended_at,amount:row.final_price??row.estimated_price,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}}));
  }
  await customer.route('**/functions/v1/ride-checkout',route=>{if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});const body=route.request().postDataJSON();expect(body).toEqual({action:'checkout',request_id:id});checkouts++;row.online_payment_state='open';return route.fulfill({headers:cors,json:{state:'open',url:'https://checkout.stripe.com/c/pay/cs_live_synthetic'}});});
- await customer.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Тестов Checkout</h1>'}));
+ await customer.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<h1>Тестов Checkout</h1>'}));
  await driver.route('**/rest/v1/rpc/complete_ride_payment',route=>{manual++;return route.abort();});
  await customer.goto('/customer/home');await driver.goto('/driver/requests');
  const pay=customer.getByRole('button',{name:'Плати онлайн с карта',exact:true});await expect(pay).toBeDisabled();await expect(customer.getByText('2.95 €',{exact:true})).toBeVisible();
