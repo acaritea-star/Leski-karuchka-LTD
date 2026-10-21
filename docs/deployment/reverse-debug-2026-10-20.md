@@ -63,9 +63,9 @@ the viewport test reproduced 20 style writes for a 10-event burst.
   logout, one welcome, route reversal, viewport bursts and terminal route abort.
 - Existing native Supabase tests remain the gate for company isolation, real
   Auth/MFA, competing acceptance, payment idempotency, receipts and welcome claims.
-- Current measured JavaScript graph: initial 660,016 bytes / 210,198 gzip;
-  booking plus initial 757,330 bytes / 244,697 gzip. Compared with the prior audit:
-  +300 / +133 bytes initially, +594 / +279 for booking. External Google Maps is
+- Current measured JavaScript graph: initial 660,016 bytes / 210,188 gzip;
+  booking plus initial 757,378 bytes / 244,700 gzip. Compared with the prior audit:
+  +300 / +123 bytes initially, +642 / +282 for booking. External Google Maps is
   excluded. No dependency, polling loop or realtime channel was added.
 - This package requires no database migration and changes no production records
   or security/payment flags. The public site was verified on the preceding
@@ -88,3 +88,22 @@ the viewport test reproduced 20 style writes for a 10-event burst.
   This audit does not certify that every possible defect is excluded.
 - After the checked main package is ready, Readdy requires **Pull from GitHub →
   Publish**; a main push by itself does not replace the public frontend.
+
+## Final CI verification — 21 October 2026
+
+Verified application source: `5c742cc1506be5631265884f62f2ca93eed4c3cd`.
+
+- [Check](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39493012450):
+  702 unit tests in 105 files and 175 Chromium/WebKit browser scenarios passed;
+  one browser-specific scenario was skipped. Lint, typecheck, production build,
+  legal-source digest, Edge Function checks and production dependency audit passed.
+- [Native Supabase](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/39493012493):
+  passed, including real Auth/MFA, cross-company access rejection, concurrent
+  dispatch/payment operations and immutable receipt/document workflows.
+- Release package: `2026.10.21-reverse-debug.1`. The preceding attempt to finish
+  packaging was blocked by an automatic-approval usage-limit error. No main ref
+  was updated in that attempt; source was preserved on the work branch.
+
+The final package changes only release metadata, this verification report and
+built output relative to the tested application source. Existing hashed assets
+are retained so already-open clients can still load their original chunks.

@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.20-launch-audit.1",
-  "baseCommit": "17068f51c1b6af48bd3113a083f4bac89f9ee927",
+  "release": "2026.10.21-reverse-debug.1",
+  "baseCommit": "17efeb812d437ad0dcf3b61e7f91b7178844e041",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "5247c5fcfa86daffedd1b81ac5d824913c89c43b",
+  "verifiedSourceCommit": "5c742cc1506be5631265884f62f2ca93eed4c3cd",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -181,5 +181,10 @@
   "ridePaymentEnforcementEnabled": true,
   "ridePaymentEnforcedAt": "2026-10-20T15:20:47.045745Z",
   "launchAuditCheckRun": 39447522847,
-  "launchAuditDatabaseRun": 39447523038
+  "launchAuditDatabaseRun": 39447523038,
+  "reverseDebugVersion": 1,
+  "reverseDebugVerifiedSourceCommit": "5c742cc1506be5631265884f62f2ca93eed4c3cd",
+  "reverseDebugDeploymentStatus": "frontend-packaged",
+  "reverseDebugCheckRun": 39493012450,
+  "reverseDebugDatabaseRun": 39493012493
 }
