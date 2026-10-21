@@ -11,14 +11,14 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => (
   welcome_title: 'Добре дошъл', welcome_cta: 'Ясно, започваме', welcome_close: 'Затвори приветствието',
   welcome_step_1_title: 'Избери откъде и докъде', welcome_step_2_title: 'Сравни фирмите и цените',
   welcome_step_3_title: 'Поръчай и следи шофьора',
-  welcome_emergency_title: 'При спешен случай', welcome_emergency_desc: 'Бутонът „112“ е горе вдясно на екрана с картата.',
+  welcome_emergency_title: 'При спешен случай', welcome_emergency_desc: 'Сигурност · 112 до панела за поръчка.',
 } as Record<string, string>)[key] ?? key }) }));
 const gate = (path = '/customer/home') => <MemoryRouter initialEntries={[path]}><CustomerWelcomeGate /></MemoryRouter>;
 beforeEach(() => { vi.clearAllMocks(); api.user = { id: 'a', role: 'CUSTOMER', first_name: 'Алекс' }; api.loading = false; api.claim.mockResolvedValue({ data: true, error: null }); });
 afterEach(cleanup);
 it('shows simple steps and the emergency button location, then dismisses without another claim', async () => {
  render(gate()); const modal = await screen.findByRole('dialog', { name: 'Добре дошъл' });
- expect(modal.textContent).toContain('Сравни фирмите и цените'); expect(modal.textContent).toContain('112'); expect(modal.textContent).toContain('горе вдясно');
+ expect(modal.textContent).toContain('Сравни фирмите и цените'); expect(modal.textContent).toContain('Сигурност · 112'); expect(modal.textContent).toContain('до панела');
  fireEvent.click(screen.getByRole('button', { name: 'Ясно, започваме' }));
  expect(screen.queryByRole('dialog')).toBeNull(); expect(api.claim).toHaveBeenCalledTimes(1);
 });

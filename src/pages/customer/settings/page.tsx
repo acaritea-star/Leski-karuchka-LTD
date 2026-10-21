@@ -1,4 +1,4 @@
-import EmergencyHelp from '@/components/feature/EmergencyHelp';
+import { EmergencyDock } from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
 import LocationSettings from '@/components/feature/LocationSettings';
 import PrivacyRequests from '@/components/feature/PrivacyRequests';
@@ -40,14 +40,15 @@ export default function CustomerSettings() {
   const initials = `${user?.first_name?.charAt(0) || ''}${user?.last_name?.charAt(0) || ''}`;
 
   return (
-    <div className="min-h-screen bg-background-50">
+    <div className="min-h-screen bg-background-50 pb-[calc(88px+env(safe-area-inset-bottom))]">
+      <EmergencyDock />
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-background-100 px-4 py-3 flex items-center gap-3">
         <BackButton to="/customer/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">
           {t('nav_settings')}
         </h1>
-        <EmergencyHelp /><AppMenu />
+        <AppMenu />
       </header>
 
       <div className="p-4 space-y-4">

@@ -1,0 +1,15 @@
+.emergency-trigger {
+  display:inline-flex; align-items:center; justify-content:center; gap:7px; flex-shrink:0;
+  min-width:44px; min-height:44px; padding:9px 12px; border:1px solid #eadbd8;
+  border-radius:999px; background:#fff; color:#7f3732; font-size:12px; font-weight:600;
+  line-height:1.2; white-space:nowrap; box-shadow:0 3px 14px #19382b0d;
+  -webkit-tap-highlight-color:transparent; cursor:pointer;
+}
+.emergency-number { padding-left:7px; border-left:1px solid #eadbd8; font-weight:800; font-variant-numeric:tabular-nums; }
+.emergency-trigger:focus-visible { outline:3px solid #b78623; outline-offset:3px; }
+@media(hover:hover) { .emergency-trigger:hover { background:#fff5f3; border-color:#cfa6a0; } }
+.emergency-dock {
+  position:fixed; z-index:40; left:max(16px,env(safe-area-inset-left));
+  top:calc(var(--customer-top,0px) + var(--customer-height,100dvh) - 60px - env(safe-area-inset-bottom));
+  width:max-content;
+}

@@ -10,11 +10,11 @@ export default function CustomerLayout({ map, header, notice, mapControls, child
 }) {
   const viewportRef = useCustomerViewport();
   return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers} data-offer-view={offerView}>
-    <div className="customer-map">{map}</div>
-    <header className="customer-header">{header}<EmergencyHelp /></header>
+    <div className="customer-map">{map}<div className="customer-safety"><EmergencyHelp /></div></div>
+    <header className="customer-header">{header}</header>
     {notice && <div className="customer-notice" role="status">{notice}</div>}
     {mapControls && <div className="customer-route-controls">{mapControls}</div>}
-    <main className="customer-sheet"><div className="customer-short-emergency"><EmergencyHelp /></div>{children}</main>
+    <main className="customer-sheet">{children}</main>
   </div>;
 }
 

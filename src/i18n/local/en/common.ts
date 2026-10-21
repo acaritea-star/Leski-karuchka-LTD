@@ -1,5 +1,6 @@
 export default {
   emergency_open: 'Emergency help on 112',
+  emergency_safety: 'Safety',
   emergency_title: 'Emergency help',
   emergency_description: 'For immediate danger or police, fire or medical assistance, call 112.',
   emergency_call: 'Call 112',
@@ -269,7 +270,7 @@ export default {
 
   welcome_close: "Close welcome",
   welcome_emergency_title: "In an emergency",
-  welcome_emergency_desc: "For emergency help, use the 112 button at the top right of the map.",
+  welcome_emergency_desc: "For emergency help, use Safety · 112 beside the booking panel, or at the bottom left on other screens.",
   // Onboarding (first-run welcome)
   welcome_title: 'Welcome',
   welcome_subtitle: "Get started in three simple steps.",

@@ -34,7 +34,7 @@ export default function WelcomeOnboarding({ onClose }: { onClose: () => void }) 
         </li>)}
       </ol>
       <div className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-3">
-        <span aria-hidden="true" className="shrink-0 whitespace-nowrap rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700">112 ↗</span>
+        <span aria-hidden="true" className="shrink-0 whitespace-nowrap rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700">112</span>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-red-800">{t('welcome_emergency_title')}</h3>
           <p className="mt-1 text-xs leading-relaxed text-red-800">{t('welcome_emergency_desc')}</p>

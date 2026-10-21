@@ -215,13 +215,13 @@
   .customer-notice + .customer-route-controls { top:156px; }
 }
 @media(min-width:600px) and (max-height:480px) {
-  .customer-experience[data-offers=true] { display:block; }
-  .customer-experience[data-offers=true] .customer-map { position:absolute; inset:0; }
-  .customer-experience[data-offers=true] .customer-header { left:12px; right:auto; top:12px; width:300px; }
-  .customer-experience[data-offers=true] .customer-route-controls { left:12px; right:auto; top:84px; width:300px; }
-  .customer-experience[data-offers=true] .customer-notice { left:326px; right:12px; top:12px; }
-  .customer-experience[data-offers=true] .customer-notice + .customer-route-controls { top:84px; }
-  .customer-experience[data-offers=true] .customer-sheet { position:absolute; inset:auto auto 12px 12px; width:300px; margin:0; max-height:calc(var(--customer-height,100dvh) - 154px); }
+  .customer-experience { display:block; }
+  .customer-experience .customer-map { position:absolute; inset:0; }
+  .customer-experience .customer-header { left:12px; right:auto; top:12px; width:300px; }
+  .customer-experience .customer-route-controls { left:12px; right:auto; top:84px; width:300px; }
+  .customer-experience .customer-notice { left:326px; right:12px; top:12px; }
+  .customer-experience .customer-notice + .customer-route-controls { top:84px; }
+  .customer-experience .customer-sheet { position:absolute; inset:auto auto 12px 12px; width:300px; margin:0; max-height:calc(var(--customer-height,100dvh) - 154px); }
   .customer-experience[data-offers=true][data-offer-view=all] .customer-sheet,
   .customer-experience[data-offers=true][data-offer-view=details] .customer-sheet { height:calc(var(--customer-height,100dvh) - 154px); }
   .carrier-category select { width:82px; }
@@ -236,20 +236,24 @@
   .carrier-details-button { flex-basis:36px; }
 }
 @media(max-width:599px) {
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=all] > .customer-header,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=all] > .customer-route-controls,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=all] > .customer-notice,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] > .customer-header,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] > .customer-route-controls,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] > .customer-notice { display:none; }
+  .customer-experience[data-short-viewport=true] {
+    --panel-height:min(var(--sheet-height),calc(var(--customer-height,100dvh) - 112px - env(safe-area-inset-bottom)));
+  }
+  .customer-experience[data-short-viewport=true] > .customer-header,
+  .customer-experience[data-short-viewport=true] > .customer-route-controls,
+  .customer-experience[data-short-viewport=true] > .customer-notice { display:none; }
+  .customer-experience[data-offers=true][data-short-viewport=true] .customer-sheet { max-height:calc(var(--customer-height,100dvh) - 96px); }
 }
 
-/* Keep emergency access distinct without adding a floating map obstruction. */
+/* Safety belongs beside the trip panel; header actions keep their full targets.
+   Leave the map attribution below the chip and zoom/recenter controls on the right. */
 .customer-brand > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .customer-brand small { overflow:hidden; text-overflow:ellipsis; }
 .customer-brand > img { flex-shrink:0; }
-.customer-short-emergency { display:none; }
-@media(max-width:599px) {
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=all] .customer-short-emergency,
-  .customer-experience[data-offers=true][data-short-viewport=true][data-offer-view=details] .customer-short-emergency { display:flex; justify-content:flex-end; flex-shrink:0; }
+.customer-safety { position:absolute; z-index:26; left:16px; bottom:32px; }
+@media(min-width:768px) {
+  .customer-safety { left:448px; bottom:40px; }
+}
+@media(min-width:600px) and (max-height:480px) {
+  .customer-safety { left:328px; bottom:24px; }
 }

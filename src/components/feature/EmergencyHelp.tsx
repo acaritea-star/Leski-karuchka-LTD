@@ -1,15 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import Modal from './Modal';
+import { useCustomerViewport } from '@/hooks/useCustomerViewport';
+import './emergency.css';
 
 /** A device dialer link, independent of GPS, maps and the application network. */
 export default function EmergencyHelp() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return <>
-    <button type="button" aria-label={t('emergency_open')} title={t('emergency_open')} onClick={() => setOpen(true)}
-      className="inline-flex items-center justify-center shrink-0 min-w-11 h-11 rounded-xl border border-red-200 bg-red-50 px-2 text-xs font-bold text-red-700 hover:bg-red-100">
-      <span aria-hidden="true">112</span>
+    <button type="button" aria-label={t('emergency_open')} aria-haspopup="dialog" title={t('emergency_open')} onClick={() => setOpen(true)}
+      className="emergency-trigger">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4 6v5c0 5 4 8 8 10 4-2 8-5 8-10V6z" /><path d="M12 8v5m0 3v.01" /></svg>
+      <span aria-hidden="true">{t('emergency_safety')}</span><span className="emergency-number" aria-hidden="true">112</span>
     </button>
     {open && <Modal label={t('emergency_title')} onClose={() => setOpen(false)} className="max-w-sm">
       <div className="p-5 space-y-4">
@@ -25,4 +28,10 @@ export default function EmergencyHelp() {
       </div>
     </Modal>}
   </>;
+}
+
+/** Secondary screens reserve bottom space; the dock follows the software keyboard. */
+export function EmergencyDock() {
+  const viewport = useCustomerViewport();
+  return <div ref={viewport} className="emergency-dock"><EmergencyHelp /></div>;
 }

@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { AppUser } from '@/hooks/useAuth';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
 import LegalAcceptanceNotice from './LegalAcceptanceNotice';
-import EmergencyHelp from './EmergencyHelp';
+import { EmergencyDock } from './EmergencyHelp';
 import { roleHomePath } from '@/lib/roleHome';
 
 interface AuthGuardProps {
@@ -24,7 +24,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
   const navigate = useNavigate();
 
   const rolesKey = allowedRoles ? allowedRoles.join(',') : '';
-  const emergency = allowedRoles?.includes('CUSTOMER') ? <div className="fixed top-4 right-4 z-[60]"><EmergencyHelp /></div> : null;
+  const emergency = allowedRoles?.includes('CUSTOMER') ? <EmergencyDock /> : null;
 
   useEffect(() => {
     if (loading) return;

@@ -11,7 +11,8 @@ test('a new customer sees route, company, tracking and 112 guidance only once ac
  await expect(welcome.getByText('Сравни фирмите и цените')).toBeVisible();
  await expect(welcome.getByText('Поръчай и следи шофьора')).toBeVisible();
  await welcome.getByRole('heading', { name: 'При спешен случай', exact: true }).scrollIntoViewIfNeeded();
- await expect(welcome).toContainText('горе вдясно');
+ await expect(welcome).toContainText('Сигурност · 112');
+ await expect(welcome).toContainText('до панела за поръчка');
  expect(await welcome.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
  await expect(welcome.getByRole('button', { name: 'Ясно, започваме' })).toBeInViewport();
  await page.screenshot({ path: test.info().outputPath('customer-welcome-mobile.png') });

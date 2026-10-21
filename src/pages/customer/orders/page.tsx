@@ -1,4 +1,4 @@
-import EmergencyHelp from '@/components/feature/EmergencyHelp';
+import { EmergencyDock } from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
 import Modal from '@/components/feature/Modal';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -182,6 +182,7 @@ export default function CustomerOrders() {
   if (ordersQuery.isLoading) {
     return (
       <div className="min-h-screen bg-background-50 flex items-center justify-center">
+        <EmergencyDock />
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-foreground-500">{t('loading')}</span>
@@ -193,6 +194,7 @@ export default function CustomerOrders() {
   if (ordersQuery.isError) {
     return (
       <div className="min-h-screen bg-background-50 flex items-center justify-center px-4">
+        <EmergencyDock />
         <div className="text-center">
           <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
             <i className="ri-error-warning-line text-2xl text-red-500" />
@@ -213,13 +215,14 @@ export default function CustomerOrders() {
   }
 
   return (
-    <div className="min-h-screen bg-background-50">
+    <div className="min-h-screen bg-background-50 pb-[calc(88px+env(safe-area-inset-bottom))]">
+      <EmergencyDock />
       {/* Header */}
       <div className="sticky top-0 z-50">
       <header className="bg-white/80 backdrop-blur-xl border-b border-background-100 px-4 py-3 flex items-center gap-3">
         <BackButton to="/customer/home" />
         <h1 className="text-lg font-bold text-foreground-950 font-heading flex-1">{t('nav_orders')}</h1>
-        <EmergencyHelp /><AppMenu />
+        <AppMenu />
       </header>
 
       {/* Tabs */}

@@ -1,5 +1,6 @@
 export default {
   emergency_open: 'Спешна помощ на 112',
+  emergency_safety: 'Сигурност',
   emergency_title: 'Спешна помощ',
   emergency_description: 'При непосредствена опасност или нужда от полиция, пожарна или медицинска помощ се обади на 112.',
   emergency_call: 'Обади се на 112',
@@ -269,7 +270,7 @@ export default {
 
   welcome_close: "Затвори приветствието",
   welcome_emergency_title: "При спешен случай",
-  welcome_emergency_desc: "За спешна помощ използвай бутона „112“ горе вдясно на картата.",
+  welcome_emergency_desc: "За спешна помощ натисни „Сигурност · 112“ до панела за поръчка или долу вляво на останалите екрани.",
   // Onboarding (first-run welcome)
   welcome_title: 'Добре дошъл',
   welcome_subtitle: "Поръчката става в три лесни стъпки.",
