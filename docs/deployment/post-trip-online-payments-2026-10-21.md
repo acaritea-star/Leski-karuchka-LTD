@@ -81,7 +81,7 @@ return after payment, no start confirmation, and a missed realtime event.
 ## Deployment record
 
 On 2026-10-21 migration `20261021174851_post_trip_stripe_payments` was applied.
-The existing `stripe-webhook` URL now serves version 5, with independent raw-body
+The existing `stripe-webhook` URL now serves version 6, with independent raw-body
 signature verification and isolated storage for sandbox and live events.
 `ride-checkout` version 1 was deployed with authentication enforced in its body.
 Smoke checks returned 405 for webhook GET, 400 for an unsigned webhook POST, and
@@ -99,3 +99,16 @@ Database role checks confirm RLS on all three new private tables, no direct read
 for anon/authenticated, and no authenticated ledger inserts or service-only RPC
 execution. Advisor findings for the new private tables are informational deny-all
 RLS notices; the existing PostGIS/public-schema and Auth advisories remain.
+
+The live merchant mapping for the Leski root was registered with `enabled=false`.
+Sandbox verification sees a configured `whsec_` value, but Stripe's signed test
+requests are rejected as `invalid_signature`. The owner must compare the signing
+secret of sandbox endpoint `we_1USiYCBXRX2hZ2VT23HCk8Bn` against the securely saved
+`STRIPE_WEBHOOK_API` value and resend the existing Checkout completion event.
+Do not copy signing secrets into tickets, source, logs or chat.
+
+The verified frontend source run passed 748 unit tests and 205 browser checks
+(1 existing skip) on Chromium/WebKit. Database regression passed after the applied
+migration filename was aligned. The packaged build retains historical assets,
+uses the production Supabase project, includes no secret Stripe key or Supabase
+service key, and adds no client-side Stripe SDK.
