@@ -16,7 +16,7 @@ the ride/customer/company/merchant/amount/currency bound before Stripe. A single
 active order and deterministic Stripe idempotency key survive repeated clicks,
 tabs and lost responses. Redirects use the canonical `/customer/home` route.
 
-`ride-stripe-webhook` verifies the raw-body signature, rejects sandbox and foreign
+`stripe-webhook` verifies the raw-body signature, rejects sandbox and foreign
 account events, retrieves the current Checkout and PaymentIntent/charge, validates
 all bindings and records a transaction only after full capture. Authentication,
 processing or delayed payment never means paid. Webhook-before-attachment and
@@ -44,11 +44,10 @@ and company administrators cannot write provider confirmations.
    Edge Function secrets. It needs account-read, Checkout create/read/expire,
    PaymentIntent read and charge/refund read. The runtime verifies the account
    identity and `charges_enabled`; the existing sandbox key cannot be substituted.
-3. Deploy `ride-checkout` (JWT checked in its body) and `ride-stripe-webhook`
-   (raw-body Stripe signature, JWT disabled). Preserve `stripe-webhook` and its
-   sandbox-only ledger unchanged.
+3. Deploy `ride-checkout` (JWT checked in its body) and `stripe-webhook`
+   (raw-body Stripe signature, JWT disabled). Keep the existing webhook URL and dispatch signed sandbox events to its isolated sandbox ledger.
 4. Create a live Stripe event destination for
-   `https://rzjyvxmfqnnxglmgnvma.supabase.co/functions/v1/ride-stripe-webhook`.
+   `https://rzjyvxmfqnnxglmgnvma.supabase.co/functions/v1/stripe-webhook`.
    Subscribe to Checkout completed/expired/async success/failure,
    PaymentIntent succeeded/processing/payment_failed/canceled, charge.refunded,
    and refund created/updated/failed. Store its signing secret exclusively as
@@ -77,3 +76,4 @@ Rollback SQL covers role/tenant checks, branch eligibility, idempotent arrival a
 settlement, cash races, double-income prevention, refunds and accounting. Browser
 tests cover the disabled-to-enabled client button, arrival at both screens,
 return after payment, no start confirmation, and a missed realtime event.
+
