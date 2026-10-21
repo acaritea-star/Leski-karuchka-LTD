@@ -120,7 +120,7 @@ test('company admin reviews files and verifies a complete package with one actio
       let data: unknown = [];
       if (url.pathname.endsWith('/auth/v1/user')) data = user;
       else if (url.pathname.endsWith('/profiles')) data = url.searchParams.get('id')?.startsWith('in.') ? [{ id: account, first_name: 'Тест', last_name: 'Водач' }] : { id: adminId, role: 'COMPANY_ADMIN', is_active: true, company_id: company, first_name: 'Админ', last_name: 'Тест' };
-      else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Тестова фирма', is_active: true }];
+      else if (url.pathname.endsWith('/companies')) data = [{ id: company, name: 'Тестова фирма', is_active: true, permit_expires_on: '2099-01-01' }];
       else if (url.pathname.endsWith('/legal_acceptances')) data = { id: driver };
       else if (url.pathname.endsWith('/driver_applications')) data = verified ? [] : [a];
       else if (url.pathname.endsWith('/company_driver_page')) data = { total: verified ? 1 : 0, rows: verified ? [{ id: driver, user_id: account, company_id: company, is_verified: true, is_online: false, online_now: false, gps_received_at: null, gps_position_at: null, total_trips: 0, rating: 5, document_verification_required: true, first_name: 'Тест', last_name: 'Водач' }] : [] };
@@ -145,7 +145,7 @@ test('company admin reviews files and verifies a complete package with one actio
     await unopened.first().click();
     await expect(unopened).toHaveCount(remaining - 1);
   }
-  await page.getByRole('checkbox', { name: /Проверих четливостта/ }).check();
+  await page.getByRole('checkbox', { name: /Проверих документите и разрешенията/ }).check();
   await expect(approve).toBeEnabled(); await approve.click();
   await expect(page.getByText('Верифициран', { exact: true })).toBeVisible();
   expect(writes).toBe(1);

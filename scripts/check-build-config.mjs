@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createJiti } from 'jiti';
+import postcss from 'postcss';
+import tailwind from 'tailwindcss';
+const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+assert.equal(pkg.dependencies['tailwindcss-animate'], '1.0.7', 'The Readdy build needs the pinned animation plugin outside devDependencies');
+assert.equal(lock.packages[''].dependencies['tailwindcss-animate'], pkg.dependencies['tailwindcss-animate']);
+assert.notEqual(lock.packages['node_modules/tailwindcss-animate'].dev, true, 'Production-only installs must retain the plugin');
+const source = await readFile(new URL('../tailwind.config.ts', import.meta.url), 'utf8');
+assert(!/\brequire\s*\(/.test(source), 'Keep the Tailwind config compatible with the ES module build');
+const config = await createJiti(import.meta.url).import('../tailwind.config.ts', { default: true });
+const { css } = await postcss([tailwind({ ...config, content: [{ raw: '<div class="animate-spin animate-in animate-out fade-in fade-out zoom-in-95 slide-in-from-right-6 slide-out-to-right"></div>' }] })]).process('@tailwind utilities;', { from: undefined });
+for (const selector of ['.animate-spin', '.animate-in', '.animate-out', '.fade-in', '.fade-out', '.zoom-in-95', '.slide-in-from-right-6', '.slide-out-to-right']) assert(css.includes(selector), 'Missing animation CSS: ' + selector);
+console.log('Build config verified: ESM import, production dependency, modal/menu/spinner animation CSS.');

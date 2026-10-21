@@ -10,7 +10,7 @@ import type { Tables } from '@/lib/database.types';
 import ApplicationReview from './ApplicationReview';
 import PartnerInvitations from '@/components/feature/PartnerInvitations';
 
-export default function DriverApplications({ companyId }: { companyId: string }) {
+export default function DriverApplications({ companyId, showInvitations = true }: { companyId: string; showInvitations?: boolean }) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const requested = params.get('application');
@@ -61,7 +61,7 @@ export default function DriverApplications({ companyId }: { companyId: string })
     }
   }
   return <div className="space-y-4 text-sm">
-    <PartnerInvitations key={companyId} kind="driver" companyId={companyId} />
+    {showInvitations && <PartnerInvitations key={companyId} kind="driver" companyId={companyId} />}
     <p className="text-foreground-500">При готов пакет използвайте „Прегледай целия пакет“ и едно общо одобрение.</p>
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {notice && <p role="status" className="text-accent-700">{notice}</p>}

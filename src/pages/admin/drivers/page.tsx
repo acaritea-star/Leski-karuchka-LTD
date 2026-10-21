@@ -1,7 +1,7 @@
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Modal from '@/components/feature/Modal';
 import DriverVerificationStatus from '@/components/feature/DriverVerificationStatus';
-import { verificationKey } from '@/lib/driverVerification';
+import { driverVerificationOptions, verificationKey } from '@/lib/driverVerification';
 import DriverApplications from './DriverApplications';
 import { signedDocumentUrl, workflowError } from '@/lib/driverDocuments';
 import { useState, useRef, useEffect } from 'react';
@@ -28,6 +28,18 @@ const DOC_LABELS: Record<string, string> = {
   vehicle_registration: 'Регистрация на автомобила',
 };
 
+function VerificationAction({ driver, busy, pendingEdits, onVerify }: { driver: DriverWithName; busy: boolean; pendingEdits: boolean; onVerify: (driver: DriverWithName) => void }) {
+  const query = useQuery(driverVerificationOptions(driver.id));
+  const report = query.data;
+  const verified = report?.is_verified ?? driver.is_verified;
+  if (verified) return <p role="status" className="mt-4 text-sm text-primary-700">✓ Шофьорът е верифициран.</p>;
+  return <div className="mt-4 rounded-xl border border-background-200 bg-white p-3 space-y-3">
+    {report?.blockers.some(x => ['vehicle', 'vehicle_insurance', 'vehicle_inspection'].includes(x.code)) && <Link to="/admin/vehicles" className="block min-h-11 text-sm underline text-primary-700">Избери или обнови автомобил в „Автомобили“</Link>}
+    {report?.blockers.some(x => x.code === 'company_permit') && <Link to="/admin/settings" className="block min-h-11 text-sm underline text-primary-700">Обнови разрешението на фирмата в „Настройки“</Link>}
+    <p className="text-sm text-foreground-600">{pendingEdits ? 'Запазете променените срокове с „Одобри“, преди да верифицирате.' : query.isError ? 'Обновете проверката по-горе, преди да верифицирате.' : report?.can_verify ? 'Всичко е готово. Потвърдете верификацията тук.' : 'Изпълнете оставащите условия, показани по-горе. След одобрение на документите проверката се обновява автоматично.'}</p>
+    <button type="button" disabled={busy || pendingEdits || query.isFetching || query.isError || !report?.can_verify} onClick={() => onVerify({ ...driver, is_verified: false })} className="min-h-12 w-full rounded-xl bg-primary-500 px-4 py-3 font-semibold text-white disabled:bg-background-200 disabled:text-foreground-500 disabled:cursor-not-allowed">{busy ? 'Потвърждаваме…' : 'Верифицирай шофьора'}</button>
+  </div>;
+}
 
 export default function AdminDrivers() {
   const { companyId } = useAdminCompany();
@@ -56,6 +68,7 @@ function CompanyDrivers() {
   const [documentDates,setDocumentDates] = useState<Record<string,string>>({});
 
   const [showAdd, setShowAdd] = useState(false);
+  const [applicationsOnly, setApplicationsOnly] = useState(false);
   const [documentError, setDocumentError] = useState('');
   const [openingDocument, setOpeningDocument] = useState(false);
   const verifyLatch = useRef(false);
@@ -69,7 +82,7 @@ function CompanyDrivers() {
     const key = companyId + ':' + (requestedApplication ?? requestedDriver ?? '');
     if (openedNotification.current === key) return;
     if (requestedApplication && /^[0-9a-f-]{36}$/i.test(requestedApplication)) {
-      openedNotification.current = key; setShowAdd(true); return;
+      openedNotification.current = key; setApplicationsOnly(true); setShowAdd(true); return;
     }
     if (!requestedDriver || !/^[0-9a-f-]{36}$/i.test(requestedDriver)) return;
     let active = true;
@@ -123,9 +136,12 @@ function CompanyDrivers() {
       } catch (error) {
         // A timed-out write may already have succeeded. Confirm once, never toggle again automatically.
         const check = await withRequestTimeout(signal => supabase.from('drivers').select('is_verified')
-          .eq('id', d.id).abortSignal(signal).single()).catch(() => null);
+          .eq('id', d.id).eq('company_id', d.company_id).abortSignal(signal).single()).catch(() => null);
         if (check?.error || !check?.data || check.data.is_verified !== !d.is_verified) throw error;
       }
+    },
+    onSuccess: (_data, d) => {
+      setSelected(current => current?.id === d.id ? { ...current, is_verified: !d.is_verified } : current);
     },
     onSettled: (_data, _error, d) => {
       verifyLatch.current = false;
@@ -136,11 +152,16 @@ function CompanyDrivers() {
   const setDocStatusMutation = useMutation({
     retry: false,
     mutationFn: async (input: { doc: DocumentRow; status: DocumentRow['status']; expires: string | null }) => {
-      const { error } = await withRequestTimeout(signal => supabase.from('driver_documents')
-        .update({ status: input.status, expires_at: input.expires }).eq('id', input.doc.id)
-        .eq('status', input.doc.status).select('id').abortSignal(signal).single());
+      const { error } = await withRequestTimeout(signal => {
+        const write = supabase.from('driver_documents').update({ status: input.status, expires_at: input.expires })
+          .eq('id', input.doc.id).eq('company_id', input.doc.company_id).eq('driver_id', input.doc.driver_id).eq('status', input.doc.status);
+        return (input.doc.expires_at === null ? write.is('expires_at', null) : write.eq('expires_at', input.doc.expires_at))
+          .select('id').abortSignal(signal).single();
+      });
+      if (error?.code === 'PGRST116') throw new Error('Документът е променен от друг администратор. Прегледайте обновените данни преди повторен опит.');
       if (error) throw error;
     },
+    onSuccess: (_data, input) => setDocumentDates(current => { const next = { ...current }; delete next[input.doc.id]; return next; }),
     onSettled: (_data, _error, input) => {
       documentLatch.current = false;
       void queryClient.invalidateQueries({ queryKey: queryKeys.driverDocuments(input.doc.driver_id) });
@@ -169,7 +190,7 @@ function CompanyDrivers() {
   return (
     <AdminLayout title={t('nav_drivers')}>
       {toggleVerifyMutation.isError && <p role="alert" className="mb-4 text-sm text-red-600">{workflowError(toggleVerifyMutation.error, 'Верификацията не е потвърдена.')}</p>}
-      <p className="mb-4 text-sm text-foreground-500">Нов шофьор: от „Добави шофьор“ поканете шофьора с личния му имейл. Той подготвя условията и документите; вие преглеждате и верифицирате целия пакет наведнъж. За по-ранни профили проверките остават в „Детайли“ и „Автомобили“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
+      <p className="mb-4 text-sm text-foreground-500">От „Добави шофьор“ изпратете лична покана. В „Кандидатури за одобрение“ прегледайте документите, изберете автомобил и одобрете пакета наведнъж. За вече добавен шофьор използвайте „Детайли“. Отнемането на верификация спира новите заявки; започнатият курс може да бъде приключен.</p>
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
           <i className="ri-error-warning-line" />
@@ -195,12 +216,13 @@ function CompanyDrivers() {
           />
         </div>
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={() => { setApplicationsOnly(false); setShowAdd(true); }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer"
         >
           <i className="ri-add-line" />
           Добави шофьор
         </button>
+        <button type="button" onClick={() => { setApplicationsOnly(true); setShowAdd(true); }} className="min-h-11 rounded-lg border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700">Кандидатури за одобрение</button>
         <div className="text-sm text-foreground-500 whitespace-nowrap">
           {driversQuery.data ? total : '—'} шофьори
         </div>
@@ -273,7 +295,10 @@ function CompanyDrivers() {
                   Детайли
                 </button>
                 <button
-                  onClick={() => { if (!verifyLatch.current) { verifyLatch.current = true; toggleVerifyMutation.mutate(d); } }}
+                  onClick={() => {
+                    if (!d.is_verified) { setSelected(d); setDocumentError(''); setDocStatusMutation.reset(); return; }
+                    if (!verifyLatch.current) { verifyLatch.current = true; toggleVerifyMutation.mutate(d); }
+                  }}
                   disabled={toggleVerifyMutation.isPending}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
                     d.is_verified
@@ -297,10 +322,10 @@ function CompanyDrivers() {
 
       {/* Add Driver Modal */}
       {showAdd && (
-        <Modal label="Добави нов шофьор" onClose={() => setShowAdd(false)} className="max-w-lg">
-          <div className="relative bg-white rounded-2xl w-full max-w-lg animate-in zoom-in-95 fade-in duration-200">
-            <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
-              <h3 className="font-semibold text-foreground-950 font-heading">Добави нов шофьор</h3>
+        <Modal label={applicationsOnly ? 'Кандидатури за одобрение' : 'Добави нов шофьор'} onClose={() => setShowAdd(false)} className="max-w-2xl">
+          <div className="relative bg-white rounded-2xl w-full max-w-2xl animate-in zoom-in-95 fade-in duration-200">
+            <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between bg-white">
+              <h3 className="font-semibold text-foreground-950 font-heading">{applicationsOnly ? 'Кандидатури за одобрение' : 'Добави нов шофьор'}</h3>
               <button
                 aria-label="Затвори поканите"
                 onClick={() => setShowAdd(false)}
@@ -312,7 +337,7 @@ function CompanyDrivers() {
 
             <div className="p-5 space-y-3">
               <p className="font-medium">{companyName || 'Изберете фирма от селектора в панела'}</p>
-              {companyId && <DriverApplications key={companyId} companyId={companyId} />}
+              {companyId && <DriverApplications key={companyId} companyId={companyId} showInvitations={!applicationsOnly} />}
             </div>
           </div>
         </Modal>
@@ -320,9 +345,9 @@ function CompanyDrivers() {
 
       {/* Detail Modal */}
       {selected && (
-        <Modal label="Документи на шофьора" onClose={() => setSelected(null)} busy={setDocStatusMutation.isPending} className="max-w-lg">
+        <Modal label="Документи на шофьора" onClose={() => setSelected(null)} busy={setDocStatusMutation.isPending || toggleVerifyMutation.isPending} className="max-w-lg">
           <div className="relative bg-white rounded-2xl w-full max-w-lg animate-in zoom-in-95 fade-in duration-200">
-            <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between sticky top-0 bg-white">
+            <div className="px-5 py-4 border-b border-background-100 flex items-center justify-between bg-white">
               <div>
                 <h3 className="font-semibold text-foreground-950 font-heading">
                   {selected.first_name} {selected.last_name}
@@ -340,6 +365,7 @@ function CompanyDrivers() {
 
             <div className="p-5">
               <DriverVerificationStatus key={selected.id} driverId={selected.id} />
+              {toggleVerifyMutation.isError && <p role="alert" className="text-sm text-red-600 mb-3">{workflowError(toggleVerifyMutation.error, 'Верификацията не е потвърдена. Обновете проверката.')}</p>}
               {documentError && <p role="alert" className="text-sm text-red-600 mb-3">{documentError}</p>}
               {setDocStatusMutation.isError && <p role="alert" className="text-sm text-red-600 mb-3">{workflowError(setDocStatusMutation.error, 'Промяната не е потвърдена. Обновете документите.')}</p>}
               {documentsQuery.isError ? <p role="alert" className="text-sm text-red-600">Документите не са заредени. <button className="underline" onClick={() => void documentsQuery.refetch()}>Опитай отново</button></p> : docLoading ? (
@@ -409,6 +435,7 @@ function CompanyDrivers() {
                   ))}
                 </div>
               )}
+              <VerificationAction driver={selected} pendingEdits={documents.some(doc => documentDates[doc.id] !== undefined && documentDates[doc.id] !== (doc.expires_at ?? ''))} busy={setDocStatusMutation.isPending || toggleVerifyMutation.isPending || documentsQuery.isFetching} onVerify={d => { if (!verifyLatch.current) { verifyLatch.current = true; toggleVerifyMutation.mutate(d); } }} />
             </div>
           </div>
         </Modal>

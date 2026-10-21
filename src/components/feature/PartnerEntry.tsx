@@ -44,6 +44,7 @@ export default function PartnerEntry({ kind }: { kind: PartnerKind | 'any' }) {
     <h1 className="text-xl font-heading font-semibold">{openCandidacy ? 'Започни като шофьор' : kind === 'company' ? 'Фирмен достъп' : kind === 'driver' ? 'Шофьорски достъп' : 'Твоята каручка'}</h1>
     {problem ? <>
       {openCandidacy ? <OpenDriverApplications key={user.id} onChoose={value => setChosen({ owner: user.id, access: value })} /> : <p role="alert" className="text-sm text-foreground-600">{problem}</p>}
+      {invite && access?.status === 'denied' && access.reason === 'invitation_required' && <p className="text-sm text-foreground-600">Провери дали имейлът по-долу съвпада буква по буква с адреса в поканата. Ако има печатна грешка, фирмата трябва да изпрати нова покана с правилния адрес.</p>}
       <p className="text-xs text-foreground-500 break-all">{user?.email}</p>
       <button onClick={() => { latch.current = false; setRedirectError(''); void query.refetch(); }} className="text-primary-700 underline min-h-11">{openCandidacy ? 'Имаш лична покана? Провери' : 'Провери отново'}</button>
       <button onClick={logout} disabled={pending} className={openCandidacy ? 'block w-full min-h-11 text-sm underline disabled:opacity-60' : 'block w-full rounded-xl bg-primary-500 text-white px-4 py-3 disabled:opacity-60'}>{pending ? 'Излизане…' : 'Влез с друг акаунт'}</button>

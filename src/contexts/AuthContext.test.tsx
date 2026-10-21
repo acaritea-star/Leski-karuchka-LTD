@@ -136,6 +136,36 @@ it('does not preserve a profile when permission is explicitly denied', async () 
   await screen.findByText('signed-out');
 });
 
+it('retries a newly issued future JWT without clearing the account or changing token validation', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  api.profile.mockResolvedValueOnce({ data: null, error: { code: 'PGRST303', message: 'JWT issued at future' }, status: 401 });
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(screen.getByText('loading')).toBeTruthy();
+  expect(api.profile).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(screen.getByText('ready:a')).toBeTruthy();
+  expect(api.profile).toHaveBeenCalledTimes(2);
+  expect(api.signOut).not.toHaveBeenCalled();
+});
+
+it('bounds persistent future-JWT errors and offers a readable retry without granting profile access', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  api.profile.mockResolvedValue({ data: null, error: { code: 'PGRST303', message: 'JWT issued at future' }, status: 401 });
+  render(<AuthProvider><Consumer /></AuthProvider>);
+  await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+  expect(screen.queryByText('loading')).toBeNull();
+  expect(screen.queryByText('ready:a')).toBeNull();
+  expect(screen.getByRole('alert').textContent).toContain('Сесията още не е потвърдена');
+  expect(api.profile).toHaveBeenCalledTimes(3);
+  api.profile.mockResolvedValue({ data: profile, error: null });
+  fireEvent.click(screen.getByText('retry'));
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(screen.getByText('ready:a')).toBeTruthy();
+});
+
 it('never carries the previous account into an unavailable new account', async () => {
   render(<AuthProvider><Consumer /></AuthProvider>);
   await screen.findByText('ready:a');

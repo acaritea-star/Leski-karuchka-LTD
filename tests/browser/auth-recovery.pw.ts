@@ -47,3 +47,17 @@ for (const temporary of [true, false]) test(`first OAuth login recovers ${tempor
   expect(acceptances).toBe(temporary ? 2 : 4); expect(state.welcomeClaims).toBe(1);
   expect(state.errors).toEqual([]);
 });
+
+test('a fresh JWT rejected as issued in the future recovers the invited driver entry without another login', async ({ page }) => {
+  const state = await setupUi(page, 'CUSTOMER'); let reads = 0, logouts = 0;
+  page.on('request', request => { if (request.url().includes('/auth/v1/logout')) logouts++; });
+  await page.route('**/rest/v1/profiles*', route => {
+    reads++;
+    return route.fulfill({ status: reads === 1 ? 401 : 200, headers: cors, json: reads === 1 ? { code: 'PGRST303', message: 'JWT issued at future' } : state.profile });
+  });
+  await page.route('**/rpc/resolve_partner_access', route => route.fulfill({ headers: cors, json: { status: 'denied', reason: 'invitation_required', message: 'Няма валидна покана за този акаунт.' } }));
+  await page.goto('/driver/access?invite=66666666-6666-4666-8666-666666666666');
+  await expect(page.getByRole('heading', { name: 'Шофьорски достъп', exact: true })).toBeVisible();
+  await expect(page.getByText(/съвпада буква по буква/)).toBeVisible();
+  expect(reads).toBe(2); expect(logouts).toBe(0); expect(state.errors).toEqual([]);
+});

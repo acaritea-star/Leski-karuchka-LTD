@@ -1,18 +1,19 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { applicationDocumentLabels, pendingApplicationUpload, prepareApplicationUpload, registerApplicationUpload, uploadApplicationDocument, type ApplicationDocumentKind, type Onboarding } from '@/lib/driverOnboarding';
 import { workflowError } from '@/lib/driverDocuments';
 import { documentExpired } from '@/lib/legalWorkflow';
-export default function ApplicationDocumentCard({ bundle, type, onSaved }: { bundle: Onboarding; type: ApplicationDocumentKind; onSaved: () => Promise<unknown> }) {
+export default function ApplicationDocumentCard({ bundle, type, onSaved, defaultExpiry, onBusyChange }: { bundle: Onboarding; type: ApplicationDocumentKind; onSaved: () => Promise<unknown>; defaultExpiry?: string; onBusyChange?: (busy: boolean) => void }) {
   const a = bundle.application;
   const existing = bundle.documents.find(x => x.type === type);
   const expired = !!existing && type !== 'vehicle_registration' && documentExpired(existing.expires_at);
   const [pending, setPending] = useState(() => pendingApplicationUpload(a, type));
   const [file, setFile] = useState<File | null>(null);
-  const [expires, setExpires] = useState(pending?.expires ?? (type === 'insurance' ? String((a.vehicle_details as Record<string, unknown> | null)?.insurance_expiry_date ?? '') : ''));
+  const [expires, setExpires] = useState(pending?.expires ?? defaultExpiry ?? (type === 'insurance' ? String((a.vehicle_details as Record<string, unknown> | null)?.insurance_expiry_date ?? '') : ''));
   const [replace, setReplace] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const latch = useRef(false);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   async function save(check = false) {
     if (latch.current) return;
     latch.current = true; setBusy(true); setError('');

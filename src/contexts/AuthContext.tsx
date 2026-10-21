@@ -1,4 +1,5 @@
 import { sessionHasMfa } from '@/lib/staffMfa';
+import { isFutureJwtError, SESSION_TIMING_ERROR } from '@/lib/authErrors';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { stopSharedGps } from '@/lib/sharedGps';
 import { queryClient } from '@/lib/queryClient';
@@ -114,10 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const retryDelaysMs = [0, 400, 1200];
       let lastError: string | null = null;
       let retryable = false;
+      let futureJwt = false;
 
       for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
         if (retryDelaysMs[attempt] > 0) {
-          await new Promise((resolve) => { setTimeout(resolve, retryDelaysMs[attempt]); });
+          await new Promise((resolve) => { setTimeout(resolve, futureJwt ? attempt * 1000 : retryDelaysMs[attempt]); });
         }
 
         try {
@@ -139,8 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (error) {
             // A rejected request (401 / missing table / clock-skewed JWT) is a
             // real failure — remember it instead of pretending the row is gone.
-            lastError = error.message || 'Грешка при зареждане на профила.';
-            retryable = !status || status >= 500 || status === 429;
+            futureJwt = isFutureJwtError(error);
+            lastError = futureJwt ? SESSION_TIMING_ERROR : error.message || 'Грешка при зареждане на профила.';
+            retryable = futureJwt || !status || status >= 500 || status === 429;
             console.error('[AuthContext] fetchProfile query error:', error);
             if (!retryable) return { user: null, error: lastError };
             continue;
@@ -151,11 +154,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           lastError = null;
           retryable = false;
+          futureJwt = false;
 
           console.warn(
             `[AuthContext] fetchProfile: no profile for user ${authUser.id} (attempt ${attempt + 1}, token: ${hasToken})`,
           );
         } catch (e) {
+          futureJwt = false;
           lastError = e instanceof Error ? e.message : String(e);
           retryable = e instanceof TypeError || (e instanceof Error && ['TimeoutError', 'AbortError', 'AuthRetryableFetchError'].includes(e.name));
           console.error('[AuthContext] fetchProfile exception:', e);
@@ -163,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Rows genuinely missing -> error stays null. API failures -> real message.
-      return { user: null, error: retryable ? CONNECTION_ERROR : lastError, retryable };
+      return { user: null, error: futureJwt ? SESSION_TIMING_ERROR : retryable ? CONNECTION_ERROR : lastError, retryable };
     },
     [buildAppUser],
   );
