@@ -1,5 +1,3 @@
-import animate from 'tailwindcss-animate';
-
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -84,5 +82,6 @@ export default {
         },
       },
     },
-    plugins: [animate],
+    // Used entrance/exit effects live in src/index.css; no optional build plugin.
+    plugins: [],
   }

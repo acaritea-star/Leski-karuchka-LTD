@@ -1,6 +1,6 @@
 # Driver verification and Readdy build recovery — 2026-10-21
 
-The GitHub source still used CommonJS `require` inside the Tailwind TS/ESM config and kept `tailwindcss-animate` in devDependencies. Readdy's local repair was replaced by each GitHub pull. Animation utilities are actually used by the menu, modals and request cards. Keep the pinned plugin, use an ESM import, and retain it during production-only dependency installation. `npm run check:build-config` loads the actual config and compiles the affected animation utilities; the normal `npm run check` includes this check.
+The GitHub source still used CommonJS `require` inside the Tailwind TS/ESM config and kept `tailwindcss-animate` in devDependencies. Readdy's local repair was replaced by each GitHub pull. Animation utilities are actually used by the menu, modals and request cards. The final implementation removes the optional plugin and implements only the used entrance/exit effects in local CSS, keeping built-in spinner/pulse utilities. This avoids both a missing-module build failure and promotion of Tailwind 3's build-time dependency chain into production dependencies. `npm run check:build-config` loads the plugin-free ESM config and compiles the actual animation styles; the normal `npm run check` includes this check.
 
 ## Review flow
 
@@ -20,7 +20,7 @@ The invitation incident was a recipient-email typo. The personal invitation chec
 
 ## Validation and publishing
 
-- Production-only clean npm install: plugin and its Tailwind peer resolve successfully.
+- Production dependency audit passes after removing the optional plugin; no application runtime dependency is added.
 - Tailwind configuration and generated modal/menu/spinner animation CSS checked.
 - TypeScript, lint, unit and browser checks, including own-car/company-car onboarding, revision replacement, upload state preservation, missing requirements, popup/preview failures, repeated clicks, lost write responses, legacy document-to-verification flow and future-JWT login recovery.
 - GitHub Check runs Chromium and WebKit; Database regression retains the existing verification, onboarding, tenant and privilege tests. No database migration is required for this release.

@@ -4,6 +4,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The app only needs these entrance/exit effects. Keep them local so a
+   production-only Readdy install can compile without an animation plugin. */
+@layer utilities {
+  @keyframes leski-enter {
+    from {
+      opacity: var(--leski-enter-opacity, 1);
+      transform: translate3d(var(--leski-enter-x, 0), var(--leski-enter-y, 0), 0) scale(var(--leski-enter-scale, 1));
+    }
+  }
+  @keyframes leski-exit {
+    to {
+      opacity: var(--leski-exit-opacity, 1);
+      transform: translate3d(var(--leski-exit-x, 0), 0, 0);
+    }
+  }
+  .animate-in {
+    animation: leski-enter var(--leski-motion-duration, 150ms);
+    --leski-enter-opacity: initial;
+    --leski-enter-x: initial;
+    --leski-enter-y: initial;
+    --leski-enter-scale: initial;
+  }
+  .animate-out {
+    animation: leski-exit var(--leski-motion-duration, 150ms);
+    --leski-exit-opacity: initial;
+    --leski-exit-x: initial;
+  }
+  .fade-in { --leski-enter-opacity: 0; }
+  .fade-out { --leski-exit-opacity: 0; }
+  .zoom-in-95 { --leski-enter-scale: .95; }
+  .slide-in-from-top-2 { --leski-enter-y: -.5rem; }
+  .slide-in-from-bottom-2 { --leski-enter-y: .5rem; }
+  .slide-in-from-right-6 { --leski-enter-x: 1.5rem; }
+  .slide-out-to-right { --leski-exit-x: 100%; }
+  .animate-in.duration-200, .animate-out.duration-200 { --leski-motion-duration: 200ms; }
+  .animate-in.duration-300, .animate-out.duration-300 { --leski-motion-duration: 300ms; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-in, .animate-out { animation-duration: 1ms; }
+  }
+}
+
 :root {
   --font-heading: 'Manrope', sans-serif;
   --font-body: 'Inter', sans-serif;

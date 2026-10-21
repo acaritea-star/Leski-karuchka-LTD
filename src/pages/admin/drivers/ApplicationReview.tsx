@@ -125,7 +125,7 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
         {options.isSuccess && !options.data.vehicles.length && <p className="text-sm text-amber-800">Няма свободен активен автомобил. <Link to="/admin/vehicles" className="underline">Добавете или освободете автомобил</Link>, после обновете проверката.</p>}
         {chosenVehicle && <p className="text-xs text-foreground-600">За {chosenVehicle.registration_number}: застраховка до {chosenVehicle.insurance_expiry_date || 'не е въведена'} · преглед до {chosenVehicle.inspection_expiry_date || 'не е въведен'}.</p>}
         {chosenVehicle && <fieldset disabled={busy} className="min-w-0"><ApplicationDocumentCard key={chosenVehicle.id} bundle={bundle} type="insurance" defaultExpiry={chosenVehicle.insurance_expiry_date ?? ''} onSaved={refresh} onBusyChange={setUploading} /></fieldset>}
-        <p className="text-xs text-foreground-600">Качете застраховката на избрания автомобил със същия срок като в „Автомобили“. Изборът и прегледаните непроменени документи се запазват след качването.</p>
+        <p className="text-xs text-foreground-600">Качете застраховката на избрания автомобил със същия срок като в „Автомобили“.</p>
       </>}
       <button type="button" disabled={options.isFetching || busy} onClick={() => void options.refetch()} className="min-h-11 text-sm underline text-primary-700 disabled:opacity-50">{options.isFetching ? 'Обновяваме…' : 'Обнови автомобилите и изискванията'}</button>
     </section>
@@ -133,7 +133,7 @@ function ReviewForm({ bundle, refresh, refreshing, onComplete }: { bundle: Onboa
       <h4 className="font-semibold">3. Потвърдете и верифицирайте</h4>
       <p className="text-sm text-foreground-600">{bundle.preparation.receipt ? '✓ Условията са приети лично и подготовката е завършена.' : 'Подготовката още не е завършена.'}</p>
       <label className="flex items-start gap-3 rounded-xl bg-background-50 p-3 text-sm leading-relaxed"><input type="checkbox" checked={checked} disabled={busy || !allOpened} onChange={e => setConfirmedRevision(e.target.checked ? a.onboarding_revision : null)} className="mt-1 h-5 w-5 shrink-0 accent-primary-500" />Проверих документите и разрешенията за работа на този шофьор и автомобил.</label>
-      <p className="text-xs leading-relaxed text-foreground-600">Проверката включва четливост, самоличност, валидност, удостоверение за таксиметров водач, психологическа годност и приложимите фирмени и общински разрешения.</p>
+      <details className="text-xs leading-relaxed text-foreground-600"><summary className="cursor-pointer min-h-8">Какво включва проверката?</summary><p className="mt-2">Четливост, самоличност, валидност, удостоверение за таксиметров водач, психологическа годност и приложимите фирмени и общински разрешения.</p></details>
       <label className="block text-sm">Бележка за проверката (по избор)<textarea maxLength={500} value={note} disabled={busy} onChange={e => setNote(e.target.value)} className="block w-full border border-background-200 rounded-xl p-3 mt-1" /></label>
     </section>
     <div className="space-y-3 rounded-xl border border-background-200 bg-white p-3">
