@@ -1,3 +1,4 @@
+import { onlinePaymentLabel } from '@/lib/ridePayment';
 import { EmergencyDock } from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
 import Modal from '@/components/feature/Modal';
@@ -343,7 +344,7 @@ export default function CustomerOrders() {
                       )}
                       <span className="flex items-center gap-1">
                         <i className="ri-wallet-3-line text-foreground-400" />
-                        {order.payment_method==='online'?(order.payment_status==='paid'?'Платено онлайн':order.payment_status==='refunded'?'Възстановено онлайн':'Онлайн плащане'):t(`payment_${order.payment_method}`)}
+                        {order.payment_method==='online'?(onlinePaymentLabel(order.payment_environment,order.payment_status)):t(`payment_${order.payment_method}`)}
                       </span>
                       {order.vehicle_type_id && vehicleTypeMap.get(order.vehicle_type_id) && (
                         <span className="flex items-center gap-1 text-primary-600">
@@ -455,3 +456,4 @@ export default function CustomerOrders() {
     </div>
   );
 }
+

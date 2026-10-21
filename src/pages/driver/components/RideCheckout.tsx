@@ -5,7 +5,7 @@ import { clearCheckout, completeRidePayment, findCheckout, prepareCheckout, read
 import { isAmbiguousWrite } from '@/lib/rideOperations';
 import type { Tables } from '@/lib/database.types';
 import { useQuery } from '@tanstack/react-query';
-import { loadRidePayment,ridePaymentAction } from '@/lib/ridePayment';
+import { loadRidePayment,ridePaymentAction,onlinePaymentLabel } from '@/lib/ridePayment';
 const button = 'min-h-12 rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-40';
 const input = 'mt-1 w-full min-h-11 rounded-xl border border-background-200 px-3 py-2 text-sm';
 export default function RideCheckout({ owner, driverId, request, onClose, onFinished }: {
@@ -33,6 +33,7 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
  const requestId = request?.id;
  const payment=useQuery({queryKey:['ride-payment-state',owner,requestId],enabled:!!requestId,
   queryFn:({signal})=>loadRidePayment(requestId!,signal),refetchInterval:10000,refetchIntervalInBackground:false,retry:1});
+ const testMode=payment.data?.environment==='test';
  const onlineBusy=!!payment.data&&['creating','open','processing'].includes(payment.data.state);
  const onlinePaid=payment.data?.payment_status==='paid'&&payment.data.payment_method==='online';
  const cancelOnline=async()=>{
@@ -86,11 +87,11 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={() => void run()}>Повтори същия запис</button>
     </div> : request && <>
      <div className="rounded-2xl bg-primary-50 p-5 text-center"><p className="text-xs text-foreground-600">Цена от заявката</p><p className="mt-1 text-4xl font-bold tabular-nums">{money(request.estimated_price == null ? null : Number(request.estimated_price))}</p><p className="mt-2 text-xs">Курс {request.id.slice(0,8)}</p></div>
-     {onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">Платено онлайн</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
-      <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">Клиентът плаща онлайн. Изчакай потвърждението от Stripe.</p>
-      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>Провери и премини към плащане в брой</button>
-      <p className="text-xs text-foreground-500">Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.</p>
-     </>:!problem ? <>
+     {onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">{onlinePaymentLabel(payment.data?.environment,'paid')}</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
+      <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{testMode?'Тестов режим · Клиентът плаща с тестова карта.':'Клиентът плаща онлайн. Изчакай потвърждението от Stripe.'}</p>
+      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>{testMode?'Отмени тестовото плащане':'Провери и премини към плащане в брой'}</button>
+      <p className="text-xs text-foreground-500">{testMode?'Този тест не добавя приходи или пари в касата.':'Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.'}</p>
+     </>:testMode?<p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Тестов режим · Клиентът може да отвори Stripe от телефона си. Изчакваме тестово плащане; суми не се добавят в реалния отчет.</p>:!problem ? <>
       {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">Клиентът вече може да плати от собствения си телефон. След потвърждение тук ще се появи „Платено онлайн“.</p>}
       <p className="text-sm text-foreground-600">Как получи парите? Потвърждението приключва курса и добавя плащането в отчета.</p>
       <button className={`${button} w-full bg-primary-500 text-white`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('cash')}>Получих в брой · приключи</button>
@@ -112,3 +113,4 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
   </Modal>}
  </>;
 }
+

@@ -1404,6 +1404,7 @@ export type Database = {
           cancelled_at: string | null
           cancelled_by: Database["public"]["Enums"]["cancelled_by"] | null
           company_id: string
+          payment_environment?: "live" | "test"
           trip_ended_at?: string | null
           online_payment_state?: string
           completed_at: string | null
@@ -1438,6 +1439,7 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: Database["public"]["Enums"]["cancelled_by"] | null
           company_id: string
+          payment_environment?: "live" | "test"
           trip_ended_at?: string | null
           online_payment_state?: string
           completed_at?: string | null
@@ -1472,6 +1474,7 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: Database["public"]["Enums"]["cancelled_by"] | null
           company_id?: string
+          payment_environment?: "live" | "test"
           trip_ended_at?: string | null
           online_payment_state?: string
           completed_at?: string | null
@@ -3130,3 +3133,4 @@ export const Constants = {
     },
   },
 } as const
+

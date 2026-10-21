@@ -51,6 +51,7 @@ interface ActiveRequest {
   destination_address: string;
   estimated_price: number | null;
   final_price?: number|null;
+  payment_environment?: 'live'|'test';
   trip_ended_at?: string|null;
   payment_status?: string;
   payment_method?: string;
@@ -620,3 +621,4 @@ export default function CustomerHome() {
       </>}
   </CustomerLayout>;
 }
+

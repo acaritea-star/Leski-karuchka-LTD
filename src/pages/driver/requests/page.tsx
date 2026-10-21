@@ -1,3 +1,4 @@
+import { onlinePaymentLabel } from '@/lib/ridePayment';
 import BackButton from '@/components/feature/BackButton';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
@@ -259,7 +260,7 @@ export default function DriverRequests() {
             cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
-            if(newRow.payment_status==='paid'&&newRow.payment_method==='online'){setPaymentNotice('Платено онлайн');setCheckoutRequest(null);void queryClient.invalidateQueries({queryKey:['accounting']});}
+            if(newRow.payment_status==='paid'&&newRow.payment_method==='online'){setPaymentNotice(onlinePaymentLabel(newRow.payment_environment,newRow.payment_status));setCheckoutRequest(null);void queryClient.invalidateQueries({queryKey:['accounting']});}
             cacheDriverRequest(queryClient, driver.id, newRow);
           }
         },
@@ -673,3 +674,4 @@ export default function DriverRequests() {
     </div>
   );
 }
+

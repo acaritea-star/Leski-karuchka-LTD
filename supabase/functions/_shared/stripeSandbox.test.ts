@@ -98,3 +98,17 @@ it('ignores unrelated event types and has no browser GET payment side effect',as
  expect((await call()).status).toBe(200);expect(record).not.toHaveBeenCalled();
  expect((await handler(new Request('https://example.invalid/stripe-webhook'))).status).toBe(405);
 });
+
+
+it('uses the account verified from the configured test API key for shared Test mode',async()=>{
+ const accountId=vi.fn().mockResolvedValue('acct_1USiOkPYGWX41ye8');
+ const testHandler=createStripeSandboxHandler({verify,retrievePayment,record,accountId});
+ expect((await testHandler(new Request('https://example.invalid',{method:'POST',headers:{'stripe-signature':'signed'},body:'raw'}))).status).toBe(200);
+ expect(record).toHaveBeenCalledWith(expect.objectContaining({account_id:'acct_1USiOkPYGWX41ye8',livemode:false}));
+});
+it('keeps test key failures retryable and rejects a signed foreign account',async()=>{
+ const accountId=vi.fn().mockRejectedValueOnce(Error('Key unavailable')).mockResolvedValueOnce('acct_foreign');
+ const testHandler=createStripeSandboxHandler({verify,retrievePayment,record,accountId});
+ const request=()=>new Request('https://example.invalid',{method:'POST',headers:{'stripe-signature':'signed'},body:'raw'});
+ expect((await testHandler(request())).status).toBe(503);expect((await testHandler(request())).status).toBe(400);expect(record).not.toHaveBeenCalled();
+});

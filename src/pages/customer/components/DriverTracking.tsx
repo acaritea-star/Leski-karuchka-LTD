@@ -33,6 +33,7 @@ export interface TrackingRequest {
   destination_address: string;
   estimated_price?: number|null;
   final_price?: number|null;
+  payment_environment?: 'live'|'test';
   trip_ended_at?: string|null;
   updated_at?: string;
 }
@@ -381,3 +382,4 @@ export default function DriverTracking({
     </div>
   </CustomerLayout>;
 }
+

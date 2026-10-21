@@ -44,3 +44,24 @@ it('retries a webhook received before the checkout attachment and ignores unrela
  deps.verify.mockResolvedValue({id:'evt_fixture',type:'checkout.session.completed',livemode:true,data:{object:session}});deps.lookup.mockResolvedValueOnce({...order,checkout_session_id:null});expect((await call()).status).toBe(503);
  deps.lookup.mockResolvedValueOnce(null);expect((await call()).status).toBe(200);expect(deps.record).not.toHaveBeenCalled();
 });
+
+
+it.each(['acct_1USiOkPYGWX41ye8','acct_1USiOtBXRX2hZ2VT'])('reconciles an explicitly registered test order for %s without accepting live objects',async account=>{
+ const testOrder={...order,account_id:account,livemode:false,checkout_session_id:'cs_test_fixture'};
+ const testSession={...session,id:'cs_test_fixture',livemode:false};
+ const testPayment={...payment,livemode:false,latest_charge:{...payment.latest_charge,livemode:false}};
+ deps.lookup.mockResolvedValue(testOrder);deps.retrieveSession.mockResolvedValue(testSession);deps.retrievePayment.mockResolvedValue(testPayment);
+ await reconcileRideCheckout(testOrder,'evt_test',deps);
+ expect(deps.record).toHaveBeenCalledWith(expect.objectContaining({p_account_id:account,p_state:'paid'}));
+ deps.verify.mockResolvedValue({id:'evt_test',account,type:'checkout.session.completed',livemode:false,data:{object:testSession}});
+ const handler=createRideStripeWebhook({...deps,livemode:false});
+ expect((await handler(new Request('https://example.invalid',{method:'POST',headers:{'stripe-signature':'signed'},body:'raw'}))).status).toBe(200);
+ deps.retrievePayment.mockResolvedValue(payment);
+ await expect(reconcileRideCheckout(testOrder,'evt_wrong',deps)).rejects.toThrow();
+});
+it('a test webhook cannot settle a registered live order even on the same account',async()=>{
+ deps.verify.mockResolvedValue({id:'evt_test',type:'checkout.session.completed',livemode:false,data:{object:session}});
+ const handler=createRideStripeWebhook({...deps,livemode:false});
+ expect((await handler(new Request('https://example.invalid',{method:'POST',headers:{'stripe-signature':'signed'},body:'raw'}))).status).toBe(400);
+ expect(deps.record).not.toHaveBeenCalled();
+});

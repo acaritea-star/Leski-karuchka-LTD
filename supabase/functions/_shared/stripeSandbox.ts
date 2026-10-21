@@ -1,5 +1,6 @@
 // This handler deliberately has no production ride/payment write path.
 export const SANDBOX_ACCOUNT = 'acct_1USiOtBXRX2hZ2VT';
+export const TEST_MODE_ACCOUNT = 'acct_1USiOkPYGWX41ye8';
 type ObjectRow = Record<string, unknown>;
 type Normalized = {
  account_id: string; event_id: string; type: string; livemode: false;
@@ -8,6 +9,7 @@ type Normalized = {
  state: 'pending' | 'processing' | 'failed' | 'canceled' | 'paid';
 };
 type Dependencies = {
+ accountId?: () => Promise<string>;
  verify: (body: string, signature: string) => Promise<unknown>;
  retrievePayment: (id: string) => Promise<unknown>;
  record: (event: Normalized) => Promise<{ data: unknown; error: unknown }>;
@@ -45,8 +47,12 @@ export function createStripeSandboxHandler(deps: Dependencies) {
    // Verify the exact raw bytes before parsing or acting on any metadata.
    event = object(await deps.verify(body,signature));
   } catch { return reply(400,'invalid_signature'); }
-  if (event.livemode !== false || event.account !== undefined && event.account !== SANDBOX_ACCOUNT) return reply(400,'wrong_stripe_environment');
+  if (event.livemode !== false) return reply(400,'wrong_stripe_environment');
   if (typeof event.type !== 'string' || !supported.has(event.type)) return reply(200,'ignored_event_type');
+  let accountId:string;
+  try { accountId=deps.accountId?await deps.accountId():SANDBOX_ACCOUNT; }
+  catch { return reply(503,'stripe_account_unavailable'); }
+  if(![SANDBOX_ACCOUNT,TEST_MODE_ACCOUNT].includes(accountId) || event.account!==undefined && event.account!==accountId)return reply(400,'wrong_stripe_environment');
   let normalized: Normalized;
   try {
    let payment = object(object(event.data).object);
@@ -89,7 +95,7 @@ export function createStripeSandboxHandler(deps: Dependencies) {
    const states: Record<string, Normalized['state']> = {succeeded:'paid',processing:'processing',canceled:'canceled',requires_payment_method:'failed',requires_action:'pending',requires_confirmation:'pending',requires_capture:'pending'};
    const state = typeof payment.status==='string' ? states[payment.status] : undefined;
    if (!state || state==='paid' && received!==amount) throw Error('Payment is not fully captured');
-   normalized = {account_id:SANDBOX_ACCOUNT,event_id:id(event.id,'evt'),type:event.type,livemode:false,payment_id:paymentId,checkout_session_id:checkoutSessionId,
+   normalized = {account_id:accountId,event_id:id(event.id,'evt'),type:event.type,livemode:false,payment_id:paymentId,checkout_session_id:checkoutSessionId,
     order_id:orderId,amount_minor:amount,received_minor:received,refunded_minor:refunded,currency:payment.currency,state};
   } catch { return reply(400,'invalid_payment_event'); }
   try {
@@ -101,3 +107,4 @@ export function createStripeSandboxHandler(deps: Dependencies) {
   } catch { return reply(503,'payment_storage_unavailable'); }
  };
 }
+

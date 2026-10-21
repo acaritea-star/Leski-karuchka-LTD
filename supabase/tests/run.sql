@@ -91,3 +91,6 @@ ROLLBACK;
 \ir stripe_sandbox_receipts.sql
 
 \ir post_trip_stripe_payments.sql
+
+
+\ir test_ride_checkouts.sql

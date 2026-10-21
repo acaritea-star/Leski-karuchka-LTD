@@ -31,3 +31,17 @@ test('a foreign company never exposes online checkout',async({page})=>{
  expect(state.errors).toEqual([]);
 });
 
+
+
+test('an allowlisted test client sees Sandbox payment on a phone and the driver sees a test confirmation',async({browser})=>{
+ const cc=await browser.newContext(),dc=await browser.newContext();const customer=await cc.newPage(),driver=await dc.newPage();await driver.clock.install();
+ const c=await setupUi(customer,'CUSTOMER'),d=await setupUi(driver,'DRIVER');const row={...ride(),payment_environment:'test'};row.trip_ended_at=new Date().toISOString();row.final_price=2.95;c.rides=[row];d.rides=[row];
+ for(const page of [customer,driver])await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',environment:'test',ended_at:row.trip_ended_at,amount:row.final_price,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}}));
+ await customer.goto('/customer/home');await driver.goto('/driver/requests');await setShortViewport(customer,320);
+ const pay=customer.getByRole('button',{name:'Тествай плащане с карта',exact:true});await expect(pay).toBeEnabled();await expect(customer.getByText('Тестов режим · Не се теглят реални пари')).toBeVisible();
+ await driver.getByRole('button',{name:'Плащане по курса',exact:true}).click();await expect(driver.getByRole('dialog')).toContainText('Тестов режим');await expect(driver.getByRole('button',{name:'Получих в брой · приключи'})).toHaveCount(0);
+ row.status='completed';row.payment_method='online';row.payment_status='paid';row.online_payment_state='paid';row.updated_at=new Date().toISOString();
+ await customer.goto('/customer/home?payment_return='+id);await expect(customer.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();
+ await driver.bringToFront();await driver.clock.fastForward(40000);await expect(driver.getByText('Тестово плащане успешно',{exact:true}).first()).toBeVisible();
+ expect(c.errors).toEqual([]);expect(d.errors).toEqual([]);await cc.close();await dc.close();
+});
