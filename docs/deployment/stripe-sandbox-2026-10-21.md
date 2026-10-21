@@ -71,6 +71,27 @@ binding; legal merchant, charge/refund liability and payout policy need a
 separate Connect decision before live onboarding. No Connect accounts, fees,
 tax registrations or public legal details are fabricated here.
 
+## Verified deployment
+
+Migration `20261021074427_stripe_sandbox_receipts` is applied. The dedicated
+sandbox merchant is configured once at Leski's root; a pending EUR 12.34 hosted
+Checkout fixture is registered privately against its Levski division. No
+customer or real ride was created for it. The existing sandbox endpoint now
+subscribes to the four additional Checkout/refund events above.
+
+The deployed `stripe-webhook` is version 2, bundle SHA-256
+`9afc2d384bc18a315fceea148f2f3ad2c560564f6f3977fe54e3f58da67491d8`.
+All 724 unit checks passed; native database run 39563989930 passed, including
+12 simultaneous event copies and competing refund updates. Frontend TypeScript,
+lint, build, legal-source and Deno Edge checks passed. Hosted payment completion
+and the resulting signed Checkout webhook are still pending; creating a session
+alone does not constitute a successful end-to-end payment test.
+
+Before the deployment, real tables contained 134 rides, one driver money entry,
+zero payment transactions and zero ride payment receipts. The sandbox order is
+outside those tables. Live payments and a new customer/driver UI are not released
+by this change.
+
 Official references: [Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment),
 [webhooks](https://docs.stripe.com/webhooks),
 [metadata](https://docs.stripe.com/metadata),
