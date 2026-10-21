@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.21-customer-safety.1",
-  "baseCommit": "95b426253487042f97e4f7fd603b064b19dcd42b",
+  "release": "2026.10.21-driver-review.1",
+  "baseCommit": "81015182e6b982f3d36256cf4a0280b329614c32",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "79ea092daf660df2a7e6c2e620d1b7d0d21b3b56",
+  "verifiedSourceCommit": "9b4f5d2031ce28fc0a50ff769675c2154f23fc4c",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -193,5 +193,12 @@
   "customerSafetyUxDeploymentStatus": "frontend-packaged",
   "stripeSandboxWebhookVersion": 2,
   "stripeSandboxMigrationVersion": "20261021074427",
-  "stripeCheckoutFrontendEnabled": false
+  "stripeCheckoutFrontendEnabled": false,
+  "driverReviewUxVersion": 2,
+  "driverReviewUxVerifiedSourceCommit": "9b4f5d2031ce28fc0a50ff769675c2154f23fc4c",
+  "driverReviewUxDeploymentStatus": "frontend-packaged",
+  "localUiAnimationsVersion": 1,
+  "authClockSkewRecoveryVersion": 1,
+  "driverOnboardingUxVersion": 2,
+  "driverOnboardingUxVerifiedSourceCommit": "9b4f5d2031ce28fc0a50ff769675c2154f23fc4c"
 }
