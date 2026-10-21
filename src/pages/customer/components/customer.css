@@ -241,7 +241,8 @@
   }
   .customer-experience[data-short-viewport=true] > .customer-header,
   .customer-experience[data-short-viewport=true] > .customer-route-controls,
-  .customer-experience[data-short-viewport=true] > .customer-notice { display:none; }
+  .customer-experience[data-short-viewport=true] > .customer-notice,
+  .customer-experience[data-short-viewport=true] .booking-map-state { display:none; }
   .customer-experience[data-offers=true][data-short-viewport=true] .customer-sheet { max-height:calc(var(--customer-height,100dvh) - 96px); }
 }
 
