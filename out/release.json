@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.22-inline-payments.1",
-  "baseCommit": "f7175d146d064ad59e0d483cf39edadc313c11a8",
+  "release": "2026.10.23-payment-loader.1",
+  "baseCommit": "1cc2120407c8c15704d7560b84d5a4631a696f83",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "a50ffab1ac0d6cc850f7e6cf76c12ba0039108c7",
+  "verifiedSourceCommit": "beb690990a62390892ce99bc27e722d40e7cc298",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -237,8 +237,22 @@
   "inlineRidePaymentMethods": "express-checkout-with-payment-element-fallback",
   "inlineRidePaymentSavedCards": "explicit-stripe-consent-only",
   "inlineRidePaymentCustomerScope": "user-stripe-account-environment",
-  "inlineRidePaymentLoader": "lazy-after-trip-end",
+  "inlineRidePaymentLoader": "parallel-sdk-and-session-after-trip-end",
   "inlineRidePaymentBankAuthentication": "external-overlay-compatible",
   "inlineRidePaymentDatabaseVerifiedCommit": "d9ae212c065f28059284145666f0b34e9bb71654",
-  "inlineRidePaymentStripeTestStatus": "card-paid-and-test-refunded"
+  "inlineRidePaymentStripeTestStatus": "card-paid-and-test-refunded",
+  "inlineRidePaymentRecoveryVersion": 1,
+  "inlineRidePaymentRecoveryVerifiedSourceCommit": "beb690990a62390892ce99bc27e722d40e7cc298",
+  "inlineRidePaymentInitializationWaitMs": 12000,
+  "inlineRidePaymentRuntimeCheck": "exact-pinned-versions-and-executable-exports",
+  "inlineRidePaymentRecoveryValidation": {
+    "unitTests": 779,
+    "browserScenarios": 14,
+    "browserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "cleanProductionInstall": true,
+    "staleAndMissingExportFixtures": "rejected"
+  }
 }
