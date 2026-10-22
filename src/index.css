@@ -567,11 +567,16 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 }
 /* Keep payment inside the viewport, including the on-screen keyboard. */
 .app-dialog.ride-payment-dialog {
+  --ink: #1f3d2b;
+  --paper: #f5f4ed;
+  --muted: #647067;
   width: min(26rem, calc(100% - 1.5rem));
   max-height: min(85dvh, calc(var(--modal-height, 100dvh) - 1.5rem));
   padding: 1.25rem;
   overscroll-behavior: contain;
 }
+.ride-payment-dialog .booking-primary { justify-content: center; }
+.ride-payment-header { position: sticky; top: -.875rem; z-index: 1; background: white; }
 @media (max-width: 360px) {
   .app-dialog.ride-payment-dialog { padding: .875rem; }
 }

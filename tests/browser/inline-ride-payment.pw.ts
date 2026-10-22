@@ -15,11 +15,14 @@ for(const wallet of [true,false])test(`inline ${wallet?'wallet':'card'} stays wi
   if(reconciles===1)return route.fulfill({status:503,headers:cors,json:{code:'PAYMENT_CHECK_PENDING'}});
   row.online_payment_state='paid';row.payment_status='paid';row.payment_method='online';return route.fulfill({headers:cors,json:{state:'paid',environment:'test'}});
  });
- await page.goto('/customer/home');await setShortViewport(page,320);
+ await page.setViewportSize({width:320,height:640});await page.goto('/customer/home');
  const dialog=page.getByRole('dialog',{name:'Плащане на пътуването'});await expect(dialog).toBeVisible();await expect(dialog.getByText('2.95 €',{exact:true})).toBeVisible();
  await expect(dialog.getByRole('button',{name:'Затвори плащането'})).toBeInViewport();
  const pay=wallet?dialog.getByRole('button',{name:'Mock Apple Pay'}):dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true});await expect(pay).toBeVisible();await pay.scrollIntoViewIfNeeded();await expect(pay).toBeInViewport();
- expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);await page.screenshot({path:info.outputPath(wallet?'inline-wallet-320.png':'inline-card-320.png')});
+ expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+ if(!wallet){const colours=await pay.evaluate(el=>({background:getComputedStyle(el).backgroundColor,colour:getComputedStyle(el).color}));expect(colours.background).not.toBe('rgba(0, 0, 0, 0)');expect(colours.background).not.toBe(colours.colour);}
+ await page.screenshot({path:info.outputPath(wallet?'inline-wallet-320.png':'inline-card-320.png')});
+ await setShortViewport(page,360);await pay.scrollIntoViewIfNeeded();await expect(pay).toBeInViewport();await expect(dialog.getByRole('button',{name:'Затвори плащането'})).toBeInViewport();
  await pay.click();await expect(dialog.getByText('Потвърждаваме плащането…',{exact:true})).toBeVisible();await expect(page.getByText('Тестово плащане успешно',{exact:true})).toHaveCount(0);
  await dialog.getByRole('button',{name:'Провери плащането',exact:true}).click();await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();
  expect(initialisations).toBe(1);expect(await page.evaluate(()=> (window as unknown as {stripeUiDouble:{confirms:number}}).stripeUiDouble.confirms)).toBe(1);expect(state.errors).toEqual([]);

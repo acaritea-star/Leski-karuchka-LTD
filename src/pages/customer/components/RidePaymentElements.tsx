@@ -25,7 +25,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   finally {setBusy(false);}
  };
  return <Modal label="Плащане на пътуването" onClose={onClose} busy={busy} className="ride-payment-dialog">
-  <div className="flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 rounded-full bg-background-100" onClick={onClose}><i className="ri-close-line" aria-hidden="true" /></button></div>
+  <div className="ride-payment-header flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 shrink-0 rounded-full bg-background-100 text-2xl" onClick={onClose}><span aria-hidden="true">×</span></button></div>
   {session?<><div className="flex justify-between items-baseline gap-3 mb-3"><span>Сума за плащане</span><strong className="text-3xl font-bold tabular-nums">{money(session.amount_minor/100)}</strong></div>
    {session.environment==='test'&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3">Тестов режим · Не се теглят реални пари</p>}
    <CheckoutElementsProvider key={session.session_id} stripe={stripe} options={{clientSecret:session.client_secret,elementsOptions:{appearance:{theme:'stripe',variables:{colorPrimary:'#15803d',borderRadius:'12px',fontFamily:'system-ui, sans-serif'}},loader:'auto',savedPaymentMethod:{enableSave:'auto',enableRedisplay:'auto'}}}}>
@@ -38,7 +38,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   {error&&<div role="alert" className="booking-error mt-3"><p>{error}</p><button type="button" className="min-h-11 underline" onClick={()=>setAttempt(v=>v+1)}>Опитай отново</button></div>}
   <div className="mt-4 border-t border-background-200 pt-3 text-center">
    <p className="text-xs text-foreground-500"><i className="ri-lock-line" aria-hidden="true" /> Сигурно плащане през Stripe</p>
-   {(session||legacy?.url)&&<button type="button" className="min-h-11 text-sm underline" disabled={busy} onClick={()=>void cancel()}>{session?.environment==='test'?'Отмени тестовото плащане':'Предпочитам в брой'}</button>}
+   {(session||legacy?.url)&&<button type="button" className="min-h-11 text-sm underline" disabled={busy} onClick={()=>void cancel()}>{(session?.environment??legacy?.environment)==='test'?'Отмени тестовото плащане':'Предпочитам в брой'}</button>}
   </div>
  </Modal>;
 }
