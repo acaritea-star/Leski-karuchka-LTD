@@ -1,5 +1,7 @@
 # Payment loader recovery — 2026-10-23
 
+> Superseded by [direct Stripe.js integration](./direct-stripe-sdk-2026-10-23.md). The React SDK packages and their npm runtime guard are retired; the versioned official browser SDK is now validated at runtime.
+
 Release: `2026.10.23-payment-loader.1`. Existing Test-mode restrictions remain; no backend, merchant eligibility, live activation or accounting changes.
 
 ## Observed failure

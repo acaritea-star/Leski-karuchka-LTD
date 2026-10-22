@@ -7,15 +7,15 @@ import { paymentPreferenceKey,parseRideElementsSession,type RideElementsSession 
 const fake=vi.hoisted(()=>({confirm:vi.fn(),action:vi.fn(),wallet:false,phase:'success'}));
 vi.mock('@/lib/supabase',()=>({supabase:{}}));
 vi.mock('@/lib/edgeRequest',()=>({invokeEdge:async()=>({data:await fake.action(),error:null}),EdgeRequestError:class extends Error{}}));
-vi.mock('@stripe/stripe-js',()=>({loadStripe:vi.fn(async()=>null)}));
-vi.mock('@stripe/react-stripe-js/checkout',()=>({
+vi.mock('@/lib/stripeCheckoutLoader',()=>({loadStripe:vi.fn(async()=>null)}));
+vi.mock('@/lib/stripeCheckout',()=>({
  CheckoutElementsProvider:()=>null,ContactDetailsElement:()=>null,
- useCheckoutElements:()=>fake.phase==='success'?({type:'success',checkout:{id:'cs_test_inline',livemode:false,currency:'eur',total:{total:{minorUnitsAmount:295}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}):({type:fake.phase,error:{message:'SDK unavailable'}}),
  ExpressCheckoutElement:({onReady,onConfirm}:{onReady:(event:unknown)=>void;onConfirm:(event:unknown)=>void})=>{
   useEffect(()=>{onReady({availablePaymentMethods:{applePay:fake.wallet}});},[onReady]);
   return fake.wallet?<button onClick={()=>onConfirm({paymentType:'apple_pay'})}>Mock Apple Pay</button>:null;
  },PaymentElement:()=> <div aria-label="Защитена форма на Stripe">Карта · Запази само по твой избор</div>,
 }));
+vi.mock('@/lib/stripeCheckoutState',()=>({useCheckoutElements:()=>fake.phase==='success'?({type:'success',checkout:{id:'cs_test_inline',livemode:false,currency:'eur',total:{total:{minorUnitsAmount:295}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}):({type:fake.phase,error:{message:'SDK unavailable'}})}));
 const session:RideElementsSession={state:'open',environment:'test',ui_mode:'elements',request_id:'ride',session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'};
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.wallet=false;fake.phase='success';fake.confirm.mockResolvedValue({type:'success',session:{}});fake.action.mockResolvedValue({state:'open'});});
 afterEach(()=>{cleanup();vi.useRealTimers();});

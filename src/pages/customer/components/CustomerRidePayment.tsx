@@ -18,6 +18,16 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
  const identity=`${user?.id}:${requestId}`,[openIdentity,setOpenIdentity]=useState<string|null>(null),autoOpened=useRef('');
  const changed=useCallback(async()=>{await refresh();},[refresh]);
  useEffect(()=>{
+  if(ended||!data?.eligible||!data.inline_available||!navigator.onLine)return;
+  const connection=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection;
+  if(connection?.saveData)return;
+  let active=true;
+  const warm=()=>{if(active)void import('@/lib/stripeCheckoutLoader').then(sdk=>{if(active)return sdk.preloadStripeCheckout();}).catch(()=>undefined);};
+  const idle=typeof window.requestIdleCallback==='function'?window.requestIdleCallback(warm,{timeout:1500}):null;
+  const timer=idle===null?window.setTimeout(warm,750):null;
+  return()=>{active=false;if(idle!==null)window.cancelIdleCallback(idle);if(timer!==null)window.clearTimeout(timer);};
+ },[identity,ended,data?.eligible,data?.inline_available]);
+ useEffect(()=>{
   if(ended&&data?.eligible&&data.inline_available&&data.state!=='processing'&&autoOpened.current!==identity){autoOpened.current=identity;setOpenIdentity(identity);}
  },[ended,data?.eligible,data?.inline_available,data?.state,identity]);
  useEffect(()=>{if(paid)setOpenIdentity(null);},[paid]);

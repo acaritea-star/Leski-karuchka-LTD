@@ -35,6 +35,7 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
     }}};},
    };},
   });
+  Object.assign(factory,{version:'endive'});
   Object.assign(window,options.scriptedLoader?{stripeUiDoubleFactory:factory}:{Stripe:factory});
  },{wallet,challenge,options});
 }

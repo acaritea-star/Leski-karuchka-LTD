@@ -4,6 +4,17 @@ import {installStripeUiDouble} from './helpers/stripeFixture';
 const id='48484848-4848-4484-8484-484848484848',cors={'access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type,x-client-info','access-control-allow-methods':'POST,OPTIONS'};
 const ride=()=>({id,company_id:uiCompany,driver_id:uiDriver,customer_id:uiAccount,status:'in_progress',estimated_price:2.95,final_price:2.95,trip_ended_at:new Date().toISOString(),online_payment_state:'none',payment_status:'pending',payment_method:'cash',payment_environment:'test',pickup_latitude:43.08,pickup_longitude:25.63,destination_latitude:43.09,destination_longitude:25.64,pickup_address:'Велико Търново, център',destination_address:'Велико Търново, Акация',created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
 const config={state:'open',environment:'test',ui_mode:'elements',request_id:id,session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'};
+for(const eligible of [true,false])test(`an ongoing ${eligible?'eligible':'ineligible'} ride warms only the permitted SDK and creates no payment`,async({page})=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,false,{scriptedLoader:true});
+ const row={...ride(),trip_ended_at:null};state.rides=[row];let paymentCalls=0;
+ await page.clock.install();
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible,inline_available:eligible,environment:'test',ended_at:null,amount:2.95,state:'none',payment_status:'pending',payment_method:'cash'}}));
+ await page.route('**/functions/v1/ride-checkout',route=>{paymentCalls++;return route.fulfill({headers:cors,json:config});});
+ await page.goto('/customer/home');await expect(page.getByRole('button',{name:'Спешна помощ на 112'})).toBeVisible();await page.clock.fastForward(2000);
+ if(eligible)await expect.poll(()=>page.evaluate(()=>(window as unknown as {stripeUiDouble:{scriptDownloads:number}}).stripeUiDouble.scriptDownloads)).toBe(1);
+ const sdk=await page.evaluate(()=>(window as unknown as {stripeUiDouble:{scriptDownloads:number;initialisations:number;confirms:number}}).stripeUiDouble);
+ expect(sdk.scriptDownloads).toBe(eligible?1:0);expect(sdk.initialisations).toBe(0);expect(sdk.confirms).toBe(0);expect(paymentCalls).toBe(0);await expect(page.getByRole('dialog')).toHaveCount(0);expect(state.errors).toEqual([]);
+});
 for(const initialization of ['stalled-first','error-first'] as const)test(`a ${initialization} Stripe initialization recovers the same Session without a second order`,async({page})=>{
  const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,false,{initialization});
  const row=ride();state.rides=[row];let sessions=0;

@@ -1,9 +1,7 @@
 import { Component,useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react';
-// This module is lazy-loaded only for an ended, eligible ride. Start the
-// official Stripe.js download alongside the Edge request, rather than after it.
-import { loadStripe } from '@stripe/stripe-js';
-import type { StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
-import { CheckoutElementsProvider,ContactDetailsElement,ExpressCheckoutElement,PaymentElement,useCheckoutElements } from '@stripe/react-stripe-js/checkout';
+import { loadStripe,type CheckoutConfirmEvent } from '@/lib/stripeCheckoutLoader';
+import { CheckoutElementsProvider,ContactDetailsElement,ExpressCheckoutElement,PaymentElement } from '@/lib/stripeCheckout';
+import { useCheckoutElements } from '@/lib/stripeCheckoutState';
 import Modal from '@/components/feature/Modal';
 import { money } from '@/lib/accounting';
 import { paymentPreferenceKey,preferredPaymentMethod,rememberPaymentMethod,ridePaymentAction,type RideElementsSession,type RidePaymentResult } from '@/lib/ridePayment';
@@ -31,7 +29,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   }).catch(()=>{if(!abort.signal.aborted)setError('Не успяхме да заредим плащането. Опитай отново със същия курс.');});
   return()=>abort.abort();
  },[requestId,userId,attempt,onChanged]);
- const sdk=useMemo(()=>session?{key:`${session.session_id}:${sdkAttempt}`,stripe:loadStripe(session.publishable_key,{locale:'bg'})}:null,[session,sdkAttempt]);
+ const sdk=useMemo(()=>session?{key:`${session.session_id}:${sdkAttempt}`,stripe:loadStripe(session.publishable_key)}:null,[session,sdkAttempt]);
  const cancel=async()=>{
   if(busy)return;setBusy(true);setError('');
   try {const result=await ridePaymentAction(requestId,'cancel');await onChanged();if(result.state==='canceled'||result.state==='paid')onClose();else setError('Плащането още се проверява. Изчакай потвърждение преди друг начин на плащане.');}
@@ -87,7 +85,7 @@ export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry}:{sessi
  if(result.type==='error')return <PaymentLoadRecovery onRetry={onRetry}/>;
  const checkout=result.checkout;
  if(checkout.id!==session.session_id || checkout.livemode!==(session.environment==='live') || checkout.currency!=='eur' || checkout.total.total.minorUnitsAmount!==session.amount_minor)return <p role="alert" className="booking-error">Сумата не съвпада. Обнови курса преди плащане.</p>;
- const confirm=async(event?:StripeExpressCheckoutElementConfirmEvent)=>{
+ const confirm=async(event?:CheckoutConfirmEvent)=>{
   if(lock.current||awaiting)return;lock.current=true;setBusy(true);onBusy(true);setError('');
   try {
    const confirmed=await checkout.confirm({redirect:'if_required',...(event?{expressCheckoutConfirmEvent:event}:{})});
