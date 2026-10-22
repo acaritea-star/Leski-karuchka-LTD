@@ -94,3 +94,4 @@ ROLLBACK;
 
 
 \ir test_ride_checkouts.sql
+\ir inline_ride_checkout.sql

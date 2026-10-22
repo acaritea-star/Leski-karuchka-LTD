@@ -565,3 +565,13 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Keep payment inside the viewport, including the on-screen keyboard. */
+.app-dialog.ride-payment-dialog {
+  width: min(26rem, calc(100% - 1.5rem));
+  max-height: min(85dvh, calc(var(--modal-height, 100dvh) - 1.5rem));
+  padding: 1.25rem;
+  overscroll-behavior: contain;
+}
+@media (max-width: 360px) {
+  .app-dialog.ride-payment-dialog { padding: .875rem; }
+}

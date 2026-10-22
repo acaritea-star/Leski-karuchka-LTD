@@ -1,6 +1,6 @@
 // Pure orchestration: transport, Stripe and database calls are injected for tests.
 export const LIVE_RIDE_ACCOUNT = 'acct_1USiOkPYGWX41ye8';
-export type RideOrder = { id:string; request_id:string; company_id:string; customer_id:string; account_id:string; amount_minor:number; currency:string; checkout_session_id:string|null; checkout_url:string|null; expires_at:number; state:string; livemode?:boolean };
+export type RideOrder = { id:string; request_id:string; company_id:string; customer_id:string; account_id:string; amount_minor:number; currency:string; checkout_session_id:string|null; checkout_url:string|null; expires_at:number; state:string; livemode?:boolean; ui_mode?:'hosted'|'elements'; stripe_customer_id?:string|null };
 type Row = Record<string,unknown>;
 export const stripeObject = (value:unknown):Row => {
  if (!value || typeof value!=='object' || Array.isArray(value)) throw Error('Invalid Stripe response');
@@ -16,21 +16,28 @@ const minor = (value:unknown):number => {
  return value as number;
 };
 export type RideStripeSnapshot = {p_order_id:string;p_account_id:string;p_session_id:string;p_payment_id:string|null;p_event_id:string;p_state:'open'|'processing'|'canceled'|'paid';p_amount_minor:number;p_received_minor:number;p_refunded_minor:number};
+export function validateRideSession(order:RideOrder,value:unknown) {
+ const session=stripeObject(value),live=order.livemode!==false;
+ if(session.object!=='checkout.session' || typeof session.id!=='string' || !session.id.startsWith(live?'cs_live_':'cs_test_') ||
+  order.checkout_session_id && session.id!==order.checkout_session_id || session.livemode!==live || session.mode!=='payment' ||
+  session.amount_total!==order.amount_minor || session.currency!==order.currency || session.client_reference_id!==order.request_id ||
+  stripeObject(session.metadata).leski_ride_order_id!==order.id ||
+  order.ui_mode==='elements' && (session.ui_mode!=='elements' || !order.stripe_customer_id || stripeId(session.customer,'cus')!==order.stripe_customer_id)) throw Error('Checkout binding rejected');
+ return session;
+}
 export async function reconcileRideCheckout(order:RideOrder,eventId:string,deps:{
  retrieveSession:(id:string)=>Promise<unknown>;retrievePayment:(id:string)=>Promise<unknown>;record:(snapshot:RideStripeSnapshot)=>Promise<unknown>;
 }) {
  const live=order.livemode!==false;
  if((live?order.account_id!==LIVE_RIDE_ACCOUNT:![LIVE_RIDE_ACCOUNT,'acct_1USiOtBXRX2hZ2VT'].includes(order.account_id)) || !order.checkout_session_id || !order.checkout_session_id.startsWith(live?'cs_live_':'cs_test_')) throw Error('Checkout registration pending');
- const session=stripeObject(await deps.retrieveSession(order.checkout_session_id));
- if(session.object!=='checkout.session' || session.id!==order.checkout_session_id || session.livemode!==live || session.mode!=='payment' ||
-  session.amount_total!==order.amount_minor || session.currency!==order.currency || session.client_reference_id!==order.request_id ||
-  stripeObject(session.metadata).leski_ride_order_id!==order.id) throw Error('Checkout binding rejected');
+ const session=validateRideSession(order,await deps.retrieveSession(order.checkout_session_id));
  let state:RideStripeSnapshot['p_state']='open', received=0,refunded=0,paymentId:string|null=null;
  if(session.payment_intent!=null) {
   paymentId=stripeId(session.payment_intent,'pi');
   const payment=stripeObject(await deps.retrievePayment(paymentId));
   if(payment.object!=='payment_intent' || payment.id!==paymentId || payment.livemode!==live || payment.amount!==order.amount_minor ||
-   payment.currency!==order.currency || stripeObject(payment.metadata).leski_ride_order_id!==order.id) throw Error('Payment binding rejected');
+   payment.currency!==order.currency || stripeObject(payment.metadata).leski_ride_order_id!==order.id ||
+   order.ui_mode==='elements' && stripeId(payment.customer,'cus')!==order.stripe_customer_id) throw Error('Payment binding rejected');
   received=minor(payment.amount_received);
   if(received>order.amount_minor) throw Error('Invalid capture');
   if(payment.latest_charge!=null) {
@@ -54,9 +61,16 @@ export function rideCheckoutParameters(order:RideOrder) {
  // All values come from a locked registered database order, never browser input.
  const metadata={leski_ride_order_id:order.id};
  const suffix=order.id.replace(/-/g,'').slice(-8).replace(/[0-9]/g,n=>String.fromCharCode(97+Number(n)));
- return {mode:'payment' as const,client_reference_id:order.request_id,metadata,payment_intent_data:{metadata},
+ const common={mode:'payment' as const,client_reference_id:order.request_id,metadata,payment_intent_data:{metadata},
   integration_identifier:`leski_ride_${suffix}`,adaptive_pricing:{enabled:false},expires_at:order.expires_at,
-  line_items:[{quantity:1,price_data:{currency:order.currency,unit_amount:order.amount_minor,product_data:{name:order.livemode===false?'ТЕСТ · Пътуване с Лески Каручка':'Пътуване с Лески Каручка',description:`Курс ${order.request_id.slice(0,8)}`}}}],
+  line_items:[{quantity:1,price_data:{currency:order.currency,unit_amount:order.amount_minor,product_data:{name:order.livemode===false?'ТЕСТ · Пътуване с Лески Каручка':'Пътуване с Лески Каручка',description:`Курс ${order.request_id.slice(0,8)}`}}}]};
+ if(order.ui_mode==='elements') {
+  if(!order.stripe_customer_id || !/^cus_[a-zA-Z0-9]+$/.test(order.stripe_customer_id))throw Error('Stripe customer required');
+  return {...common,ui_mode:'elements' as const,customer:order.stripe_customer_id,allowed_payment_method_types:['card' as const],
+   saved_payment_method_options:{payment_method_save:'enabled' as const,payment_method_remove:'enabled' as const},
+   return_url:`https://leskikaruchka.com/customer/home?payment_return=${order.request_id}`};
+ }
+ return {...common,
   success_url:`https://leskikaruchka.com/customer/home?payment_return=${order.request_id}`,
   cancel_url:`https://leskikaruchka.com/customer/home?payment_return=${order.request_id}`};
 }

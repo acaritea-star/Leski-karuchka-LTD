@@ -1,0 +1,97 @@
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js/pure';
+import type { StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
+import { CheckoutElementsProvider,ContactDetailsElement,ExpressCheckoutElement,PaymentElement,useCheckoutElements } from '@stripe/react-stripe-js/checkout';
+import Modal from '@/components/feature/Modal';
+import { money } from '@/lib/accounting';
+import { paymentPreferenceKey,preferredPaymentMethod,rememberPaymentMethod,ridePaymentAction,type RideElementsSession,type RidePaymentResult } from '@/lib/ridePayment';
+
+export default function RidePaymentElements({requestId,userId,onClose,onChanged}:{requestId:string;userId:string;onClose:()=>void;onChanged:()=>Promise<unknown>}) {
+ const [session,setSession]=useState<RideElementsSession|null>(null),[legacy,setLegacy]=useState<RidePaymentResult|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false);
+ useEffect(()=>{
+  const abort=new AbortController();setError('');setSession(null);setLegacy(null);
+  void ridePaymentAction(requestId,'elements',abort.signal).then(result=>{
+   if(abort.signal.aborted)return;
+   if('ui_mode' in result)setSession(result);
+   else {setLegacy(result);void onChanged();}
+  }).catch(()=>{if(!abort.signal.aborted)setError('Не успяхме да заредим плащането. Опитай отново със същия курс.');});
+  return()=>abort.abort();
+ },[requestId,userId,attempt,onChanged]);
+ const stripe=useMemo(()=>session?loadStripe(session.publishable_key,{locale:'bg'}):null,[session]);
+ const cancel=async()=>{
+  if(busy)return;setBusy(true);setError('');
+  try {const result=await ridePaymentAction(requestId,'cancel');await onChanged();if(result.state==='canceled'||result.state==='paid')onClose();else setError('Плащането още се проверява. Изчакай потвърждение преди друг начин на плащане.');}
+  catch {setError('Не успяхме да проверим плащането. Опитай отново, когато имаш интернет.');}
+  finally {setBusy(false);}
+ };
+ return <Modal label="Плащане на пътуването" onClose={onClose} busy={busy} className="ride-payment-dialog">
+  <div className="flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 rounded-full bg-background-100" onClick={onClose}><i className="ri-close-line" aria-hidden="true" /></button></div>
+  {session?<><div className="flex justify-between items-baseline gap-3 mb-3"><span>Сума за плащане</span><strong className="text-3xl font-bold tabular-nums">{money(session.amount_minor/100)}</strong></div>
+   {session.environment==='test'&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3">Тестов режим · Не се теглят реални пари</p>}
+   <CheckoutElementsProvider key={session.session_id} stripe={stripe} options={{clientSecret:session.client_secret,elementsOptions:{appearance:{theme:'stripe',variables:{colorPrimary:'#15803d',borderRadius:'12px',fontFamily:'system-ui, sans-serif'}},loader:'auto',savedPaymentMethod:{enableSave:'auto',enableRedisplay:'auto'}}}}>
+    <RidePaymentForm session={session} userId={userId} onBusy={setBusy} onChanged={onChanged} />
+   </CheckoutElementsProvider>
+  </>:error?null:legacy?<div role="status" className="space-y-3">
+   <p>{legacy.url?'Имате започнато плащане. Продължете го, за да избегнем повторно таксуване.':legacy.state==='paid'?'Плащането е потвърдено.':'Проверяваме състоянието на плащането.'}</p>
+   {legacy.url&&<a href={legacy.url} className="booking-primary w-full">Продължи плащането</a>}
+  </div>:<p role="status" className="py-6 text-center">Зареждаме сигурното плащане…</p>}
+  {error&&<div role="alert" className="booking-error mt-3"><p>{error}</p><button type="button" className="min-h-11 underline" onClick={()=>setAttempt(v=>v+1)}>Опитай отново</button></div>}
+  <div className="mt-4 border-t border-background-200 pt-3 text-center">
+   <p className="text-xs text-foreground-500"><i className="ri-lock-line" aria-hidden="true" /> Сигурно плащане през Stripe</p>
+   {(session||legacy?.url)&&<button type="button" className="min-h-11 text-sm underline" disabled={busy} onClick={()=>void cancel()}>{session?.environment==='test'?'Отмени тестовото плащане':'Предпочитам в брой'}</button>}
+  </div>
+ </Modal>;
+}
+
+export function RidePaymentForm({session,userId,onBusy,onChanged}:{session:RideElementsSession;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<unknown>}) {
+ const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session.account_id,session.environment);
+ const [wallets,setWallets]=useState<boolean|null>(null),[card,setCard]=useState(()=>preferredPaymentMethod(key)==='card'),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
+ const lock=useRef(false),alive=useRef(true);
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
+ const reconcile=useCallback(async()=>{
+  if(lock.current)return;lock.current=true;setBusy(true);onBusy(true);setError('');
+  try {const checked=await ridePaymentAction(session.request_id,'reconcile');await onChanged();if(alive.current)setAwaiting(checked.state!=='paid'&&checked.state!=='canceled'&&checked.state!=='open');}
+  catch {if(alive.current)setError('Потвърждението се забави. Провери отново — използваме същото плащане.');}
+  finally {lock.current=false;if(alive.current){setBusy(false);onBusy(false);}}
+ },[session.request_id,onChanged,onBusy]);
+ useEffect(()=>{
+  if(!awaiting)return;
+  const online=()=>{if(document.visibilityState!=='hidden'&&navigator.onLine)void reconcile();};
+  window.addEventListener('online',online);document.addEventListener('visibilitychange',online);
+  const timer=window.setTimeout(online,2500);
+  return()=>{clearTimeout(timer);window.removeEventListener('online',online);document.removeEventListener('visibilitychange',online);};
+ },[awaiting,reconcile]);
+ if(result.type==='loading')return <p role="status" className="py-5 text-center">Подготвяме начините за плащане…</p>;
+ if(result.type==='error')return <p role="alert" className="booking-error">Плащането не се зареди. Затвори този прозорец и опитай отново.</p>;
+ const checkout=result.checkout;
+ if(checkout.id!==session.session_id || checkout.livemode!==(session.environment==='live') || checkout.currency!=='eur' || checkout.total.total.minorUnitsAmount!==session.amount_minor)return <p role="alert" className="booking-error">Сумата не съвпада. Обнови курса преди плащане.</p>;
+ const confirm=async(event?:StripeExpressCheckoutElementConfirmEvent)=>{
+  if(lock.current||awaiting)return;lock.current=true;setBusy(true);onBusy(true);setError('');
+  try {
+   const confirmed=await checkout.confirm({redirect:'if_required',returnUrl:`https://leskikaruchka.com/customer/home?payment_return=${session.request_id}`,...(event?{expressCheckoutConfirmEvent:event}:{})});
+   if(!alive.current)return;
+   if(confirmed.type==='error'){setError(confirmed.error.message||'Плащането не е завършено. Провери данните и опитай отново.');return;}
+   rememberPaymentMethod(key,event?'wallet':'card');setAwaiting(true);
+   // The SDK never marks a ride paid. Only verified server reconciliation may do that.
+   try {const checked=await ridePaymentAction(session.request_id,'reconcile');await onChanged();if(alive.current)setAwaiting(!['paid','canceled','open'].includes(checked.state));}
+   catch {if(alive.current)setError('Потвърждаваме плащането. При прекъсната връзка натисни „Провери плащането“.');}
+  }catch {if(alive.current){setAwaiting(true);setError('Връзката прекъсна. Провери плащането преди следващ опит.');}}
+  finally {lock.current=false;if(alive.current){setBusy(false);onBusy(false);}}
+ };
+ return <div className="space-y-3" aria-busy={busy}>
+  {!checkout.email&&<ContactDetailsElement />}
+  <div className={awaiting?'hidden':''}><ExpressCheckoutElement options={{buttonHeight:48,buttonTheme:{applePay:'black',googlePay:'black'},buttonType:{applePay:'plain',googlePay:'pay'},paymentMethodOrder:['apple_pay','google_pay'],layout:{maxColumns:1,maxRows:2},paymentMethods:{applePay:'auto',googlePay:'auto',link:'never',amazonPay:'never',paypal:'never',klarna:'never'}}}
+   onReady={event=>setWallets(!!(event.availablePaymentMethods?.applePay||event.availablePaymentMethods?.googlePay))}
+   onLoadError={()=>setWallets(false)} onConfirm={event=>void confirm(event)} /></div>
+  {!awaiting&&<>
+   {wallets&&<button type="button" className="min-h-11 w-full text-sm underline" disabled={busy} onClick={()=>setCard(v=>!v)}>{card?'Скрий плащането с карта':'Плати с карта'}</button>}
+   {(card||wallets===false)&&<form className="space-y-3" onSubmit={event=>{event.preventDefault();void confirm();}}>
+    <PaymentElement options={{layout:'accordion',wallets:{applePay:'never',googlePay:'never',link:'never'}}} />
+    <button type="submit" className="booking-primary w-full disabled:opacity-40" disabled={busy||!checkout.canConfirm}>{busy?'Потвърждаваме…':`${session.environment==='test'?'Тествай':'Плати'} ${money(session.amount_minor/100)}`}</button>
+   </form>}
+   {wallets===null&&!card&&<p className="text-xs text-center text-foreground-500">Проверяваме наличните начини… <button type="button" className="min-h-11 underline" onClick={()=>setCard(true)}>Използвай карта</button></p>}
+  </>}
+  {awaiting&&<div role="status"><p>Потвърждаваме плащането…</p><button type="button" className="min-h-11 underline" disabled={busy} onClick={()=>void reconcile()}>Провери плащането</button></div>}
+  {error&&<p role="alert" className="booking-error">{error}</p>}
+ </div>;
+}
