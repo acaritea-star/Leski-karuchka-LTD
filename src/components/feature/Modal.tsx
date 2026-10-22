@@ -66,7 +66,7 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
   }, [allowExternalOverlays, busy, onClose]);
   if (allowExternalOverlays) return createPortal(<>
     <div className="app-dialog-scrim" aria-hidden="true" onClick={() => { if (!busy) onClose(); }} />
-    <div ref={node => { ref.current = node; }} role="dialog" aria-label={label} aria-labelledby={labelledBy} aria-modal="true" aria-busy={busy}
+    <div ref={node => { ref.current = node; }} role="dialog" aria-label={label} aria-labelledby={labelledBy} aria-modal={busy ? undefined : true} aria-busy={busy}
       tabIndex={-1} className={`app-dialog app-dialog-external ${className}`}>
       <fieldset disabled={busy} className="min-w-0">{children}</fieldset>
     </div>

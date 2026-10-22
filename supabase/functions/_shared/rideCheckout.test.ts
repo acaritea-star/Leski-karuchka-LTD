@@ -60,6 +60,7 @@ it('uses explicit Stripe save consent and no off-session automatic card saving',
  const params=rideCheckoutParameters({...order,stripe_customer_id:'cus_inline'});
  expect(params).toMatchObject({saved_payment_method_options:{payment_method_save:'enabled',payment_method_remove:'enabled'}});
  expect(params).not.toHaveProperty('success_url');expect(params.payment_intent_data).not.toHaveProperty('setup_future_usage');
+ expect(params).toHaveProperty('return_url',`https://leskikaruchka.com/customer/home?payment_return=${order.request_id}`);
 });
 it('rejects a foreign PaymentIntent customer before settlement',async()=>{
  const record=vi.fn();await expect(reconcileRideCheckout({...order,stripe_customer_id:'cus_inline',checkout_session_id:'cs_test_inline'},'evt_test',{

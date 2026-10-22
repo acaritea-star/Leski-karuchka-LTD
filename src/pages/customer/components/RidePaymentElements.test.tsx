@@ -22,7 +22,7 @@ const setup=()=>{const changed=vi.fn(async()=>undefined),busy=vi.fn();render(<Ri
 it('offers the card form when wallets are unavailable and needs one payment confirmation',async()=>{
  const {changed}=setup();await screen.findByRole('button',{name:'Тествай 2.95 €'});fireEvent.click(screen.getByRole('button',{name:'Тествай 2.95 €'}));
  await waitFor(()=>expect(fake.confirm).toHaveBeenCalledOnce());await waitFor(()=>expect(changed).toHaveBeenCalledOnce());
- expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({redirect:'if_required'}));expect(screen.queryByText('Платено онлайн')).toBeNull();
+ expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({redirect:'if_required'}));expect(fake.confirm.mock.calls[0][0]).not.toHaveProperty('returnUrl');expect(screen.queryByText('Платено онлайн')).toBeNull();
  expect(localStorage.getItem(paymentPreferenceKey('owner','acct_fixture','test'))).toBe('card');
 });
 it('shows a wallet first and reveals a card without leaving the ride',async()=>{

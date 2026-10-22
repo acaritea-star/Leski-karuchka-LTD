@@ -45,6 +45,7 @@ test('a bank authentication overlay can receive focus and clicks above the payme
  });
  await page.goto('/customer/home');await page.getByRole('button',{name:'Тествай 2.95 €',exact:true}).click();
  const bank=page.getByRole('dialog',{name:'Mock bank authentication'});await expect(bank).toBeVisible();
+ await expect(page.getByRole('dialog',{name:'Плащане на пътуването'})).not.toHaveAttribute('aria-modal','true');
  const approve=bank.getByRole('button',{name:'Потвърди тестовата банкова проверка'});await expect(approve).toBeFocused();await approve.click();
  await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(state.errors).toEqual([]);
 });

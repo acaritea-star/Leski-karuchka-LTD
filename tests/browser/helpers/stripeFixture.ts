@@ -17,7 +17,8 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
   Object.assign(window,{Stripe:()=>({elements:()=>{},createToken:()=>{},createPaymentMethod:()=>{},confirmCardPayment:()=>{},_registerWrapper:()=>{},registerAppInfo:()=>{},
    initCheckoutElementsSdk:()=>{controls.initialisations++;return {
     on:()=>{},changeAppearance:()=>{},createExpressCheckoutElement:()=>element('express'),createPaymentElement:()=>element('payment'),createContactDetailsElement:()=>element('contact'),
-    loadActions:async()=>({type:'success',actions:{getSession:()=>session,confirm:async()=>{
+    loadActions:async()=>({type:'success',actions:{getSession:()=>session,confirm:async(args?:{returnUrl?:string})=>{
+     if(args?.returnUrl)throw Error('Session return_url and confirm returnUrl are mutually exclusive');
      controls.confirms++;
      if(challenge)await new Promise<void>(resolve=>{
       setTimeout(()=>{

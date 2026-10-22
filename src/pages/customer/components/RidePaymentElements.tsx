@@ -68,7 +68,7 @@ export function RidePaymentForm({session,userId,onBusy,onChanged}:{session:RideE
  const confirm=async(event?:StripeExpressCheckoutElementConfirmEvent)=>{
   if(lock.current||awaiting)return;lock.current=true;setBusy(true);onBusy(true);setError('');
   try {
-   const confirmed=await checkout.confirm({redirect:'if_required',returnUrl:`https://leskikaruchka.com/customer/home?payment_return=${session.request_id}`,...(event?{expressCheckoutConfirmEvent:event}:{})});
+   const confirmed=await checkout.confirm({redirect:'if_required',...(event?{expressCheckoutConfirmEvent:event}:{})});
    if(!alive.current)return;
    if(confirmed.type==='error'){setError(confirmed.error.message||'Плащането не е завършено. Провери данните и опитай отново.');return;}
    rememberPaymentMethod(key,event?'wallet':'card');setAwaiting(true);
