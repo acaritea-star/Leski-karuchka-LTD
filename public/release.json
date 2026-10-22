@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.23-payment-loader.1",
-  "baseCommit": "1cc2120407c8c15704d7560b84d5a4631a696f83",
+  "release": "2026.10.23-direct-stripe.1",
+  "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "beb690990a62390892ce99bc27e722d40e7cc298",
+  "verifiedSourceCommit": "279b6ffad5b766b457dfe574df415435d8ccf009",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -237,14 +237,14 @@
   "inlineRidePaymentMethods": "express-checkout-with-payment-element-fallback",
   "inlineRidePaymentSavedCards": "explicit-stripe-consent-only",
   "inlineRidePaymentCustomerScope": "user-stripe-account-environment",
-  "inlineRidePaymentLoader": "parallel-sdk-and-session-after-trip-end",
+  "inlineRidePaymentLoader": "prewarm-eligible-rides-and-parallel-session-loading",
   "inlineRidePaymentBankAuthentication": "external-overlay-compatible",
   "inlineRidePaymentDatabaseVerifiedCommit": "d9ae212c065f28059284145666f0b34e9bb71654",
   "inlineRidePaymentStripeTestStatus": "card-paid-and-test-refunded",
   "inlineRidePaymentRecoveryVersion": 1,
   "inlineRidePaymentRecoveryVerifiedSourceCommit": "beb690990a62390892ce99bc27e722d40e7cc298",
   "inlineRidePaymentInitializationWaitMs": 12000,
-  "inlineRidePaymentRuntimeCheck": "exact-pinned-versions-and-executable-exports",
+  "inlineRidePaymentRuntimeCheck": "versioned-official-script-and-runtime-capability",
   "inlineRidePaymentRecoveryValidation": {
     "unitTests": 779,
     "browserScenarios": 14,
@@ -254,5 +254,21 @@
     ],
     "cleanProductionInstall": true,
     "staleAndMissingExportFixtures": "rejected"
+  },
+  "inlineRidePaymentDirectSdkVersion": 1,
+  "inlineRidePaymentDirectSdkVerifiedSourceCommit": "279b6ffad5b766b457dfe574df415435d8ccf009",
+  "inlineRidePaymentSdkUrl": "https://js.stripe.com/endive/stripe.js",
+  "inlineRidePaymentReactSdkDependency": false,
+  "inlineRidePaymentScriptLoadTimeoutMs": 10000,
+  "inlineRidePaymentDirectSdkValidation": {
+    "unitTests": 784,
+    "browserScenarios": 18,
+    "browserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "cleanProductionInstall": true,
+    "realStripeTestPayment": "paid-and-fully-refunded",
+    "hardwareWalletApproval": "phone-check-required"
   }
 }
