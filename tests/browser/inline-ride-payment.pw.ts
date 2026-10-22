@@ -35,3 +35,16 @@ test('inline dialog opens once, restores focus, and reuses the Session when reop
  await dialog.getByRole('button',{name:'Затвори плащането'}).click();await expect(dialog).toHaveCount(0);await page.getByRole('button',{name:'Продължи плащането',exact:true}).click();
  await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();await dialog.getByRole('button',{name:'Затвори плащането'}).click();await expect(page.getByRole('button',{name:'Продължи плащането',exact:true})).toBeFocused();expect(calls).toBe(2);expect(state.errors).toEqual([]);
 });
+test('a bank authentication overlay can receive focus and clicks above the payment dialog',async({page})=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,true);const row=ride();state.rides=[row];
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}}));
+ await page.route('**/functions/v1/ride-checkout',route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  if(route.request().postDataJSON().action==='elements')return route.fulfill({headers:cors,json:config});
+  row.online_payment_state='paid';row.payment_status='paid';row.payment_method='online';return route.fulfill({headers:cors,json:{state:'paid',environment:'test'}});
+ });
+ await page.goto('/customer/home');await page.getByRole('button',{name:'Тествай 2.95 €',exact:true}).click();
+ const bank=page.getByRole('dialog',{name:'Mock bank authentication'});await expect(bank).toBeVisible();
+ const approve=bank.getByRole('button',{name:'Потвърди тестовата банкова проверка'});await expect(approve).toBeFocused();await approve.click();
+ await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(state.errors).toEqual([]);
+});

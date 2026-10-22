@@ -24,7 +24,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   catch {setError('Не успяхме да проверим плащането. Опитай отново, когато имаш интернет.');}
   finally {setBusy(false);}
  };
- return <Modal label="Плащане на пътуването" onClose={onClose} busy={busy} className="ride-payment-dialog">
+ return <Modal label="Плащане на пътуването" onClose={onClose} busy={busy} allowExternalOverlays className="ride-payment-dialog">
   <div className="ride-payment-header flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 shrink-0 rounded-full bg-background-100 text-2xl" onClick={onClose}><span aria-hidden="true">×</span></button></div>
   {session?<><div className="flex justify-between items-baseline gap-3 mb-3"><span>Сума за плащане</span><strong className="text-3xl font-bold tabular-nums">{money(session.amount_minor/100)}</strong></div>
    {session.environment==='test'&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3">Тестов режим · Не се теглят реални пари</p>}

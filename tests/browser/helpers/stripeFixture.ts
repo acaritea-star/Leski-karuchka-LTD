@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 /** A local UI double, never used in production or as proof of Stripe settlement. */
-export async function installStripeUiDouble(page:Page,wallet=false) {
- await page.addInitScript(({wallet})=>{
+export async function installStripeUiDouble(page:Page,wallet=false,challenge=false) {
+ await page.addInitScript(({wallet,challenge})=>{
   const controls={confirms:0,initialisations:0};Object.assign(window,{stripeUiDouble:controls});
   const session={id:'cs_test_inline',livemode:false,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
   const element=(kind:string)=>{
@@ -17,8 +17,18 @@ export async function installStripeUiDouble(page:Page,wallet=false) {
   Object.assign(window,{Stripe:()=>({elements:()=>{},createToken:()=>{},createPaymentMethod:()=>{},confirmCardPayment:()=>{},_registerWrapper:()=>{},registerAppInfo:()=>{},
    initCheckoutElementsSdk:()=>{controls.initialisations++;return {
     on:()=>{},changeAppearance:()=>{},createExpressCheckoutElement:()=>element('express'),createPaymentElement:()=>element('payment'),createContactDetailsElement:()=>element('contact'),
-    loadActions:async()=>({type:'success',actions:{getSession:()=>session,confirm:async()=>{controls.confirms++;return {type:'success',session};}}}),
+    loadActions:async()=>({type:'success',actions:{getSession:()=>session,confirm:async()=>{
+     controls.confirms++;
+     if(challenge)await new Promise<void>(resolve=>{
+      setTimeout(()=>{
+      const bank=document.createElement('div');bank.setAttribute('role','dialog');bank.setAttribute('aria-label','Mock bank authentication');
+      bank.style.cssText='position:fixed;inset:20px;z-index:2147483000;background:white;display:grid;place-items:center';
+      const approve=document.createElement('button');approve.textContent='Потвърди тестовата банкова проверка';approve.onclick=()=>{bank.remove();resolve();};bank.appendChild(approve);document.body.appendChild(bank);approve.focus();
+      },0);
+     });
+     return {type:'success',session};
+    }}}),
    };},
   })});
- },{wallet});
+ },{wallet,challenge});
 }

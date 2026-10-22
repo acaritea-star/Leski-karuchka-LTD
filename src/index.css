@@ -247,6 +247,9 @@ button, a {
   box-shadow: 0 24px 80px #0003;
 }
 .app-dialog::backdrop { background: #0006; }
+/* Payment SDKs mount their authentication iframe on body, above this overlay. */
+.app-dialog-scrim { position: fixed; inset: 0; z-index: 9999; background: #0006; }
+.app-dialog-external { z-index: 10000; }
 .app-dialog input, .app-dialog select, .app-dialog textarea { min-width: 0; max-width: 100%; }
 [role="alert"] { overflow-wrap: anywhere; }
 .app-dialog:focus-visible { outline: 3px solid oklch(var(--primary-400)); outline-offset: 3px; }
