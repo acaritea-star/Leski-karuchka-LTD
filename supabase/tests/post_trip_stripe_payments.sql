@@ -1,5 +1,7 @@
 -- Entirely synthetic and rollback-only. No Stripe API calls or real charges.
 BEGIN;
+-- Report dates are business dates in Sofia, including after UTC 21:00.
+SET LOCAL TIME ZONE 'Europe/Sofia';
 UPDATE private.app_security SET staff_mfa_enforced=false;
 CREATE FUNCTION pg_temp.stripe_denied(stmt text) RETURNS void LANGUAGE plpgsql AS $$BEGIN BEGIN EXECUTE stmt;EXCEPTION WHEN OTHERS THEN RETURN;END;RAISE EXCEPTION 'FAIL expected denial: %',stmt;END$$;
 DO $t$
