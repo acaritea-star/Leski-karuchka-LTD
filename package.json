@@ -50,7 +50,9 @@
     "check:legal-release": "node scripts/check-legal-release.mjs",
     "test:browser": "playwright test",
     "test:database": "node scripts/test-database.mjs",
-    "check:build-config": "node scripts/check-build-config.mjs"
+    "check:build-config": "node scripts/check-build-config.mjs",
+    "check:stripe-runtime": "node scripts/check-stripe-runtime.mjs",
+    "prebuild": "npm run check:stripe-runtime"
   },
   "type": "module",
   "version": "0.0.0",

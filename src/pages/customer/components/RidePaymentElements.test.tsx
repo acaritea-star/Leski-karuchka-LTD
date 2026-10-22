@@ -1,24 +1,36 @@
 // @vitest-environment jsdom
 import { useEffect } from 'react';
-import { cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import { RidePaymentForm } from './RidePaymentElements';
 import { paymentPreferenceKey,parseRideElementsSession,type RideElementsSession } from '@/lib/ridePayment';
-const fake=vi.hoisted(()=>({confirm:vi.fn(),action:vi.fn(),wallet:false}));
+const fake=vi.hoisted(()=>({confirm:vi.fn(),action:vi.fn(),wallet:false,phase:'success'}));
 vi.mock('@/lib/supabase',()=>({supabase:{}}));
 vi.mock('@/lib/edgeRequest',()=>({invokeEdge:async()=>({data:await fake.action(),error:null}),EdgeRequestError:class extends Error{}}));
+vi.mock('@stripe/stripe-js',()=>({loadStripe:vi.fn(async()=>null)}));
 vi.mock('@stripe/react-stripe-js/checkout',()=>({
  CheckoutElementsProvider:()=>null,ContactDetailsElement:()=>null,
- useCheckoutElements:()=>({type:'success',checkout:{id:'cs_test_inline',livemode:false,currency:'eur',total:{total:{minorUnitsAmount:295}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}),
+ useCheckoutElements:()=>fake.phase==='success'?({type:'success',checkout:{id:'cs_test_inline',livemode:false,currency:'eur',total:{total:{minorUnitsAmount:295}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}):({type:fake.phase,error:{message:'SDK unavailable'}}),
  ExpressCheckoutElement:({onReady,onConfirm}:{onReady:(event:unknown)=>void;onConfirm:(event:unknown)=>void})=>{
   useEffect(()=>{onReady({availablePaymentMethods:{applePay:fake.wallet}});},[onReady]);
   return fake.wallet?<button onClick={()=>onConfirm({paymentType:'apple_pay'})}>Mock Apple Pay</button>:null;
  },PaymentElement:()=> <div aria-label="Защитена форма на Stripe">Карта · Запази само по твой избор</div>,
 }));
 const session:RideElementsSession={state:'open',environment:'test',ui_mode:'elements',request_id:'ride',session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'};
-beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.wallet=false;fake.confirm.mockResolvedValue({type:'success',session:{}});fake.action.mockResolvedValue({state:'open'});});
-afterEach(cleanup);
-const setup=()=>{const changed=vi.fn(async()=>undefined),busy=vi.fn();render(<RidePaymentForm session={session} userId="owner" onBusy={busy} onChanged={changed}/>);return {changed,busy};};
+beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.wallet=false;fake.phase='success';fake.confirm.mockResolvedValue({type:'success',session:{}});fake.action.mockResolvedValue({state:'open'});});
+afterEach(()=>{cleanup();vi.useRealTimers();});
+const setup=()=>{const changed=vi.fn(async()=>undefined),busy=vi.fn(),retry=vi.fn();render(<RidePaymentForm session={session} userId="owner" onBusy={busy} onChanged={changed} onRetry={retry}/>);return {changed,busy,retry};};
+it('replaces a stalled SDK loader with recovery without confirming or canceling money',()=>{
+ vi.useFakeTimers();fake.phase='loading';const {retry,changed}=setup();
+ expect(screen.getByText('Подготвяме начините за плащане…')).toBeTruthy();
+ act(()=>{vi.advanceTimersByTime(12000);});
+ fireEvent.click(screen.getByRole('button',{name:'Зареди плащането отново'}));
+ expect(retry).toHaveBeenCalledOnce();expect(fake.confirm).not.toHaveBeenCalled();expect(fake.action).not.toHaveBeenCalled();expect(changed).not.toHaveBeenCalled();
+});
+it('offers local recovery when Stripe initialization fails',()=>{
+ fake.phase='error';const {retry}=setup();fireEvent.click(screen.getByRole('button',{name:'Зареди плащането отново'}));
+ expect(retry).toHaveBeenCalledOnce();expect(fake.confirm).not.toHaveBeenCalled();expect(fake.action).not.toHaveBeenCalled();
+});
 it('offers the card form when wallets are unavailable and needs one payment confirmation',async()=>{
  const {changed}=setup();await screen.findByRole('button',{name:'Тествай 2.95 €'});fireEvent.click(screen.getByRole('button',{name:'Тествай 2.95 €'}));
  await waitFor(()=>expect(fake.confirm).toHaveBeenCalledOnce());await waitFor(()=>expect(changed).toHaveBeenCalledOnce());

@@ -4,6 +4,43 @@ import {installStripeUiDouble} from './helpers/stripeFixture';
 const id='48484848-4848-4484-8484-484848484848',cors={'access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type,x-client-info','access-control-allow-methods':'POST,OPTIONS'};
 const ride=()=>({id,company_id:uiCompany,driver_id:uiDriver,customer_id:uiAccount,status:'in_progress',estimated_price:2.95,final_price:2.95,trip_ended_at:new Date().toISOString(),online_payment_state:'none',payment_status:'pending',payment_method:'cash',payment_environment:'test',pickup_latitude:43.08,pickup_longitude:25.63,destination_latitude:43.09,destination_longitude:25.64,pickup_address:'Велико Търново, център',destination_address:'Велико Търново, Акация',created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
 const config={state:'open',environment:'test',ui_mode:'elements',request_id:id,session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'};
+for(const initialization of ['stalled-first','error-first'] as const)test(`a ${initialization} Stripe initialization recovers the same Session without a second order`,async({page})=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,false,{initialization});
+ const row=ride();state.rides=[row];let sessions=0;
+ await page.clock.install();
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:true,inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:'open',payment_status:'pending',payment_method:'cash'}}));
+ await page.route('**/functions/v1/ride-checkout',route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  expect(route.request().postDataJSON().action).toBe('elements');sessions++;return route.fulfill({headers:cors,json:config});
+ });
+ await page.goto('/customer/home');
+ const dialog=page.getByRole('dialog',{name:'Плащане на пътуването'});
+ if(initialization==='stalled-first'){
+  await expect(dialog.getByText('Подготвяме начините за плащане…')).toBeVisible();
+  await page.clock.fastForward(12001);
+ }
+ await dialog.getByRole('button',{name:'Зареди плащането отново'}).click();
+ await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();
+ const sdk=await page.evaluate(()=>(window as unknown as {stripeUiDouble:{initialisations:number;confirms:number}}).stripeUiDouble);
+ expect(sdk.initialisations).toBe(2);expect(sdk.confirms).toBe(0);expect(sessions).toBe(1);expect(state.errors).toEqual([]);
+});
+test('Stripe.js downloads while the payment Session is still loading',async({page})=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,false,{scriptedLoader:true});
+ const row=ride();state.rides=[row];let release=()=>{};const pending=new Promise<void>(resolve=>{release=resolve;});let sessions=0;
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:true,inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:'open',payment_status:'pending',payment_method:'cash'}}));
+ await page.route('**/functions/v1/ride-checkout',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  expect(route.request().postDataJSON().action).toBe('elements');sessions++;await pending;return route.fulfill({headers:cors,json:config});
+ });
+ try{
+  await page.goto('/customer/home');
+  await expect.poll(()=>page.evaluate(()=>(window as unknown as {stripeUiDouble:{scriptDownloads:number}}).stripeUiDouble.scriptDownloads)).toBe(1);
+  expect(await page.evaluate(()=>(window as unknown as {stripeUiDouble:{initialisations:number}}).stripeUiDouble.initialisations)).toBe(0);
+  release();
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();
+  expect(sessions).toBe(1);expect(state.errors).toEqual([]);
+ }finally{release();}
+});
 for(const wallet of [true,false])test(`inline ${wallet?'wallet':'card'} stays within 320px and waits for server confirmation`,async({page},info)=>{
  const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,wallet);const row=ride();state.rides=[row];let initialisations=0,reconciles=0;
  await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}}));

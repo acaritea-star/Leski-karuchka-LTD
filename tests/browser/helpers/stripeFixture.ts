@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
 /** A local UI double, never used in production or as proof of Stripe settlement. */
-export async function installStripeUiDouble(page:Page,wallet=false,challenge=false) {
- await page.addInitScript(({wallet,challenge})=>{
-  const controls={confirms:0,initialisations:0};Object.assign(window,{stripeUiDouble:controls});
+export async function installStripeUiDouble(page:Page,wallet=false,challenge=false,options:{initialization?:'stalled-first'|'error-first';scriptedLoader?:boolean}={}) {
+ if(options.scriptedLoader)await page.route('https://js.stripe.com/**',route=>route.fulfill({contentType:'application/javascript',body:'window.stripeUiDouble.scriptDownloads++;window.Stripe=window.stripeUiDoubleFactory;'}));
+ await page.addInitScript(({wallet,challenge,options})=>{
+  const controls={confirms:0,initialisations:0,scriptDownloads:0};Object.assign(window,{stripeUiDouble:controls});
   const session={id:'cs_test_inline',livemode:false,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
   const element=(kind:string)=>{
    const handlers:Record<string,(event:unknown)=>void>={};let node:HTMLElement|null=null;
@@ -14,10 +15,13 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
      setTimeout(ready,0);
     },destroy:()=>{node?.replaceChildren();node=null;},unmount:()=>{node?.replaceChildren();node=null;}};
   };
-  Object.assign(window,{Stripe:()=>({elements:()=>{},createToken:()=>{},createPaymentMethod:()=>{},confirmCardPayment:()=>{},_registerWrapper:()=>{},registerAppInfo:()=>{},
-   initCheckoutElementsSdk:()=>{controls.initialisations++;return {
+  const factory=()=>({elements:()=>{},createToken:()=>{},createPaymentMethod:()=>{},confirmCardPayment:()=>{},_registerWrapper:()=>{},registerAppInfo:()=>{},
+   initCheckoutElementsSdk:()=>{const initialization=++controls.initialisations;return {
     on:()=>{},changeAppearance:()=>{},createExpressCheckoutElement:()=>element('express'),createPaymentElement:()=>element('payment'),createContactDetailsElement:()=>element('contact'),
-    loadActions:async()=>({type:'success',actions:{getSession:()=>session,confirm:async(args?:{returnUrl?:string})=>{
+    loadActions:async()=>{
+     if(initialization===1&&options.initialization==='stalled-first')await new Promise<void>(()=>{});
+     if(initialization===1&&options.initialization==='error-first')throw Error('Test SDK initialization failure');
+     return {type:'success',actions:{getSession:()=>session,confirm:async(args?:{returnUrl?:string})=>{
      if(args?.returnUrl)throw Error('Session return_url and confirm returnUrl are mutually exclusive');
      controls.confirms++;
      if(challenge)await new Promise<void>(resolve=>{
@@ -28,8 +32,9 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
       },0);
      });
      return {type:'success',session};
-    }}}),
+    }}};},
    };},
-  })});
- },{wallet,challenge});
+  });
+  Object.assign(window,options.scriptedLoader?{stripeUiDoubleFactory:factory}:{Stripe:factory});
+ },{wallet,challenge,options});
 }

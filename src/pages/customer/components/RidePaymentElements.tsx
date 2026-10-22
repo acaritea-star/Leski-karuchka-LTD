@@ -1,13 +1,27 @@
-import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js/pure';
+import { Component,useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react';
+// This module is lazy-loaded only for an ended, eligible ride. Start the
+// official Stripe.js download alongside the Edge request, rather than after it.
+import { loadStripe } from '@stripe/stripe-js';
 import type { StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 import { CheckoutElementsProvider,ContactDetailsElement,ExpressCheckoutElement,PaymentElement,useCheckoutElements } from '@stripe/react-stripe-js/checkout';
 import Modal from '@/components/feature/Modal';
 import { money } from '@/lib/accounting';
 import { paymentPreferenceKey,preferredPaymentMethod,rememberPaymentMethod,ridePaymentAction,type RideElementsSession,type RidePaymentResult } from '@/lib/ridePayment';
 
+const INITIALIZATION_WAIT_MS=12000;
+function PaymentLoadRecovery({onRetry,delayed=false}:{onRetry:()=>void;delayed?:boolean}) {
+ return <div role="alert" className="booking-error"><p>{delayed?'Зареждането се забави. Опитай отново със същото плащане.':'Плащането не се зареди. Опитай отново със същото плащане.'}</p><button type="button" className="min-h-11 underline" onClick={onRetry}>Зареди плащането отново</button></div>;
+}
+class PaymentSdkBoundary extends Component<{children:ReactNode;onRetry:()=>void},{failed:boolean}> {
+ state={failed:false};
+ static getDerivedStateFromError(){return {failed:true};}
+ render(){return this.state.failed?<PaymentLoadRecovery onRetry={this.props.onRetry}/>:this.props.children;}
+}
+
 export default function RidePaymentElements({requestId,userId,onClose,onChanged}:{requestId:string;userId:string;onClose:()=>void;onChanged:()=>Promise<unknown>}) {
  const [session,setSession]=useState<RideElementsSession|null>(null),[legacy,setLegacy]=useState<RidePaymentResult|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false);
+ const [sdkAttempt,setSdkAttempt]=useState(0);
+ const retrySdk=useCallback(()=>setSdkAttempt(value=>value+1),[]);
  useEffect(()=>{
   const abort=new AbortController();setError('');setSession(null);setLegacy(null);
   void ridePaymentAction(requestId,'elements',abort.signal).then(result=>{
@@ -17,7 +31,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   }).catch(()=>{if(!abort.signal.aborted)setError('Не успяхме да заредим плащането. Опитай отново със същия курс.');});
   return()=>abort.abort();
  },[requestId,userId,attempt,onChanged]);
- const stripe=useMemo(()=>session?loadStripe(session.publishable_key,{locale:'bg'}):null,[session]);
+ const sdk=useMemo(()=>session?{key:`${session.session_id}:${sdkAttempt}`,stripe:loadStripe(session.publishable_key,{locale:'bg'})}:null,[session,sdkAttempt]);
  const cancel=async()=>{
   if(busy)return;setBusy(true);setError('');
   try {const result=await ridePaymentAction(requestId,'cancel');await onChanged();if(result.state==='canceled'||result.state==='paid')onClose();else setError('Плащането още се проверява. Изчакай потвърждение преди друг начин на плащане.');}
@@ -28,9 +42,11 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
   <div className="ride-payment-header flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 shrink-0 rounded-full bg-background-100 text-2xl" onClick={onClose}><span aria-hidden="true">×</span></button></div>
   {session?<><div className="flex justify-between items-baseline gap-3 mb-3"><span>Сума за плащане</span><strong className="text-3xl font-bold tabular-nums">{money(session.amount_minor/100)}</strong></div>
    {session.environment==='test'&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3">Тестов режим · Не се теглят реални пари</p>}
-   <CheckoutElementsProvider key={session.session_id} stripe={stripe} options={{clientSecret:session.client_secret,elementsOptions:{appearance:{theme:'stripe',variables:{colorPrimary:'#15803d',borderRadius:'12px',fontFamily:'system-ui, sans-serif'}},loader:'auto',savedPaymentMethod:{enableSave:'auto',enableRedisplay:'auto'}}}}>
-    <RidePaymentForm session={session} userId={userId} onBusy={setBusy} onChanged={onChanged} />
-   </CheckoutElementsProvider>
+   <PaymentSdkBoundary key={sdk?.key} onRetry={retrySdk}>
+    <CheckoutElementsProvider stripe={sdk?.stripe??null} options={{clientSecret:session.client_secret,elementsOptions:{appearance:{theme:'stripe',variables:{colorPrimary:'#15803d',borderRadius:'12px',fontFamily:'system-ui, sans-serif'}},loader:'auto',savedPaymentMethod:{enableSave:'auto',enableRedisplay:'auto'}}}}>
+     <RidePaymentForm session={session} userId={userId} onBusy={setBusy} onChanged={onChanged} onRetry={retrySdk} />
+    </CheckoutElementsProvider>
+   </PaymentSdkBoundary>
   </>:error?null:legacy?<div role="status" className="space-y-3">
    <p>{legacy.url?'Имате започнато плащане. Продължете го, за да избегнем повторно таксуване.':legacy.state==='paid'?'Плащането е потвърдено.':'Проверяваме състоянието на плащането.'}</p>
    {legacy.url&&<a href={legacy.url} className="booking-primary w-full">Продължи плащането</a>}
@@ -43,9 +59,15 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged}
  </Modal>;
 }
 
-export function RidePaymentForm({session,userId,onBusy,onChanged}:{session:RideElementsSession;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<unknown>}) {
+export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry}:{session:RideElementsSession;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<unknown>;onRetry:()=>void}) {
  const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session.account_id,session.environment);
  const [wallets,setWallets]=useState<boolean|null>(null),[card,setCard]=useState(()=>preferredPaymentMethod(key)==='card'),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
+ const [initializationDelayed,setInitializationDelayed]=useState(false);
+ useEffect(()=>{
+  if(result.type!=='loading')return;
+  const timer=window.setTimeout(()=>setInitializationDelayed(true),INITIALIZATION_WAIT_MS);
+  return()=>window.clearTimeout(timer);
+ },[result.type]);
  const lock=useRef(false),alive=useRef(true);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
  const reconcile=useCallback(async()=>{
@@ -61,8 +83,8 @@ export function RidePaymentForm({session,userId,onBusy,onChanged}:{session:RideE
   const timer=window.setTimeout(online,2500);
   return()=>{clearTimeout(timer);window.removeEventListener('online',online);document.removeEventListener('visibilitychange',online);};
  },[awaiting,reconcile]);
- if(result.type==='loading')return <p role="status" className="py-5 text-center">Подготвяме начините за плащане…</p>;
- if(result.type==='error')return <p role="alert" className="booking-error">Плащането не се зареди. Затвори този прозорец и опитай отново.</p>;
+ if(result.type==='loading')return initializationDelayed?<PaymentLoadRecovery onRetry={onRetry} delayed/>:<p role="status" className="py-5 text-center">Подготвяме начините за плащане…</p>;
+ if(result.type==='error')return <PaymentLoadRecovery onRetry={onRetry}/>;
  const checkout=result.checkout;
  if(checkout.id!==session.session_id || checkout.livemode!==(session.environment==='live') || checkout.currency!=='eur' || checkout.total.total.minorUnitsAmount!==session.amount_minor)return <p role="alert" className="booking-error">Сумата не съвпада. Обнови курса преди плащане.</p>;
  const confirm=async(event?:StripeExpressCheckoutElementConfirmEvent)=>{
