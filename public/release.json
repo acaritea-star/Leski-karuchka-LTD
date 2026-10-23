@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.23-payment-performance.1",
+  "release": "2026.10.23-warm-checkout.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "fc77d3eecaf04434a44f1ff2b69d101f7b1fbf69",
+  "verifiedSourceCommit": "7af7ef16cdd3cdde7274f9fe9bfb3de5219ff270",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -37,7 +37,8 @@
     "20261021074427_stripe_sandbox_receipts",
     "20261021174851_post_trip_stripe_payments",
     "20261021191415_allowlisted_test_ride_payments",
-    "20261022062508_inline_ride_checkout"
+    "20261022062508_inline_ride_checkout",
+    "20261023132252_warm_ride_checkout"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -287,6 +288,24 @@
       21.2
     ],
     "labEnvironment": "native-chromium-through-test-proxy-not-phone-SLA",
+    "newDependencies": false,
+    "hardwareWalletApproval": "phone-check-required"
+  },
+  "checkoutPreparationVersion": 1,
+  "stripeTestingAssistant": false,
+  "checkoutPreparationVerifiedSourceCommit": "7af7ef16cdd3cdde7274f9fe9bfb3de5219ff270",
+  "checkoutPreparationValidation": {
+    "unitTests": 797,
+    "browserScenarios": 22,
+    "browserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "labColdSeconds": 20.462,
+    "labPreparedSeconds": 8.056,
+    "labTapToFieldsSecondsAfterReady": 1.777,
+    "labReopenSeconds": 0.67,
+    "labEnvironment": "real-Stripe-native-Chromium-test-proxy-with-mocked-app-API-not-phone-SLA",
     "newDependencies": false,
     "hardwareWalletApproval": "phone-check-required"
   }
