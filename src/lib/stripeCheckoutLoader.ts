@@ -5,7 +5,7 @@ export type CheckoutSnapshot={id:string;livemode:boolean;currency:string;email:s
 export type CheckoutConfirmOptions={redirect:'if_required';expressCheckoutConfirmEvent?:CheckoutConfirmEvent};
 export type CheckoutConfirmResult={type:'success';session?:unknown}|{type:'error';error:{message?:string}};
 export type CheckoutActions={getSession:()=>CheckoutSnapshot;confirm:(options:CheckoutConfirmOptions)=>Promise<CheckoutConfirmResult>};
-export type CheckoutOptions={clientSecret:string;elementsOptions:Record<string,unknown>};
+export type CheckoutOptions={clientSecret:string|Promise<string>;elementsOptions:Record<string,unknown>};
 type ElementEvents={ready:{availablePaymentMethods?:{applePay?:boolean;googlePay?:boolean}|null};confirm:CheckoutConfirmEvent;loaderror:unknown;focus:unknown};
 export interface CheckoutElement {
  mount:(node:HTMLElement)=>void;
@@ -20,7 +20,7 @@ export interface CheckoutSdk {
  createContactDetailsElement:()=>CheckoutElement;
 }
 export type CheckoutStripe={initCheckoutElementsSdk:(options:CheckoutOptions)=>CheckoutSdk};
-export type CheckoutStripeConstructor=((key:string,options:{locale:'bg'})=>CheckoutStripe)&{version?:string};
+export type CheckoutStripeConstructor=((key:string,options:{locale:'bg';developerTools:{assistant:{enabled:false}}})=>CheckoutStripe)&{version?:string};
 let loading:Promise<CheckoutStripeConstructor>|null=null;
 // Stripe recommends sharing one instance for an identical public key/options.
 // This contains no customer, Session secret or payment data. Each dialog still
@@ -56,7 +56,7 @@ export function loadStripe(key:string):Promise<CheckoutStripe> {
  if(!/^pk_(test|live)_/.test(key))return Promise.reject(Error('Invalid payment configuration.'));
  const existing=instances.get(key);if(existing)return existing;
  const pending=preloadStripeCheckout().then(Stripe=>{
-  const stripe=Stripe(key,{locale:'bg'});
+  const stripe=Stripe(key,{locale:'bg',developerTools:{assistant:{enabled:false}}});
   if(typeof stripe?.initCheckoutElementsSdk!=='function')throw Error('Unsupported payment SDK.');
   return stripe;
  });

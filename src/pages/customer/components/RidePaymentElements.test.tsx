@@ -20,6 +20,20 @@ const session:RideElementsSession={state:'open',environment:'test',ui_mode:'elem
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.wallet=false;fake.phase='success';fake.amount=295;fake.confirm.mockResolvedValue({type:'success',session:{}});fake.action.mockResolvedValue({state:'open'});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 const setup=()=>{const changed=vi.fn(async()=>undefined),busy=vi.fn(),retry=vi.fn();render(<RidePaymentForm session={session} userId="owner" onBusy={busy} onChanged={changed} onRetry={retry}/>);return {changed,busy,retry};};
+it('does not request a Session while preparing an unfinished ride, or re-request when reopening',async()=>{
+ fake.action.mockResolvedValue(session);const props={requestId:'ride',userId:'owner',onClose:()=>{},onChanged:async()=>{},preparation:session};
+ const view=render(<RidePaymentElements {...props} open={false} enabled={false}/>);
+ await act(async()=>{});expect(fake.action).not.toHaveBeenCalled();expect(screen.queryByRole('dialog')).toBeNull();
+ view.rerender(<RidePaymentElements {...props} open={false} enabled/>);
+ await waitFor(()=>expect(fake.action).toHaveBeenCalledOnce());await act(async()=>{});
+ view.rerender(<RidePaymentElements {...props} open enabled/>);await screen.findByText('Сума за плащане');
+ view.rerender(<RidePaymentElements {...props} open={false} enabled/>);
+ view.rerender(<RidePaymentElements {...props} open enabled/>);await act(async()=>{});expect(fake.action).toHaveBeenCalledOnce();expect(fake.confirm).not.toHaveBeenCalled();
+});
+it.each([null,session])('cannot confirm a hidden or unbound prepared form',async(value)=>{
+ fake.wallet=true;render(<RidePaymentForm session={value} preparation={session} active={false} userId="owner" onBusy={()=>{}} onChanged={async()=>{}} onRetry={()=>{}}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Mock Apple Pay'}));expect(fake.confirm).not.toHaveBeenCalled();expect(fake.action).not.toHaveBeenCalled();
+});
 it('keeps the form mounted during slow actions and offers recovery without confirming or canceling money',()=>{
  vi.useFakeTimers();fake.phase='loading';const {retry,changed}=setup();
  expect(screen.getByText('Подготвяме начините за плащане…')).toBeTruthy();

@@ -13,6 +13,22 @@ BEGIN
  INSERT INTO public.vehicle_types(id,company_id,name)VALUES(vt,city,'Synthetic');
  INSERT INTO public.taxi_requests(id,company_id,customer_id,driver_id,vehicle_type_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,status,estimated_price,started_at)
  VALUES(ride,city,customer,did,vt,43.2,25.6,43.21,25.61,'in_progress',12.34,now()-interval '8 minutes');
+
+ -- Warmup exposes public configuration solely to this ride's eligible customer.
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',customer,'role','authenticated')::text,true);EXECUTE 'SET LOCAL ROLE authenticated';
+ IF public.ride_payment_state(ride)->'preparation'<>'null'::jsonb THEN RAISE EXCEPTION 'FAIL non-pilot prewarm';END IF;EXECUTE 'RESET ROLE';
+ INSERT INTO private.ride_stripe_test_customers VALUES(customer,root,true);
+ UPDATE private.ride_stripe_merchants SET publishable_key='pk_test_synthetic' WHERE account_id=aid;
+ EXECUTE 'SET LOCAL ROLE authenticated';o:=public.ride_payment_state(ride);EXECUTE 'RESET ROLE';
+ IF o->'preparation'<>jsonb_build_object('account_id',aid,'publishable_key','pk_test_synthetic','environment','test') OR o->>'ended_at' IS NOT NULL THEN RAISE EXCEPTION 'FAIL own public preparation';END IF;
+ IF EXISTS(SELECT 1 FROM private.ride_stripe_orders WHERE request_id=ride) THEN RAISE EXCEPTION 'FAIL read created payment';END IF;
+ PERFORM pg_temp.inline_denied(format('SELECT public.begin_ride_elements_checkout(%L,%L,%L)',ride,customer,aid));
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',outsider,'role','authenticated')::text,true);EXECUTE 'SET LOCAL ROLE authenticated';
+ PERFORM pg_temp.inline_denied(format('SELECT public.ride_payment_state(%L)',ride));EXECUTE 'RESET ROLE';
+ PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);EXECUTE 'SET LOCAL ROLE authenticated';
+ IF public.ride_payment_state(ride)->'preparation'<>'null'::jsonb THEN RAISE EXCEPTION 'FAIL driver received customer preparation';END IF;EXECUTE 'RESET ROLE';
+ DELETE FROM private.ride_stripe_test_customers WHERE customer_id=customer AND root_company_id=root;
+ UPDATE private.ride_stripe_merchants SET publishable_key=NULL WHERE account_id=aid;
  PERFORM pg_temp.inline_denied(format('SELECT public.begin_ride_elements_checkout(%L,%L,%L)',ride,customer,aid));
  PERFORM set_config('request.jwt.claims',json_build_object('sub',duid,'role','authenticated')::text,true);EXECUTE 'SET LOCAL ROLE authenticated';
  PERFORM public.end_ride_trip(ride);EXECUTE 'RESET ROLE';

@@ -12,7 +12,7 @@ it('shares one official script download while keeping merchant instances separat
  expect(document.querySelectorAll('script')).toHaveLength(1);expect(script().src).toBe(STRIPE_CHECKOUT_SCRIPT);
  expect(document.head.innerHTML).not.toContain('pk_test_');
  const factory=install();script().dispatchEvent(new Event('load'));await Promise.all([first,second]);
- expect(factory).toHaveBeenCalledTimes(2);expect(factory).toHaveBeenCalledWith('pk_test_first',{locale:'bg'});expect(factory).toHaveBeenCalledWith('pk_test_second',{locale:'bg'});
+ expect(factory).toHaveBeenCalledTimes(2);expect(factory).toHaveBeenCalledWith('pk_test_first',{locale:'bg',developerTools:{assistant:{enabled:false}}});expect(factory).toHaveBeenCalledWith('pk_test_second',{locale:'bg',developerTools:{assistant:{enabled:false}}});
 });
 it('replaces an old global SDK instead of silently using its legacy API',async()=>{
  const old=Object.assign(vi.fn(),{version:'basil'});Object.assign(window,{Stripe:old});

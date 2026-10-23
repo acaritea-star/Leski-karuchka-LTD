@@ -5,9 +5,9 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
  await page.addInitScript(({wallet,challenge,options})=>{
   const controls={confirms:0,initialisations:0,scriptDownloads:0,instances:0,paymentMounts:0,paymentDestroys:0,actionsReady:false};Object.assign(window,{stripeUiDouble:controls});
   const session={id:'cs_test_inline',livemode:false,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
-  const element=(kind:string)=>{
+  const element=(kind:string,secret:string|Promise<string>)=>{
    const handlers:Record<string,(event:unknown)=>void>={};let node:HTMLElement|null=null;
-   const ready=()=>handlers.ready?.({availablePaymentMethods:wallet?{applePay:true}:null});
+   const ready=async()=>{try{await secret;if(node)handlers.ready?.({availablePaymentMethods:wallet?{applePay:true}:null});}catch{/* canceled preparation */}};
    return {on:(name:string,handler:(event:unknown)=>void)=>{handlers[name]=handler;if(name==='ready'&&node)setTimeout(ready,0);},off:(name:string)=>{delete handlers[name];},update:()=>{},
     mount:(target:HTMLElement)=>{node=target;if(kind==='payment')controls.paymentMounts++;
      if(kind==='express'&&wallet){const button=document.createElement('button');button.textContent='Mock Apple Pay';button.type='button';button.style.cssText='width:100%;height:48px;background:#111;color:white;border-radius:12px';button.onclick=()=>handlers.confirm?.({paymentType:'apple_pay'});target.appendChild(button);}
@@ -16,9 +16,10 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
     },destroy:()=>{if(kind==='payment')controls.paymentDestroys++;node?.replaceChildren();node=null;},unmount:()=>{node?.replaceChildren();node=null;}};
   };
   const factory=()=>{controls.instances++;return {elements:()=>{},createToken:()=>{},createPaymentMethod:()=>{},confirmCardPayment:()=>{},_registerWrapper:()=>{},registerAppInfo:()=>{},
-   initCheckoutElementsSdk:()=>{const initialization=++controls.initialisations;return {
-    on:()=>{},changeAppearance:()=>{},createExpressCheckoutElement:()=>element('express'),createPaymentElement:()=>element('payment'),createContactDetailsElement:()=>element('contact'),
+   initCheckoutElementsSdk:(checkoutOptions:{clientSecret:string|Promise<string>})=>{const initialization=++controls.initialisations;return {
+    on:()=>{},changeAppearance:()=>{},createExpressCheckoutElement:()=>element('express',checkoutOptions.clientSecret),createPaymentElement:()=>element('payment',checkoutOptions.clientSecret),createContactDetailsElement:()=>element('contact',checkoutOptions.clientSecret),
     loadActions:async()=>{
+     await checkoutOptions.clientSecret;
      if(initialization===1&&options.initialization==='stalled-first')await new Promise<void>(()=>{});
      if(initialization===1&&options.initialization==='error-first')throw Error('Test SDK initialization failure');
      if(options.actionsDelayMs)await new Promise<void>(resolve=>setTimeout(resolve,options.actionsDelayMs));

@@ -3,7 +3,8 @@ import { invokeEdge,EdgeRequestError } from './edgeRequest';
 import { withRequestTimeout } from './requestTimeout';
 import type { Tables } from './database.types';
 import { startRidePaymentTiming } from './ridePaymentTiming';
-export type RidePaymentState={request_id:string;eligible:boolean;inline_available?:boolean;environment:'live'|'test';ended_at:string|null;amount:number|null;state:string;payment_status:string;payment_method:string};
+export type RidePaymentPreparation={account_id:string;publishable_key:string;environment:'live'|'test'};
+export type RidePaymentState={request_id:string;eligible:boolean;inline_available?:boolean;preparation?:RidePaymentPreparation|null;environment:'live'|'test';ended_at:string|null;amount:number|null;state:string;payment_status:string;payment_method:string};
 export type RideElementsSession={state:string;environment:'live'|'test';url?:string|null;ui_mode:'elements';request_id:string;session_id:string;account_id:string;amount_minor:number;currency:'eur';publishable_key:string;client_secret:string};
 export type RidePaymentResult={state:string;url?:string|null;environment?:'live'|'test'};
 const states=['none','creating','open','processing','canceled','paid','partially_refunded','refunded'];
@@ -14,6 +15,10 @@ export async function loadRidePayment(requestId:string,signal?:AbortSignal):Prom
  if(!value || value.inline_available!==undefined && typeof value.inline_available!=='boolean' || value.environment!==undefined && !['live','test'].includes(value.environment) || value.request_id!==requestId || typeof value.eligible!=='boolean' || !states.includes(value.state) || !['pending','paid','refunded'].includes(value.payment_status) || !['cash','card','online'].includes(value.payment_method) ||
   value.amount!==null && (typeof value.amount!=='number' || !Number.isFinite(value.amount) || value.amount<0) ||
   value.ended_at!==null && (typeof value.ended_at!=='string'||!Number.isFinite(Date.parse(value.ended_at))))throw Error('Плащането не може да бъде проверено.');
+ const preparation=value.preparation;
+ if(preparation&&(!value.eligible||!value.inline_available||preparation.environment!==value.environment||
+  typeof preparation.account_id!=='string'||!/^acct_[a-zA-Z0-9]+$/.test(preparation.account_id)||typeof preparation.publishable_key!=='string'||
+  !(value.environment==='live'?/^pk_live_[a-zA-Z0-9]+$/:/^pk_test_[a-zA-Z0-9]+$/).test(preparation.publishable_key)))throw Error('Платежната конфигурация не може да бъде проверена.');
  return {...value,environment:value.environment??'live'};
 }
 export async function endRideTrip(requestId:string,driverId:string):Promise<Tables<'taxi_requests'>> {

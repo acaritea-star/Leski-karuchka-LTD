@@ -4,14 +4,14 @@ import { createPortal } from 'react-dom';
 let locks = 0;
 let previousOverflow = '';
 
-export default function Modal({ label, labelledBy, onClose, busy = false, className = '', children, allowExternalOverlays = false }: {
-  label?: string; labelledBy?: string; onClose: () => void; busy?: boolean; className?: string; children: ReactNode; allowExternalOverlays?: boolean;
+export default function Modal({ label, labelledBy, onClose, busy = false, className = '', children, allowExternalOverlays = false, open = true }: {
+  label?: string; labelledBy?: string; onClose: () => void; busy?: boolean; className?: string; children: ReactNode; allowExternalOverlays?: boolean; open?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement | HTMLDivElement>(null);
   const active = useRef(false);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element) return;
+    if (!element || !open) return;
     active.current = true;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (locks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
@@ -42,9 +42,9 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
       }
       if (--locks === 0) document.body.style.overflow = previousOverflow;
     };
-  }, [allowExternalOverlays]);
+  }, [allowExternalOverlays, open]);
   useLayoutEffect(() => {
-    if (!allowExternalOverlays) return;
+    if (!allowExternalOverlays || !open) return;
     const element = ref.current;
     if (!element) return;
     const focusable = () => Array.from(element.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), iframe, [tabindex="0"]'))
@@ -63,10 +63,11 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
     };
     document.addEventListener('keydown', keydown); document.addEventListener('focusin', focusin);
     return () => { document.removeEventListener('keydown', keydown); document.removeEventListener('focusin', focusin); };
-  }, [allowExternalOverlays, busy, onClose]);
+  }, [allowExternalOverlays, busy, onClose, open]);
   if (allowExternalOverlays) return createPortal(<>
-    <div className="app-dialog-scrim" aria-hidden="true" onClick={() => { if (!busy) onClose(); }} />
-    <div ref={node => { ref.current = node; }} role="dialog" aria-label={label} aria-labelledby={labelledBy} aria-modal={busy ? undefined : true} aria-busy={busy}
+    {open && <div className="app-dialog-scrim" aria-hidden="true" onClick={() => { if (!busy) onClose(); }} />}
+    <div ref={node => { ref.current = node; }} role={open ? 'dialog' : undefined} aria-label={label} aria-labelledby={labelledBy} aria-modal={open && !busy ? true : undefined} aria-busy={busy}
+      aria-hidden={!open || undefined} inert={!open} style={open ? undefined : { visibility: 'hidden', pointerEvents: 'none' }}
       tabIndex={-1} className={`app-dialog app-dialog-external ${className}`}>
       <fieldset disabled={busy} className="min-w-0">{children}</fieldset>
     </div>

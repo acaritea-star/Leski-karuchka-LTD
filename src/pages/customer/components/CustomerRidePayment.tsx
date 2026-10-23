@@ -15,22 +15,22 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
  const data=payment.data,testMode=data?.environment==='test',ended=!!endedAt || !!data?.ended_at;
  const paid=data?.payment_status==='paid' && data.payment_method==='online';
  const active=!!data && ['creating','open','processing'].includes(data.state);
- const identity=`${user?.id}:${requestId}`,[openIdentity,setOpenIdentity]=useState<string|null>(null),autoOpened=useRef('');
+ const identity=`${user?.id}:${requestId}`,[openIdentity,setOpenIdentity]=useState<string|null>(null),[preparedIdentity,setPreparedIdentity]=useState<string|null>(null),autoPrepared=useRef('');
  const changed=useCallback(async()=>{await refresh();},[refresh]);
  useEffect(()=>{
   if(ended||!data?.eligible||!data.inline_available||!navigator.onLine)return;
   const connection=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection;
   if(connection?.saveData)return;
   let active=true;
-  const warm=()=>{if(active)void import('@/lib/stripeCheckoutLoader').then(sdk=>{if(active)return sdk.preloadStripeCheckout();}).catch(()=>undefined);};
+  const warm=()=>{if(!active)return;if(data.preparation)setPreparedIdentity(identity);else void import('@/lib/stripeCheckoutLoader').then(sdk=>{if(active)return sdk.preloadStripeCheckout();}).catch(()=>undefined);};
   const idle=typeof window.requestIdleCallback==='function'?window.requestIdleCallback(warm,{timeout:1500}):null;
   const timer=idle===null?window.setTimeout(warm,750):null;
   return()=>{active=false;if(idle!==null)window.cancelIdleCallback(idle);if(timer!==null)window.clearTimeout(timer);};
- },[identity,ended,data?.eligible,data?.inline_available]);
+ },[identity,ended,data?.eligible,data?.inline_available,data?.preparation]);
  useEffect(()=>{
-  if(ended&&data?.eligible&&data.inline_available&&data.state!=='processing'&&autoOpened.current!==identity){autoOpened.current=identity;setOpenIdentity(identity);}
+  if(ended&&data?.eligible&&data.inline_available&&!['processing','canceled'].includes(data.state)&&autoPrepared.current!==identity){autoPrepared.current=identity;setPreparedIdentity(identity);}
  },[ended,data?.eligible,data?.inline_available,data?.state,identity]);
- useEffect(()=>{if(paid)setOpenIdentity(null);},[paid]);
+ useEffect(()=>{if(paid||data?.state==='canceled'){setOpenIdentity(null);setPreparedIdentity(null);}},[paid,data?.state]);
  const run=async(action:'checkout'|'cancel'|'reconcile')=>{
   if(lock.current)return;lock.current=true;setBusy(true);setError('');setMessage('');
   try{
@@ -44,8 +44,8 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   <div className="flex items-center justify-between gap-3 text-sm"><span>{ended?'Дължима сума':'Цена на пътуването'}</span><strong className="text-xl tabular-nums">{money(data?.amount??price)}</strong></div>
   {testMode&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">Тестов режим · Не се теглят реални пари</p>}
   {paid?<p role="status" className="font-semibold text-primary-700">{onlinePaymentLabel(data?.environment,'paid')}</p>:data?.eligible?<>
-   <button type="button" className="booking-primary w-full disabled:opacity-40" disabled={!ended || busy || payment.isError || data.state==='processing'} onClick={()=>data.inline_available?setOpenIdentity(identity):void run('checkout')}>
-    <i className="ri-bank-card-line" aria-hidden="true" />{busy?'Проверка…':data.state==='processing'?'Проверяваме плащането…':active?'Продължи плащането':testMode?'Тествай плащане с карта':'Плати онлайн с карта'}
+   <button type="button" className="booking-primary w-full disabled:opacity-40" disabled={!ended || busy || payment.isError || data.state==='processing'} onClick={()=>{if(data.inline_available){setPreparedIdentity(identity);setOpenIdentity(identity);}else void run('checkout');}}>
+    <i className="ri-bank-card-line" aria-hidden="true" />{busy?'Проверка…':data.state==='processing'?'Проверяваме плащането…':active&&!data.inline_available?'Продължи плащането':testMode?'Тествай плащане с карта':'Плати онлайн с карта'}
    </button>
    <p className="text-xs text-foreground-500">{ended?(testMode?'Използвай тестова карта на Stripe. Сумата не влиза в реалния отчет.':'Apple Pay и други налични методи през Stripe. Можеш да платиш и в брой.'):'Плащането се отключва, когато шофьорът отбележи края на пътуването.'}</p>
    {active&&<div className="flex flex-wrap gap-x-4 text-xs"><button type="button" className="min-h-11 underline" disabled={busy} onClick={()=>void run('reconcile')}>Провери плащането</button><button type="button" className="min-h-11 underline" disabled={busy} onClick={()=>void run('cancel')}>{testMode?'Отмени тестовото плащане':'Премини към плащане в брой'}</button></div>}
@@ -53,7 +53,7 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   {payment.isError&&<button type="button" className="min-h-11 text-xs underline" onClick={()=>void refresh()}>Обнови възможностите за плащане</button>}
   {message&&<p role="status" className="text-xs text-primary-700">{message}</p>}
   {error&&<p role="alert" className="booking-error">{error}</p>}
-  {openIdentity===identity&&user?.id&&data?.eligible&&<Suspense fallback={<p role="status" className="text-sm">Зареждаме плащането…</p>}><RidePaymentElements key={identity} requestId={requestId} userId={user.id} onClose={()=>setOpenIdentity(null)} onChanged={changed} /></Suspense>}
+  {(preparedIdentity===identity||openIdentity===identity)&&user?.id&&data?.eligible&&data.inline_available&&<Suspense fallback={openIdentity===identity?<p role="status" className="text-sm">Зареждаме плащането…</p>:null}><RidePaymentElements key={`${identity}:${data.preparation?.account_id??''}:${data.preparation?.publishable_key??''}`} requestId={requestId} userId={user.id} open={openIdentity===identity} enabled={ended} preparation={data.preparation??null} onClose={()=>setOpenIdentity(null)} onChanged={changed} /></Suspense>}
  </div>;
 }
 
