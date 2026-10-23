@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { invokeEdge,EdgeRequestError } from './edgeRequest';
 import { withRequestTimeout } from './requestTimeout';
 import type { Tables } from './database.types';
+import { startRidePaymentTiming } from './ridePaymentTiming';
 export type RidePaymentState={request_id:string;eligible:boolean;inline_available?:boolean;environment:'live'|'test';ended_at:string|null;amount:number|null;state:string;payment_status:string;payment_method:string};
 export type RideElementsSession={state:string;environment:'live'|'test';url?:string|null;ui_mode:'elements';request_id:string;session_id:string;account_id:string;amount_minor:number;currency:'eur';publishable_key:string;client_secret:string};
 export type RidePaymentResult={state:string;url?:string|null;environment?:'live'|'test'};
@@ -23,7 +24,9 @@ export async function endRideTrip(requestId:string,driverId:string):Promise<Tabl
  return ride;
 }
 export async function ridePaymentAction(requestId:string,action:'checkout'|'cancel'|'reconcile'|'elements',signal?:AbortSignal):Promise<RidePaymentResult|RideElementsSession> {
+ const finishTiming=action==='reconcile'?startRidePaymentTiming('reconcile'):()=>{};
  const {data,error}=await invokeEdge<RidePaymentResult & Partial<RideElementsSession>>('ride-checkout',{request_id:requestId,action},22000,signal);
+ finishTiming();
  if(error)throw Error(error instanceof EdgeRequestError && error.code==='PAYMENT_NOT_ALLOWED'?'Онлайн плащането още не е достъпно за този курс.':'Потвърждението се забави. Провери плащането преди да опиташ друг начин.');
  if(!data || !states.includes(data.state))throw Error('Няма проверено състояние на плащането.');
  if(data.url) {

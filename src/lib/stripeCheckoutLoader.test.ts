@@ -20,6 +20,15 @@ it('replaces an old global SDK instead of silently using its legacy API',async()
  expect(script().src).toBe('https://js.stripe.com/endive/stripe.js');expect(old).not.toHaveBeenCalled();
  const current=install();script().dispatchEvent(new Event('load'));await pending;expect(current).toHaveBeenCalledOnce();expect(old).not.toHaveBeenCalled();
 });
+it('reuses an account-only instance across retries while separating merchant and mode',async()=>{
+ const factory=install();const {loadStripe}=await import('./stripeCheckoutLoader');
+ const first=loadStripe('pk_test_owner');expect(loadStripe('pk_test_owner')).toBe(first);
+ const instance=await first;expect(await loadStripe('pk_test_owner')).toBe(instance);
+ expect(await loadStripe('pk_live_owner')).not.toBe(instance);
+ expect(await loadStripe('pk_test_other')).not.toBe(instance);
+ expect(factory).toHaveBeenCalledTimes(3);
+ expect(instance.initCheckoutElementsSdk).not.toHaveBeenCalled();
+});
 it('recovers from a failed download without retaining a rejected shared promise',async()=>{
  const {loadStripe}=await import('./stripeCheckoutLoader');const first=loadStripe('pk_test_owner');const rejected=expect(first).rejects.toThrow('could not be loaded');
  script().dispatchEvent(new Event('error'));await rejected;expect(script()).toBeNull();
@@ -28,8 +37,13 @@ it('recovers from a failed download without retaining a rejected shared promise'
 it('releases a stalled script so a retry can start a fresh download',async()=>{
  vi.useFakeTimers();const {preloadStripeCheckout}=await import('./stripeCheckoutLoader');
  const pending=preloadStripeCheckout();const rejected=expect(pending).rejects.toThrow('could not be loaded');
- await vi.advanceTimersByTimeAsync(10000);await rejected;expect(script()).toBeNull();
+ await vi.advanceTimersByTimeAsync(30000);await rejected;expect(script()).toBeNull();
  const retry=preloadStripeCheckout();install();script().dispatchEvent(new Event('load'));await expect(retry).resolves.toHaveProperty('version','endive');
+});
+it('lets a slow but successful download finish after the UI recovery notice',async()=>{
+ vi.useFakeTimers();const {loadStripe}=await import('./stripeCheckoutLoader');const pending=loadStripe('pk_test_owner'),original=script();
+ await vi.advanceTimersByTimeAsync(15000);expect(script()).toBe(original);expect(loadStripe('pk_test_owner')).toBe(pending);
+ install();original.dispatchEvent(new Event('load'));await expect(pending).resolves.toHaveProperty('initCheckoutElementsSdk');
 });
 it('rejects an incompatible script response and a missing modern SDK capability',async()=>{
  const {loadStripe}=await import('./stripeCheckoutLoader');const pending=loadStripe('pk_test_owner');const rejected=expect(pending).rejects.toThrow('could not be loaded');

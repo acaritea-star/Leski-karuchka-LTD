@@ -81,7 +81,7 @@ test('inline dialog opens once, restores focus, and reuses the Session when reop
  await page.route('**/functions/v1/ride-checkout',route=>{if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});calls++;return route.fulfill({headers:cors,json:config});});
  await page.goto('/customer/home');const dialog=page.getByRole('dialog');await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();
  await dialog.getByRole('button',{name:'Затвори плащането'}).click();await expect(dialog).toHaveCount(0);await page.getByRole('button',{name:'Продължи плащането',exact:true}).click();
- await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();await dialog.getByRole('button',{name:'Затвори плащането'}).click();await expect(page.getByRole('button',{name:'Продължи плащането',exact:true})).toBeFocused();expect(calls).toBe(2);expect(state.errors).toEqual([]);
+ await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeVisible();await dialog.getByRole('button',{name:'Затвори плащането'}).click();await expect(page.getByRole('button',{name:'Продължи плащането',exact:true})).toBeFocused();expect(calls).toBe(2);expect(await page.evaluate(()=>(window as unknown as {stripeUiDouble:{instances:number}}).stripeUiDouble.instances)).toBe(1);expect(state.errors).toEqual([]);
 });
 test('a bank authentication overlay can receive focus and clicks above the payment dialog',async({page})=>{
  const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,false,true);const row=ride();state.rides=[row];
@@ -96,4 +96,24 @@ test('a bank authentication overlay can receive focus and clicks above the payme
  await expect(page.getByRole('dialog',{name:'Плащане на пътуването'})).not.toHaveAttribute('aria-modal','true');
  const approve=bank.getByRole('button',{name:'Потвърди тестовата банкова проверка'});await expect(approve).toBeFocused();await approve.click();
  await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(state.errors).toEqual([]);
+});
+
+test('card mounts before slow actions and wallets, keeps input after the loading deadline and late wallet detection',async({page})=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,true,false,{actionsDelayMs:15000,walletDelayMs:20000,paymentDelayMs:1000});
+ const row=ride();state.rides=[row];let sessions=0;
+ await page.clock.install();
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:true,inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:'open',payment_status:'pending',payment_method:'cash'}}));
+ await page.route('**/functions/v1/ride-checkout',route=>{if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});sessions++;return route.fulfill({headers:cors,json:config});});
+ await page.goto('/customer/home');const dialog=page.getByRole('dialog'),input=dialog.getByRole('textbox',{name:'Тестова карта'}),pay=dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true});
+ await expect(input).toBeVisible();await expect(pay).toBeDisabled();
+ await input.fill('4242 test input');
+ const before=await page.evaluate(()=>(window as unknown as {stripeUiDouble:{paymentMounts:number;actionsReady:boolean;confirms:number}}).stripeUiDouble);
+ expect(before.paymentMounts).toBe(1);expect(before.actionsReady).toBe(false);expect(before.confirms).toBe(0);
+ await page.clock.fastForward(12001);await expect(dialog.getByRole('button',{name:'Зареди плащането отново'})).toBeVisible();await expect(input).toHaveValue('4242 test input');
+ await page.clock.fastForward(3001);await expect(pay).toBeEnabled();await expect(input).toHaveValue('4242 test input');
+ await page.clock.fastForward(5001);await expect(dialog.getByRole('button',{name:'Mock Apple Pay'})).toBeVisible();await expect(input).toBeVisible();
+ await dialog.getByRole('button',{name:'Скрий плащането с карта'}).click();await expect(input).toBeHidden();
+ await dialog.getByRole('button',{name:'Плати с карта'}).click();await expect(input).toHaveValue('4242 test input');
+ const after=await page.evaluate(()=>(window as unknown as {stripeUiDouble:{paymentMounts:number;paymentDestroys:number;confirms:number}}).stripeUiDouble);
+ expect(after.paymentMounts).toBe(1);expect(after.paymentDestroys).toBe(0);expect(after.confirms).toBe(0);expect(sessions).toBe(1);expect(state.errors).toEqual([]);
 });
