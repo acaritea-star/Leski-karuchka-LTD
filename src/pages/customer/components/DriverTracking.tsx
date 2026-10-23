@@ -104,6 +104,15 @@ export default function DriverTracking({
   const vehicleFrame = useVehicleMarker(mapReady ? mapRef.current : null, location, motionPath, CAR_COLORS[vehicleType] || CAR_COLORS.standard,
     frame => { if (motionPath.length >= 2) activeLineRef.current?.follow(frame); }, roadNetwork, 'prefer');
 
+  const frameTrip = useCallback((map: google.maps.Map) => {
+    // Route endpoints are not necessarily the SW and NE corners. Passing them
+    // as corners can describe a rectangle spanning almost the entire globe.
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend({ lat: request.pickup_latitude, lng: request.pickup_longitude });
+    bounds.extend({ lat: request.destination_latitude, lng: request.destination_longitude });
+    map.fitBounds(bounds, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
+  }, [request.pickup_latitude, request.pickup_longitude, request.destination_latitude, request.destination_longitude]);
+
   // ── Initialise Google map (once) ──
   useEffect(() => {
     const el = mapContainerRef.current;
@@ -116,6 +125,8 @@ export default function DriverTracking({
       .then(() => {
         if (cancelled || mapRef.current) return;
         const map = new google.maps.Map(el, {
+          center: { lat: request.pickup_latitude, lng: request.pickup_longitude },
+          zoom: 14,
           disableDefaultUI: true,
           gestureHandling: 'greedy',
           zoomControl: false,
@@ -124,11 +135,7 @@ export default function DriverTracking({
           fullscreenControl: false,
         });
 
-        const bounds = new google.maps.LatLngBounds(
-          { lat: request.pickup_latitude, lng: request.pickup_longitude },
-          { lat: request.destination_latitude, lng: request.destination_longitude },
-        );
-        map.fitBounds(bounds, { top: 94, bottom: 40, left: window.innerWidth >= 768 ? 462 : 40, right: 40 });
+        frameTrip(map);
 
         mapRef.current = map;
         setMapReady(true);
@@ -150,6 +157,7 @@ export default function DriverTracking({
     };
   }, [
     mapAttempt,
+    frameTrip,
     request.id,
     request.pickup_latitude,
     request.pickup_longitude,
@@ -303,9 +311,10 @@ export default function DriverTracking({
 
   const recenter = useCallback(() => {
     const map = mapRef.current;
-    if (!map || !location) return;
-    map.panTo({ lat: location.lat, lng: location.lng });
-  }, [location]);
+    if (!map) return;
+    if (location && !positionStale) map.panTo({ lat: location.lat, lng: location.lng });
+    else frameTrip(map);
+  }, [location, positionStale, frameTrip]);
 
   const handleCancel = async () => {
     if (!onCancel || cancelInFlight.current) return;
