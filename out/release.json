@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.23-direct-stripe.1",
+  "release": "2026.10.23-payment-performance.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "279b6ffad5b766b457dfe574df415435d8ccf009",
+  "verifiedSourceCommit": "fc77d3eecaf04434a44f1ff2b69d101f7b1fbf69",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -237,7 +237,7 @@
   "inlineRidePaymentMethods": "express-checkout-with-payment-element-fallback",
   "inlineRidePaymentSavedCards": "explicit-stripe-consent-only",
   "inlineRidePaymentCustomerScope": "user-stripe-account-environment",
-  "inlineRidePaymentLoader": "prewarm-eligible-rides-and-parallel-session-loading",
+  "inlineRidePaymentLoader": "parallel-elements-actions-wallets-with-preserved-fields",
   "inlineRidePaymentBankAuthentication": "external-overlay-compatible",
   "inlineRidePaymentDatabaseVerifiedCommit": "d9ae212c065f28059284145666f0b34e9bb71654",
   "inlineRidePaymentStripeTestStatus": "card-paid-and-test-refunded",
@@ -259,7 +259,7 @@
   "inlineRidePaymentDirectSdkVerifiedSourceCommit": "279b6ffad5b766b457dfe574df415435d8ccf009",
   "inlineRidePaymentSdkUrl": "https://js.stripe.com/endive/stripe.js",
   "inlineRidePaymentReactSdkDependency": false,
-  "inlineRidePaymentScriptLoadTimeoutMs": 10000,
+  "inlineRidePaymentScriptLoadTimeoutMs": 30000,
   "inlineRidePaymentDirectSdkValidation": {
     "unitTests": 784,
     "browserScenarios": 18,
@@ -269,6 +269,25 @@
     ],
     "cleanProductionInstall": true,
     "realStripeTestPayment": "paid-and-fully-refunded",
+    "hardwareWalletApproval": "phone-check-required"
+  },
+  "inlineRidePaymentPerformanceVersion": 1,
+  "inlineRidePaymentPerformanceVerifiedSourceCommit": "fc77d3eecaf04434a44f1ff2b69d101f7b1fbf69",
+  "inlineRidePaymentPerformanceValidation": {
+    "unitTests": 788,
+    "browserScenarios": 20,
+    "browserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "realStripeTestPayment": "paid-and-fully-refunded",
+    "labCardReadySecondsBefore": 42.99,
+    "labCardReadySecondsAfter": [
+      16.81,
+      21.2
+    ],
+    "labEnvironment": "native-chromium-through-test-proxy-not-phone-SLA",
+    "newDependencies": false,
     "hardwareWalletApproval": "phone-check-required"
   }
 }
