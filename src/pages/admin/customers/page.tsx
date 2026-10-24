@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -70,9 +71,7 @@ function CustomerList() {
       <p className="mb-4 text-xs text-foreground-500">Показани са завършените курсове към тази фирма. Стойността им е прогнозна, не доказателство за получени пари.</p>
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-background-100 text-center py-16">
           <i className="ri-user-line text-4xl text-foreground-300" />

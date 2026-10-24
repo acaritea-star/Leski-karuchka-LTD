@@ -97,7 +97,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
             const label = link.label.startsWith('nav_') ? t(link.label) : link.label;
             return (
               <button
-                key={link.path}
+                key={link.path} data-route={link.path}
                 type="button"
                 aria-current={location.pathname === link.path ? 'page' : undefined}
                 onClick={() => {

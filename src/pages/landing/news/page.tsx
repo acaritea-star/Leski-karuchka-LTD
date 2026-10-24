@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/lib/database.types';
@@ -59,9 +60,7 @@ export default function NewsListPage() {
       <section className="bg-background-50 pb-24 md:pb-32">
         <div className="mx-auto w-full px-4 md:px-6 lg:px-10 max-w-6xl">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-background-200 border-t-primary-500 rounded-full animate-spin" />
-            </div>
+            <ContentSkeleton />
           ) : error ? (
             <div className="text-center py-20">
               <p className="text-sm text-red-600 mb-4">{error}</p>

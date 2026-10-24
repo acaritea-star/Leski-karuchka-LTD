@@ -1,3 +1,5 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
+import CancelRideButton from '../components/CancelRideButton';
 import { onlinePaymentLabel } from '@/lib/ridePayment';
 import { EmergencyDock } from '@/components/feature/EmergencyHelp';
 import BackButton from '@/components/feature/BackButton';
@@ -180,18 +182,6 @@ export default function CustomerOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, orders, ordersQuery.isLoading, ratingsQuery.isLoading]);
 
-  if (ordersQuery.isLoading) {
-    return (
-      <div className="min-h-screen bg-background-50 flex items-center justify-center">
-        <EmergencyDock />
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-foreground-500">{t('loading')}</span>
-        </div>
-      </div>
-    );
-  }
-
   if (ordersQuery.isError) {
     return (
       <div className="min-h-screen bg-background-50 flex items-center justify-center px-4">
@@ -264,7 +254,7 @@ export default function CustomerOrders() {
       {/* Orders list */}
       <div className="px-4 pb-8">
         {ratingsQuery.isError && <p role="alert" className="py-3 text-sm text-red-600">{t('ratings_load_error')} <button type="button" className="underline min-h-11" disabled={ratingsQuery.isFetching} onClick={() => void ratingsQuery.refetch()}>{t('retry')}</button></p>}
-        {displayedOrders.length === 0 ? (
+        {ordersQuery.isLoading ? <ContentSkeleton label="Зареждаме твоите поръчки…" /> : displayedOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20 px-6">
             <div className="relative mb-5">
               <div className="w-20 h-20 rounded-3xl bg-primary-50 flex items-center justify-center">
@@ -282,7 +272,7 @@ export default function CustomerOrders() {
             </p>
             {activeTab === 'active' && (
               <button
-                onClick={() => navigate('/customer/home')}
+                data-route="/customer/home" onClick={() => navigate('/customer/home')}
                 className="px-5 py-3 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 shadow-md shadow-primary-500/15"
               >
                 <i className="ri-taxi-line" />
@@ -361,13 +351,15 @@ export default function CustomerOrders() {
                   {/* Track active order */}
                   {['pending', 'accepted', 'arrived', 'in_progress'].includes(order.status) && (
                     <button
-                      onClick={() => navigate('/customer/home')}
+                      data-route="/customer/home" onClick={() => navigate('/customer/home')}
                       className="mt-3 w-full py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-primary-500/15"
                     >
                       <i className="ri-radar-line" />
                       {t('track_trip')}
                     </button>
                   )}
+
+                  <CancelRideButton key={order.id} request={order} className="mt-2 w-full" />
 
                   {/* Rate button */}
                   {canRate(order) && (

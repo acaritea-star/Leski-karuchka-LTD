@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
@@ -171,9 +172,7 @@ function PricingEditor() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : !loaded ? (
         <div className="bg-white border border-background-200 rounded-2xl p-6 text-sm text-foreground-600">Тарифите на фирмата не са заредени. Провери достъпа и опитай отново; цените ще се покажат след потвърдено зареждане.</div>
       ) : (

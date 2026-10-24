@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import StaffSecuritySettings from '@/components/feature/StaffSecuritySettings';
 import BackButton from '@/components/feature/BackButton';
 import { useSignOut } from '@/hooks/useSignOut';
@@ -53,9 +54,7 @@ export default function DriverProfile() {
         {profile && !profile.is_verified && <p className="mb-3 text-sm text-foreground-600">Преди верификация: премини подготовката и приеми условията за шофьори, качи книжка и застраховка. Фирмата проверява документите и назначава автомобил, преди да получаваш заявки.</p>}
         {logoutError && <p role="alert" className="mb-3 text-sm text-red-600">{logoutError}</p>}
         {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <ContentSkeleton />
         ) : (
           <>
             {/* Profile Card */}

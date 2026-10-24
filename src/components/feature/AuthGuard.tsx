@@ -1,3 +1,4 @@
+import PageLoading from './LoadingState';
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,7 +18,8 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children, allowedRoles, redirectTo = '/', showLegalNotice = true, companyScoped = true }: AuthGuardProps) {
   const { user, loading, session, refreshProfile, profileError } = useAuth();
-  const { companyId, companies } = useAdminCompany();
+  const { companyId, companies, loading: companyLoading } = useAdminCompany();
+  const preparingCompany = companyScoped && (user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN') && companyLoading;
   const headquartersHasDivisions = companies.some(c => c.id === companyId && c.parent_company_id === null) && companies.some(c => c.parent_company_id === companyId);
   const needsCompanySetup = companyScoped && user?.role === 'COMPANY_ADMIN' && (!user.company_id || companies.some(c => c.id === companyId && c.setup_completed_at === null));
   const [retrying, setRetrying] = useState(false);
@@ -27,7 +29,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
   const emergency = allowedRoles?.includes('CUSTOMER') ? <EmergencyDock /> : null;
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || preparingCompany) return;
     // An authenticated session with an unavailable profile gets a recovery screen.
     if (!user && (session || profileError)) return;
     if (!user) {
@@ -39,18 +41,11 @@ export default function AuthGuard({ children, allowedRoles, redirectTo = '/', sh
       navigate(roleHomePath(user.role), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, session, profileError, navigate, redirectTo, rolesKey, needsCompanySetup, companyId, headquartersHasDivisions]);
+  }, [loading, preparingCompany, user, session, profileError, navigate, redirectTo, rolesKey, needsCompanySetup, companyId, headquartersHasDivisions]);
 
-  if (loading) {
-    return <>{emergency}{(
-      <div className="min-h-screen bg-background-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-foreground-500">Зареждане...</span>
-        </div>
-      </div>
-    )}</>;
-  }
+  if (loading) return <>{emergency}<PageLoading label="Отваряме профила ти…" /></>;
+
+  if (preparingCompany) return <PageLoading title="Фирмен панел" label="Подготвяме фирмения панел…" />;
 
   if (!user && (session || profileError)) {
     const onRetry = async () => {

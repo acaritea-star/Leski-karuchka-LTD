@@ -117,7 +117,7 @@
 .booking-cancel-confirm { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #fff3ed; font-size: 14px; }
 .booking-cancel-confirm > div { display: flex; gap: 8px; }
 .booking-cancel-confirm button { flex: 1; }
-.booking-map-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 80px 24px 20px; color: #536756; text-align: center; background: #edf1e8; font-size: 14px; }
+.booking-map-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 80px 24px 84px; color: #536756; text-align: center; background: #edf1e8; font-size: 14px; }
 .booking-map-state > i { font-size: 36px; }
 .tracking-map-controls { position: absolute; right: 12px; bottom: 32px; display: grid; background: white; border-radius: 14px; box-shadow: 0 3px 15px #19382b18; }
 .tracking-driver { display: flex; align-items: center; gap: 10px; padding: 0 2px 10px; }
@@ -259,5 +259,13 @@
   .customer-safety { left:328px; bottom:24px; }
 }
 
-.tracking-payment-actions { flex-direction: column; }
-.tracking-payment-actions > * { flex: none; }
+/* Trip actions have their own reserved row. Payment content can never push
+   cancellation out of the clipped map sheet, including on short PWA screens. */
+.tracking-trip-tools { display:flex; gap:8px; flex-shrink:0; }
+.tracking-trip-tools:empty { display:none; }
+.tracking-trip-tools > * { flex:1; min-width:0; }
+.tracking-trip-content { display:flex; flex-direction:column; gap:12px; }
+.tracking-trip-content > * { flex-shrink:0; }
+.tracking-trip-content[data-ended=true] .tracking-trip-payment { order:-1; }
+.tracking-trip-content .tracking-driver { padding-top:2px; }
+.booking-status-heading h2 { font-size:clamp(17px,5vw,21px); line-height:1.25; }

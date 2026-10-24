@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import Modal from '@/components/feature/Modal';
 import { toArticleStatus } from '@/lib/news';
 import { useEffect, useRef, useState } from 'react';
@@ -271,9 +272,7 @@ export default function AdminNewsEdit() {
   if (loading) {
     return (
       <AdminLayout title="Редактор на статия">
-        <div className="flex items-center justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       </AdminLayout>
     );
   }

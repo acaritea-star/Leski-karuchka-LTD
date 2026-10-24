@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -119,9 +120,7 @@ export default function NewsArticlePage() {
 
   if (loading) {
     return (
-      <div className="bg-background-50 min-h-[60vh] flex items-center justify-center pt-32">
-        <div className="w-8 h-8 border-2 border-background-200 border-t-primary-500 rounded-full animate-spin" />
-      </div>
+      <div className="max-w-3xl mx-auto px-5 pt-32"><ContentSkeleton label="Зареждаме статията…" /></div>
     );
   }
 

@@ -1,4 +1,4 @@
-import { cancelTaxiRequest } from '@/lib/rideOperations';
+import CancelRideButton from './CancelRideButton';
 /* global google */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -63,16 +63,6 @@ export default function DriverTracking({
   const positionStale = !usePositionFreshness(location);
   const loadingInfo = driverQuery.isPending;
   const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-  const cancelInFlight = useRef(false);
-  const cancelRevision = useRef(0);
-  useEffect(() => {
-    const run = ++cancelRevision.current;
-    cancelInFlight.current = false; setCancelling(false); setCancelError('');
-    return () => { cancelRevision.current = run + 1; };
-  }, [request.id]);
-  const [cancelError,setCancelError] = useState('');
-  const [cancelConfirm, setCancelConfirm] = useState(false);
   const vehicleType = driverQuery.data?.vehicleType ?? 'standard';
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
@@ -90,8 +80,6 @@ export default function DriverTracking({
 
   const headingToPickup = request.status === 'accepted' || request.status === 'arrived';
   const isWaiting = request.status === 'arrived';
-  const canCancel =
-    request.status === 'accepted' || request.status === 'arrived';
 
   const targetLat = headingToPickup ? request.pickup_latitude : request.destination_latitude;
   const targetLng = headingToPickup ? request.pickup_longitude : request.destination_longitude;
@@ -316,19 +304,8 @@ export default function DriverTracking({
     else frameTrip(map);
   }, [location, positionStale, frameTrip]);
 
-  const handleCancel = async () => {
-    if (!onCancel || cancelInFlight.current) return;
-    cancelInFlight.current = true;
-    const run = cancelRevision.current;
-    setCancelError(''); setCancelling(true);
-    try {
-      await cancelTaxiRequest(request.id, request.status);
-      if (run === cancelRevision.current) onCancel();
-    } catch(error) { if (run === cancelRevision.current) setCancelError(error instanceof Error ? error.message : 'Отмяната не е потвърдена.'); }
-    finally { if (run === cancelRevision.current) { cancelInFlight.current = false; setCancelling(false); } }
-  };
-
   return <CustomerLayout
+    expanded={!!request.trip_ended_at}
     map={<>
       <div ref={mapContainerRef} className="absolute inset-0" />
       {!mapReady && <div className="booking-map-state" role="status">
@@ -361,13 +338,12 @@ export default function DriverTracking({
             : isWaiting ? t('booking_meet_driver') : t('booking_waiting_location')}</p>
         </div>
       </div>
-      <div className="booking-scroll">
-        {cancelConfirm ? <div className="booking-cancel-confirm">
-          <p>{t('confirm_cancel')}</p><div>
-            <button type="button" className="booking-secondary" disabled={cancelling} onClick={() => setCancelConfirm(false)}>{t('keep_request')}</button>
-            <button type="button" className="booking-secondary booking-danger" disabled={cancelling} onClick={handleCancel}>{cancelling ? t('booking_cancel_sending') : t('yes_cancel')}</button>
-          </div>
-        </div> : <>
+      <div className="tracking-trip-tools">
+        {!request.trip_ended_at && driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
+        {onCancel && <CancelRideButton key={request.id} request={request} onCancelled={onCancel} />}
+      </div>
+      <div className="booking-scroll tracking-trip-content" data-ended={!!request.trip_ended_at}>
+        <div className="tracking-trip-details">
           <div className="tracking-driver">
             {driverInfo?.avatar_url ? <img src={driverInfo.avatar_url} alt="" />
               : <span className="tracking-avatar" aria-hidden="true"><i className="ri-user-3-line" /></span>}
@@ -380,13 +356,9 @@ export default function DriverTracking({
             <p><span className="route-pin-label" aria-hidden="true">A</span><span title={request.pickup_address}>{request.pickup_address}</span></p>
             <p><span className="route-pin-label route-pin-label-end" aria-hidden="true">B</span><span title={request.destination_address}>{request.destination_address}</span></p>
           </div>
-        </>}
-        {cancelError && <p className="booking-error" role="alert">{cancelError}</p>}
-      </div>
-      <div className="booking-status-actions tracking-payment-actions">
-        <CustomerRidePayment key={request.id} requestId={request.id} price={request.final_price??request.estimated_price??null} endedAt={request.trip_ended_at} revision={request.updated_at} />
-        {driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
-        {canCancel && onCancel && !cancelConfirm && <button type="button" className="booking-secondary" onClick={() => setCancelConfirm(true)}>{t('cancel_request')}</button>}
+        </div>
+        <div className="tracking-trip-payment"><CustomerRidePayment key={request.id} requestId={request.id} price={request.final_price??request.estimated_price??null} endedAt={request.trip_ended_at} revision={request.updated_at} /></div>
+        {request.trip_ended_at && driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}>{t('call_driver')}</a>}
       </div>
     </div>
   </CustomerLayout>;

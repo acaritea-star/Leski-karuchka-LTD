@@ -74,7 +74,7 @@ export default function AppMenu() {
       <button
         key={item.path}
         type="button"
-        onClick={() => go(item.path)}
+        data-route={item.path} onClick={() => go(item.path)}
         className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors cursor-pointer text-left ${
           active ? 'bg-primary-50' : 'hover:bg-background-100'
         }`}
@@ -149,7 +149,7 @@ export default function AppMenu() {
         {/* Profile */}
         <button
           type="button"
-          onClick={() => go('/customer/profile')}
+          data-route="/customer/profile" onClick={() => go('/customer/profile')}
           className="mx-5 mb-3 flex items-center gap-3 rounded-2xl bg-background-50 p-3 text-left cursor-pointer"
         >
           <div className="w-11 h-11 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden flex-shrink-0">

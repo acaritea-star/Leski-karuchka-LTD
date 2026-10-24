@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { onlinePaymentLabel } from '@/lib/ridePayment';
 import BackButton from '@/components/feature/BackButton';
 import { driverRecordOptions } from '@/lib/driverRecord';
@@ -93,9 +94,7 @@ export default function DriverHistory() {
               className="px-4 py-2 rounded-full bg-white text-sm text-foreground-600 cursor-pointer">{t('retry')}</button>
           </div>
         ) : loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <ContentSkeleton />
         ) : trips.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20">
             <div className="relative mb-5">

@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -44,9 +45,7 @@ export default function NewsSection() {
         </Reveal>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-2 border-background-200 border-t-primary-500 rounded-full animate-spin" />
-          </div>
+          <ContentSkeleton />
         ) : articles.length === 0 ? (
           <p className="text-foreground-400 text-sm">Скоро ще има новини.</p>
         ) : (

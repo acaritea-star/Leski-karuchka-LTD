@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import Modal from '@/components/feature/Modal';
 import { documentExpired } from '@/lib/legalWorkflow';
 import { useState, useMemo, useRef } from 'react';
@@ -242,9 +243,7 @@ function VehiclesEditor() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : vehicles.length === 0 ? (
         <div className="bg-white rounded-2xl border border-background-100 text-center py-16">
           <i className="ri-car-line text-4xl text-foreground-300" />

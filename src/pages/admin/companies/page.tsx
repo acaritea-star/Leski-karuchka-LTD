@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import Modal from '@/components/feature/Modal';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -93,9 +94,7 @@ export default function AdminCompanies() {
       <p className="mb-4 text-sm text-foreground-500">Тук управляваш всички фирми като супер администратор. Избери „Управлявай“, за да отвориш конкретна фирма. Новите фирми започват с лична покана по имейл. За съществуваща фирма използвай „Покани представител“.</p>
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : companies.length === 0 ? (
         <div className="bg-white rounded-2xl border border-background-100 text-center py-16">
           <i className="ri-building-2-line text-4xl text-foreground-300" />

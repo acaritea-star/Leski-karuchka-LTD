@@ -1,3 +1,4 @@
+import Modal from '@/components/feature/Modal';
 import { onlinePaymentLabel } from '@/lib/ridePayment';
 import CarrierIdentity from '@/components/feature/CarrierIdentity';
 import { useTranslation } from 'react-i18next';
@@ -36,24 +37,26 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
       </div><div><h2>{title}</h2><p>{hint}</p></div>
     </div>
     <div className="booking-scroll">
-      {props.confirmCancel && pending ? <div className="booking-cancel-confirm">
-        <p>{t('confirm_cancel')}</p><div>
-          <button type="button" className="booking-secondary" disabled={props.cancelling} onClick={props.onKeepRequest}>{t('keep_request')}</button>
-          <button type="button" className="booking-secondary booking-danger" disabled={props.cancelling} onClick={props.onCancel}>
-            {props.cancelling ? t('booking_cancel_sending') : t('yes_cancel')}</button>
-        </div>
-      </div> : <div className="booking-status-route">
+      <div className="booking-status-route">
         <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
         <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
-      </div>}
+      </div>
       {props.price != null && <div className="booking-meta"><span>{request.payment_method==='online'?(onlinePaymentLabel(request.payment_environment,request.payment_status)):t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
       <CarrierIdentity companyId={request.company_id} />
       {props.requestError && <p className="booking-error" role="alert">{props.requestError}</p>}
     </div>
+    {props.confirmCancel && pending && <Modal label={t('confirm_cancel')} busy={props.cancelling} onClose={props.onKeepRequest} className="ride-cancel-dialog">
+      <h2>{t('confirm_cancel')}</h2>
+      <p>Заявката ще бъде спряна след потвърждение.</p>
+      <div className="ride-cancel-choices">
+        <button type="button" className="ride-cancel-keep" onClick={props.onKeepRequest}>{t('keep_request')}</button>
+        <button type="button" className="ride-cancel-confirm" onClick={props.onCancel}>{props.cancelling ? t('booking_cancel_sending') : t('yes_cancel')}</button>
+      </div>
+    </Modal>}
     <div className="booking-status-actions">
       {pending ? <>
         {typeof navigator.share === 'function' && <button type="button" className="booking-secondary" onClick={props.onShare}>{t('share_trip')}</button>}
-        {!props.confirmCancel && <button type="button" className="booking-secondary" onClick={props.onShowCancel}>{t('cancel_request')}</button>}
+        {!props.confirmCancel && <button type="button" className="ride-cancel-button" onClick={props.onShowCancel}>{t('cancel_request')}</button>}
       </> : (completed || cancelled) && <>
         <button type="button" className="booking-secondary" onClick={props.onReset}>{t('nav_orders')}</button>
         {props.onNewOrder && <button type="button" className="booking-primary" onClick={props.onNewOrder}>{noDriver ? 'Виж други оферти' : t('order_new_taxi')}</button>}

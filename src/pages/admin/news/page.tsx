@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import Modal from '@/components/feature/Modal';
 import { toArticleStatus } from '@/lib/news';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -186,9 +187,7 @@ export default function AdminNews() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : error ? (
         <div className="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-4 flex items-center gap-2">
           <i className="ri-error-warning-line" />

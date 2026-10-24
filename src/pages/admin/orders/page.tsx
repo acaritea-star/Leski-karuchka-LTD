@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -82,9 +83,7 @@ function OrderList() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-background-100 text-center py-16">
           <i className="ri-file-list-3-line text-4xl text-foreground-300" />

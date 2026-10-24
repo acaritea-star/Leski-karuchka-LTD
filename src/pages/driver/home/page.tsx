@@ -1,3 +1,4 @@
+import PageLoading from '@/components/feature/LoadingState';
 import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
@@ -289,12 +290,7 @@ export default function DriverHome() {
 
   if (authLoading || driverQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-background-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-foreground-500">{t('loading')}</span>
-        </div>
-      </div>
+      <PageLoading title="Шофьорски панел" backTo="/driver/home" />
     );
   }
 
@@ -318,7 +314,7 @@ export default function DriverHome() {
             <NotificationBell />
             {pendingRequests > 0 && (
               <button
-                onClick={() => navigate('/driver/requests')}
+                data-route="/driver/requests" onClick={() => navigate('/driver/requests')}
                 aria-label="Входящи заявки"
                 className="relative w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur hover:bg-white transition-colors cursor-pointer shadow-sm"
               >
@@ -329,7 +325,7 @@ export default function DriverHome() {
               </button>
             )}
             <button
-              onClick={() => navigate('/driver/profile')}
+              data-route="/driver/profile" onClick={() => navigate('/driver/profile')}
               aria-label="Профил и документи"
               className="w-9 h-9 flex items-center justify-center rounded-full bg-white/80 backdrop-blur hover:bg-white transition-colors cursor-pointer shadow-sm"
             >
@@ -352,7 +348,7 @@ export default function DriverHome() {
             {driver && !driver.is_verified && !activeRequest && <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 space-y-3" aria-label="Подготовка за работа">
               <h2 className="font-semibold text-foreground-950">Следваща стъпка: профил и документи</h2>
               <p className="text-sm text-foreground-600">Условия и обучение → документи и автомобил → одобрение от фирмата.</p>
-              <button type="button" onClick={() => navigate('/driver/profile')} className="rounded-xl bg-primary-500 px-4 py-3 text-sm text-white font-semibold">Продължи подготовката</button>
+              <button type="button" data-route="/driver/profile" onClick={() => navigate('/driver/profile')} className="rounded-xl bg-primary-500 px-4 py-3 text-sm text-white font-semibold">Продължи подготовката</button>
             </section>}
             {/* Incoming Request Card — first priority */}
             {latestRequest && !activeRequest && driver?.is_online && (
@@ -413,7 +409,7 @@ export default function DriverHome() {
             {/* Active Request Card */}
             {activeRequest && (
               <button
-                onClick={() => navigate('/driver/requests')}
+                data-route="/driver/requests" onClick={() => navigate('/driver/requests')}
                 className="w-full bg-white/95 backdrop-blur-xl rounded-2xl border border-primary-200 p-4 text-left cursor-pointer animate-in zoom-in-95 fade-in duration-300 hover:border-primary-400 transition-colors"
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -522,7 +518,7 @@ export default function DriverHome() {
               {/* Stats row — refined */}
             </section>
             <section className="bg-white rounded-2xl border border-background-200 p-4 md:p-5" aria-label="Твоят ден">
-              <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-semibold text-foreground-950">Твоят ден</h2><button type="button" onClick={() => navigate('/driver/earnings')} className="text-xs text-primary-700 font-semibold underline">Към отчета</button></div>
+              <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-semibold text-foreground-950">Твоят ден</h2><button type="button" data-route="/driver/earnings" onClick={() => navigate('/driver/earnings')} className="text-xs text-primary-700 font-semibold underline">Към отчета</button></div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-background-50 rounded-xl p-3 text-center">
                   <p className="text-lg font-bold text-foreground-950 font-heading">{todayStatsQuery.data ? todayStats.trips : '—'}</p>

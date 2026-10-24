@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/feature/LoadingState';
 import StaffSecuritySettings from '@/components/feature/StaffSecuritySettings';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -143,9 +144,7 @@ function SettingsEditor() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ContentSkeleton />
       ) : (
         <div className="max-w-2xl bg-white rounded-2xl border border-background-100 p-6">
           <h3 className="font-semibold text-foreground-950 mb-1">Профил на компанията</h3>

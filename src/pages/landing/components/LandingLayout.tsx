@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { ContentSkeleton } from '@/components/feature/LoadingState';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
@@ -164,7 +165,7 @@ export default function LandingLayout() {
 
       {/* Page content */}
       <main className="flex-1">
-        <Outlet />
+        <Suspense fallback={<div className="max-w-5xl mx-auto px-5 pt-28 pb-12"><ContentSkeleton /></div>}><Outlet /></Suspense>
       </main>
 
       <LandingFooter />

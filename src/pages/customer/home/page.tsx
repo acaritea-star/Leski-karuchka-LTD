@@ -8,7 +8,8 @@ import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
 import type { Tables } from '@/lib/database.types';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { availabilityFresh, carrierAvailable, loadMarketplaceAvailability } from '@/lib/bookingAvailability';
 import { SERVICE_CLASSES, marketplaceRange, carrierOffers, carrierOfferKey } from '@/lib/marketplace';
 import { useFleetClock } from '@/hooks/useFleetClock';
@@ -87,6 +88,7 @@ function persistRecent(list: LocationPreset[]) {
 
 export default function CustomerHome() {
   const { t } = useTranslation();
+  const client = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [notificationParams, setNotificationParams] = useSearchParams();
@@ -124,6 +126,7 @@ export default function CustomerHome() {
   const [requestError, setRequestError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const cancelLocked = useRef(false);
   const [recovering, setRecovering] = useState(true);
   const [recoveryError, setRecoveryError] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
@@ -495,7 +498,8 @@ export default function CustomerHome() {
   }, [pickup, destination, quoteReady, quoteRefresh, activeRequestId, quoteInput, endpoints, t]);
 
   const cancelRequest = async () => {
-    if (!activeRequest || cancelling || !['pending', 'accepted', 'arrived'].includes(activeRequest.status)) return;
+    if (!activeRequest || cancelLocked.current || !['pending', 'accepted', 'arrived'].includes(activeRequest.status)) return;
+    cancelLocked.current = true;
     setCancelling(true);
     setRequestError('');
     try {
@@ -503,6 +507,7 @@ export default function CustomerHome() {
       if (data) {
         setConfirmCancel(false);
         setActiveRequest(prev => mergeRequestSnapshot(prev, data as ActiveRequest));
+        if (user?.id) void client.invalidateQueries({ queryKey: queryKeys.customerOrders(user.id), refetchType: 'none' });
       } else {
         setConfirmCancel(false);
         setRequestError(t('request_already_taken'));
@@ -510,7 +515,7 @@ export default function CustomerHome() {
     } catch {
       setConfirmCancel(false);
       setRequestError(t('request_failed_hint'));
-    } finally { setCancelling(false); }
+    } finally { cancelLocked.current = false; setCancelling(false); }
   };
 
   // Reset

@@ -1,3 +1,5 @@
+import RouteIntent from './router/RouteIntent';
+import PageLoading from '@/components/feature/LoadingState';
 import CustomerWelcomeGate from '@/components/feature/CustomerWelcomeGate';
 import StaffMfaBoundary from '@/components/feature/StaffMfaBoundary';
 import ErrorBoundary from '@/components/feature/ErrorBoundary';
@@ -25,13 +27,7 @@ function NotificationScope({ children }: { children: ReactNode }) {
   return <Suspense fallback={<RouteFallback />}><NotificationsProvider>{children}</NotificationsProvider></Suspense>;
 }
 
-function RouteFallback() {
-  return (
-    <div className="min-h-screen bg-background-50 flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-foreground-200 border-t-primary-500 rounded-full animate-spin" />
-    </div>
-  );
-}
+function RouteFallback() { return <PageLoading />; }
 
 function AppAccess() {
   const { pathname } = useLocation();
@@ -48,7 +44,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <BrowserRouter basename={__BASE_PATH__}>
-            <AppAccess />
+            <RouteIntent /><AppAccess />
             <CookieConsent />
           </BrowserRouter>
         </AuthProvider>

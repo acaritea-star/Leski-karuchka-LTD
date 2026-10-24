@@ -4,13 +4,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AuthGuard from './AuthGuard';
-const state = vi.hoisted(() => ({ user: { id: 'a', role: 'SUPER_ADMIN' }, companyId: 'one', profileError: null as string | null }));
+const state = vi.hoisted(() => ({ user: { id: 'a', role: 'SUPER_ADMIN' }, companyId: 'one', companyLoading: false, profileError: null as string | null }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ ...state, loading: false, session: null, refreshProfile: vi.fn() }) }));
-vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: state.companyId, companies: [] }) }));
+vi.mock('@/pages/admin/components/AdminCompanyContext', () => ({ useAdminCompany: () => ({ companyId: state.companyId, companies: [], loading: state.companyLoading }) }));
 vi.mock('./LegalAcceptanceNotice', () => ({ default: () => null }));
 function Draft() { const [value, setValue] = useState(''); return <input aria-label="draft" value={value} onChange={event => setValue(event.target.value)} />; }
 const tree = () => <MemoryRouter><AuthGuard><Draft /></AuthGuard></MemoryRouter>;
-beforeEach(() => { state.user = { id: 'a', role: 'SUPER_ADMIN' }; state.companyId = 'one'; state.profileError = null; });
+beforeEach(() => { state.user = { id: 'a', role: 'SUPER_ADMIN' }; state.companyId = 'one'; state.companyLoading = false; state.profileError = null; });
 afterEach(cleanup);
 it('discards a form draft immediately when company changes', () => {
   const view = render(tree());
@@ -31,4 +31,15 @@ it('does not discard a platform-wide form when the available company context cha
   fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'new-company' } });
   state.companyId = 'two'; view.rerender(globalTree());
   expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('new-company');
+});
+
+it('waits for the first company scope so a ready page does not reset after the user interacts', () => {
+  state.companyLoading = true; state.companyId = '';
+  const view = render(tree());
+  expect(screen.queryByLabelText('draft')).toBeNull();
+  expect(screen.getByRole('status')).toBeTruthy();
+  state.companyLoading = false; state.companyId = 'one'; view.rerender(tree());
+  fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'selected-tab' } });
+  view.rerender(tree());
+  expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('selected-tab');
 });

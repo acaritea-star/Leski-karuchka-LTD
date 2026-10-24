@@ -583,3 +583,33 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 @media (max-width: 360px) {
   .app-dialog.ride-payment-dialog { padding: .875rem; }
 }
+
+/* Quiet, consistent loading surfaces. No new animation/runtime dependency. */
+.content-skeleton { display:grid; gap:12px; width:100%; padding:16px 0; }
+.content-skeleton-card { display:grid; gap:14px; padding:20px; min-height:126px; border:1px solid #e8ebe4; border-radius:20px; background:#fff; }
+.content-skeleton-heading { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+.content-skeleton-line { display:block; width:100%; height:10px; border-radius:8px; background:#edf0e9; }
+.content-skeleton-heading .content-skeleton-line { width:45%; height:13px; }
+.content-skeleton-mark { flex:0 0 30px; height:30px; border-radius:11px; background:#e7ede3; }
+.content-skeleton-short { width:64%; }
+.content-skeleton-card > *, .content-skeleton-heading > * { animation:content-rest 2.4s .2s ease-in-out infinite alternate; }
+.page-loading { min-height:100svh; background:#f7f8f3; color:#19382b; }
+.page-loading-header { display:flex; align-items:center; gap:12px; min-height:68px; padding:12px 20px; padding-top:calc(12px + env(safe-area-inset-top)); border-bottom:1px solid #e4e9e1; background:#fffffff5; }
+.page-loading-brand { display:grid; place-items:center; width:34px; height:34px; flex-shrink:0; border-radius:12px; background:#e8efe3; font-size:12px; font-weight:700; letter-spacing:-.5px; }
+.page-loading-back { display:grid; place-items:center; min-width:44px; min-height:44px; border-radius:12px; }
+.page-loading-body { max-width:680px; padding:28px 20px; margin:0 auto; }
+.page-loading-body > p { color:#69756d; font-size:13px; margin:0 0 8px; }
+@keyframes content-rest { to { opacity:.65; } }
+@media(prefers-reduced-motion:reduce) { .content-skeleton *, .page-loading * { animation:none !important; } }
+.ride-cancel-button { display:flex; align-items:center; justify-content:center; min-height:44px; padding:9px 12px; border:1px solid #e2e6de; border-radius:13px; background:#fff; color:#7d4334; font-size:13px; font-weight:600; }
+.ride-cancel-button:hover { background:#faf3ee; }
+.ride-cancel-button:focus-visible, .ride-cancel-choices button:focus-visible { outline:2px solid #19382b; outline-offset:3px; }
+.ride-cancel-dialog { max-width:380px; padding:24px; }
+.ride-cancel-dialog h2 { font-size:21px; font-weight:700; color:#19382b; letter-spacing:-.5px; }
+.ride-cancel-dialog p { margin-top:12px; color:#69756d; font-size:14px; line-height:1.6; }
+.ride-cancel-choices { display:grid; gap:10px; margin-top:24px; }
+.ride-cancel-choices button { min-height:48px; padding:12px; border-radius:14px; font-size:14px; font-weight:600; }
+.ride-cancel-keep { color:white; background:#19382b; }
+.ride-cancel-confirm { color:#873e2e; background:#faf0eb; }
+.ride-cancel-choices button:disabled { opacity:.6; }
+.ride-cancel-dialog .ride-cancel-error { color:#873e2e; }
