@@ -61,7 +61,7 @@ it('does not restart the Session request for a new parent callback identity',asy
 });
 it('offers the card form when wallets are unavailable and needs one payment confirmation',async()=>{
  const {changed}=setup();await screen.findByRole('button',{name:'Тествай 2.95 €'});fireEvent.click(screen.getByRole('button',{name:'Тествай 2.95 €'}));
- await waitFor(()=>expect(fake.confirm).toHaveBeenCalledOnce());await waitFor(()=>expect(changed).toHaveBeenCalledOnce());
+ await waitFor(()=>expect(fake.confirm).toHaveBeenCalledOnce());await waitFor(()=>expect(changed).toHaveBeenCalledTimes(2));
  expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({redirect:'if_required'}));expect(fake.confirm.mock.calls[0][0]).not.toHaveProperty('returnUrl');expect(screen.queryByText('Платено онлайн')).toBeNull();
  expect(localStorage.getItem(paymentPreferenceKey('owner','acct_fixture','test'))).toBe('card');
 });
@@ -91,4 +91,11 @@ it('scopes the remembered method by user, merchant and environment',()=>{
 });
 it.each([{environment:'live'},{request_id:'foreign'},{session_id:'cs_test_foreign'},{publishable_key:'pk_live_wrong'},{amount_minor:295.1},{currency:'usd'}])('rejects a payment configuration mismatch %j',mutation=>{
  expect(()=>parseRideElementsSession({...session,...mutation},'ride')).toThrow();
+});
+
+it('uses the webhook-confirmed database receipt without a second Stripe reconciliation',async()=>{
+ const changed=vi.fn(async()=>true);render(<RidePaymentForm session={session} userId="owner" onBusy={()=>{}} onChanged={changed} onRetry={()=>{}}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Тествай 2.95 €'}));
+ await waitFor(()=>expect(changed).toHaveBeenCalledOnce());expect(fake.action).not.toHaveBeenCalled();expect(fake.confirm).toHaveBeenCalledOnce();
+ expect(screen.queryByText('Платено онлайн')).toBeNull();
 });

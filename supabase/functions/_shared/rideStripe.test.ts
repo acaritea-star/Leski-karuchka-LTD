@@ -65,3 +65,14 @@ it('a test webhook cannot settle a registered live order even on the same accoun
  expect((await handler(new Request('https://example.invalid',{method:'POST',headers:{'stripe-signature':'signed'},body:'raw'}))).status).toBe(400);
  expect(deps.record).not.toHaveBeenCalled();
 });
+it('settles an expanded server response with one Stripe read, retaining all amount checks',async()=>{
+ deps.retrieveSession.mockResolvedValue({...session,payment_intent:payment});
+ await reconcileRideCheckout(order,'evt_expanded',deps);expect(deps.retrieveSession).toHaveBeenCalledOnce();expect(deps.retrievePayment).not.toHaveBeenCalled();
+ expect(deps.record).toHaveBeenCalledWith(expect.objectContaining({p_state:'paid',p_received_minor:295}));
+ deps.record.mockClear();deps.retrieveSession.mockResolvedValue({...session,payment_intent:{...payment,amount:999}});
+ await expect(reconcileRideCheckout(order,'evt_badexpanded',deps)).rejects.toThrow('Payment binding');expect(deps.record).not.toHaveBeenCalled();
+});
+it('retrieves a PaymentIntent when its charge was not expanded',async()=>{
+ deps.retrieveSession.mockResolvedValue({...session,payment_intent:{...payment,latest_charge:'ch_unexpanded'}});
+ await reconcileRideCheckout(order,'evt_unexpanded',deps);expect(deps.retrievePayment).toHaveBeenCalledOnce();
+});

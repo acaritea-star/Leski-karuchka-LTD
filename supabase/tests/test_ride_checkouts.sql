@@ -3,7 +3,7 @@ BEGIN;
 UPDATE private.app_security SET staff_mfa_enforced=false;
 CREATE FUNCTION pg_temp.test_ride_denied(stmt text) RETURNS void LANGUAGE plpgsql AS $$BEGIN BEGIN EXECUTE stmt;EXCEPTION WHEN OTHERS THEN RETURN;END;RAISE EXCEPTION 'FAIL expected denial: %',stmt;END$$;
 DO $t$
-DECLARE root uuid:=gen_random_uuid();city uuid:=gen_random_uuid();duid uuid:=gen_random_uuid();customer uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();admin_id uuid:=gen_random_uuid();did uuid;vt uuid:=gen_random_uuid();ride uuid:=gen_random_uuid();ride2 uuid:=gen_random_uuid();o jsonb;report jsonb;aid text:='acct_1USiOkPYGWX41ye8';
+DECLARE root uuid:=gen_random_uuid();city uuid:=gen_random_uuid();duid uuid:=gen_random_uuid();customer uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();admin_id uuid:=gen_random_uuid();did uuid;vt uuid:=gen_random_uuid();ride uuid:=gen_random_uuid();ride2 uuid:=gen_random_uuid();o jsonb;report jsonb;before_ride jsonb;before_order jsonb;aid text:='acct_1USiOkPYGWX41ye8';
 BEGIN
  INSERT INTO public.companies(id,name,slug)VALUES(root,'Test root','test-root-'||root);
  INSERT INTO public.companies(id,name,slug,parent_company_id,service_city,service_latitude,service_longitude,service_radius_km)VALUES(city,'Test branch','test-city-'||city,root,'Synthetic',43.2,25.6,5);
@@ -28,7 +28,13 @@ BEGIN
  PERFORM pg_temp.test_ride_denied(format('SELECT private.attach_ride_checkout(%L,''cs_live_wrong'',''https://checkout.stripe.com/c/pay/cs_live_wrong'')',o->>'id'));
  PERFORM private.attach_ride_checkout((o->>'id')::uuid,'cs_test_ride','https://checkout.stripe.com/c/pay/cs_test_ride');
  PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_paid','paid',1234,1234,0);
+ SELECT to_jsonb(r) INTO before_ride FROM public.taxi_requests r WHERE id=ride;
+ SELECT to_jsonb(r) INTO before_order FROM private.ride_stripe_orders r WHERE id=(o->>'id')::uuid;
  PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_paid','paid',1234,1234,0);
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_second_paid','paid',1234,1234,0);
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_old_open','open',1234,0,0);
+ IF before_ride IS DISTINCT FROM (SELECT to_jsonb(r) FROM public.taxi_requests r WHERE id=ride) OR before_order IS DISTINCT FROM (SELECT to_jsonb(r) FROM private.ride_stripe_orders r WHERE id=(o->>'id')::uuid) THEN RAISE EXCEPTION 'FAIL repeated settlement changed rows or timestamps';END IF;
+ IF (SELECT count(*) FROM private.ride_stripe_events WHERE order_id=(o->>'id')::uuid)<>3 THEN RAISE EXCEPTION 'FAIL event audit was lost';END IF;
  IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride AND status='completed' AND payment_environment='test' AND payment_status='paid') THEN RAISE EXCEPTION 'FAIL test lifecycle completion';END IF;
  IF EXISTS(SELECT 1 FROM public.payment_transactions WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.driver_money_entries WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.request_outcomes WHERE request_id=ride) OR EXISTS(SELECT 1 FROM public.trips WHERE request_id=ride) THEN RAISE EXCEPTION 'FAIL simulated money entered real accounting';END IF;
  PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_ride','pi_testRide','evt_test_refund','paid',1234,1234,100);

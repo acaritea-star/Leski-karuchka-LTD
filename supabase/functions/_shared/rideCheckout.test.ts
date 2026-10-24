@@ -68,3 +68,13 @@ it('rejects a foreign PaymentIntent customer before settlement',async()=>{
   retrievePayment:async()=>({object:'payment_intent',id:'pi_inline',livemode:false,amount:295,amount_received:295,currency:'eur',customer:'cus_other',metadata:{leski_ride_order_id:order.id},status:'succeeded'}),record,
  })).rejects.toThrow('Payment binding');expect(record).not.toHaveBeenCalled();
 });
+it.each(['paid','partially_refunded','refunded','canceled'])('reads authoritative %s settlement without any Stripe API request or ledger write',async state=>{
+ saved={...order,state,checkout_session_id:'cs_test_inline'};const requireStripe=vi.fn();
+ const result=await runRideCheckout('customer',order.request_id,'reconcile',{...deps,requireStripe});
+ expect(result).toEqual({state,environment:'test'});expect(rpc).toHaveBeenCalledExactlyOnceWith('read_ride_checkout',{p_request_id:order.request_id,p_actor:'customer'});
+ expect(requireStripe).not.toHaveBeenCalled();expect(retrieveSession).not.toHaveBeenCalled();expect(retrievePayment).not.toHaveBeenCalled();expect(createSession).not.toHaveBeenCalled();
+});
+it('still requires actor-scoped database access before using a terminal receipt',async()=>{
+ rpc.mockRejectedValue(Error('not allowed'));
+ await expect(runRideCheckout('outsider',order.request_id,'reconcile',deps)).rejects.toThrow('not allowed');expect(retrieveSession).not.toHaveBeenCalled();
+});

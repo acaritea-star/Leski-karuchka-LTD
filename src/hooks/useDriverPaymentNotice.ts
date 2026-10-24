@@ -1,22 +1,36 @@
 import { onlinePaymentLabel } from '@/lib/ridePayment';
-import { useEffect,useRef,useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery,useQueryClient } from '@tanstack/react-query';
+import type { Tables } from '@/lib/database.types';
+import { mergeRequestSnapshot } from '@/lib/requestSnapshot';
+import { queryKeys } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import { withRequestTimeout } from '@/lib/requestTimeout';
-/** One final database read when a ride disappears also recovers a missed paid
- * event. No extra channel and no polling when the driver has no active ride. */
+/** Reuse the terminal server snapshot already delivered by Realtime. If that
+ * event was missed, read the exact previous ride once; never poll idle drivers. */
 export function useDriverPaymentNotice(owner:string|undefined,driverId:string|undefined,requestId:string|undefined) {
- const previous=useRef<{owner:string;driverId:string;requestId:string}|null>(null);
- const [notice,setNotice]=useState<{owner:string;text:string}|null>(null);
+ const client=useQueryClient();
+ const [previous,setPrevious]=useState<{owner:string;driverId:string;requestId:string}|null>(null);
  useEffect(()=>{
-  if(!owner||!driverId){previous.current=null;return;}
-  if(requestId){previous.current={owner,driverId,requestId};return;}
-  const last=previous.current;previous.current=null;
-  if(!last||last.owner!==owner||last.driverId!==driverId)return;
-  const controller=new AbortController();
-  void withRequestTimeout(signal=>supabase.from('taxi_requests').select('id,status,payment_status,payment_method,payment_environment').eq('id',last.requestId).eq('driver_id',driverId).abortSignal(signal).maybeSingle(),8000,controller.signal)
-   .then(({data,error})=>{if(!controller.signal.aborted&&!error&&data?.status==='completed'&&data.payment_status==='paid'&&data.payment_method==='online')setNotice({owner,text:onlinePaymentLabel(data.payment_environment,data.payment_status)});}).catch(()=>{});
-  return()=>controller.abort();
+  if(!owner||!driverId){setPrevious(null);return;}
+  if(requestId)setPrevious({owner,driverId,requestId});
  },[owner,driverId,requestId]);
- return notice&&notice.owner===owner?notice.text:'';
+ const scoped=!!owner&&!!driverId&&previous?.owner===owner&&previous.driverId===driverId;
+ const queryKey=queryKeys.driverRequestSnapshot(driverId??'none',scoped?previous.requestId:'none');
+ const receipt=useQuery<Tables<'taxi_requests'>|null>({
+  queryKey,
+  enabled:scoped&&!requestId,staleTime:q=>q.state.data&&['completed','cancelled'].includes(q.state.data.status)?Infinity:0,retry:1,refetchOnWindowFocus:false,
+  queryFn:async({signal})=>{
+   if(!scoped)return null;
+   const {data,error}=await withRequestTimeout(abort=>supabase.from('taxi_requests').select('*')
+    .eq('id',previous.requestId).eq('driver_id',driverId).abortSignal(abort).maybeSingle(),8000,signal);
+   if(error)throw error;
+   if(data&&(data.id!==previous.requestId||data.driver_id!==driverId))throw Error('Wrong ride receipt');
+   const latest=client.getQueryData<Tables<'taxi_requests'>|null>(queryKey);
+   return latest?(data?mergeRequestSnapshot(latest,data):latest):data;
+  },
+ });
+ const row=receipt.data;
+ return scoped&&!requestId&&row?.id===previous.requestId&&row.driver_id===driverId&&row.status==='completed'&&row.payment_status==='paid'&&row.payment_method==='online'
+  ?onlinePaymentLabel(row.payment_environment,row.payment_status):'';
 }
-

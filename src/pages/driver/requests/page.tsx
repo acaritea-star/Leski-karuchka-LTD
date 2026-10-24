@@ -1,4 +1,3 @@
-import { onlinePaymentLabel } from '@/lib/ridePayment';
 import BackButton from '@/components/feature/BackButton';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
@@ -56,7 +55,7 @@ export default function DriverRequests() {
   const offersConnected = useDriverOfferConnection();
   const [checkoutOwner, setCheckoutOwner] = useState('');
   const [checkoutRequest, setCheckoutRequest] = useState<TaxiRequest | null>(null);
-  const [paymentNotice, setPaymentNotice] = useState('');
+  const [manualNotice,setManualNotice]=useState<{owner:string;driverId:string}|null>(null);
   const [driverNavInfo, setDriverNavInfo] = useState<NavInfo | null>(null);
 
   // Unlock audio on first user interaction (required by browsers)
@@ -89,6 +88,7 @@ export default function DriverRequests() {
 
   // Reset nav info when active request changes (pickup → destination switch)
   useEffect(() => {
+    if(activeRequest?.id)setManualNotice(null);
     setDriverNavInfo(null);
     setError('');
   }, [activeRequest?.id, activeRequest?.status]);
@@ -237,7 +237,7 @@ export default function DriverRequests() {
     mutationFn:(request:TaxiRequest)=>endRideTrip(request.id,driver!.id),
     onSuccess:updated=>{
       if(driver?.id)cacheDriverRequest(queryClient,driver.id,updated);
-      setError('');setPaymentNotice('');setCheckoutOwner(user?.id??'');setCheckoutRequest(updated);
+      setError('');setCheckoutOwner(user?.id??'');setCheckoutRequest(updated);
     },
     onError:cause=>{setError(cause instanceof Error?cause.message:'Краят не е потвърден. Обнови курса и опитай пак.');
       if(driver?.id)void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)});},
@@ -260,7 +260,7 @@ export default function DriverRequests() {
             cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
-            if(newRow.payment_status==='paid'&&newRow.payment_method==='online'){setPaymentNotice(onlinePaymentLabel(newRow.payment_environment,newRow.payment_status));setCheckoutRequest(null);void queryClient.invalidateQueries({queryKey:['accounting']});}
+            if(newRow.payment_status==='paid'&&newRow.payment_method==='online'){setCheckoutRequest(current=>current?.id===newRow.id?null:current);void queryClient.invalidateQueries({queryKey:['accounting']});}
             cacheDriverRequest(queryClient, driver.id, newRow);
           }
         },
@@ -556,11 +556,12 @@ export default function DriverRequests() {
           </div>
         )}
 
-        {(paymentNotice||paidNotice) && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paymentNotice||paidNotice}</p>}
+        {!activeRequest&&!paidNotice&&manualNotice?.owner===user?.id&&manualNotice?.driverId===driver?.id&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.</p>}
+        {paidNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paidNotice}</p>}
         {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => { setCheckoutRequest(null); void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)}); }} onFinished={ride => {
           if (activeOwner.current !== user.id) return;
           cacheDriverRequest(queryClient, driver.id, ride); setCheckoutRequest(null); setError('');
-          setPaymentNotice('Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.');
+          setManualNotice({owner:user.id,driverId:driver.id});
           void queryClient.invalidateQueries({ queryKey: ['accounting'] });
         }} /></Suspense>}
 

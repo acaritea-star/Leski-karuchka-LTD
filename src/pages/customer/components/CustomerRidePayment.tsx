@@ -1,20 +1,25 @@
 import { lazy,Suspense,useCallback,useEffect,useRef,useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery,useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { loadRidePayment,ridePaymentAction,onlinePaymentLabel } from '@/lib/ridePayment';
 import { money } from '@/lib/accounting';
 const RidePaymentElements=lazy(()=>import('./RidePaymentElements'));
 export default function CustomerRidePayment({requestId,price,endedAt,revision}:{requestId:string;price:number|null;endedAt?:string|null;revision?:string}) {
+ const client=useQueryClient();
  const {user}=useAuth();const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');const lock=useRef(false);
  const payment=useQuery({queryKey:['ride-payment-state',user?.id,requestId],enabled:!!user?.id,
   queryFn:({signal})=>loadRidePayment(requestId,signal),retry:1,staleTime:10000,refetchOnWindowFocus:true,
   refetchInterval:q=>q.state.data?.ended_at && ['creating','open','processing'].includes(q.state.data.state)?10000:false,
   refetchIntervalInBackground:false});
  const refresh=payment.refetch;
- useEffect(()=>{void refresh();},[revision,refresh]);
+ const lastRevision=useRef({requestId,revision});
+ useEffect(()=>{
+  const previous=lastRevision.current;lastRevision.current={requestId,revision};
+  if(previous.requestId===requestId&&previous.revision!==revision)void refresh({cancelRefetch:false});
+ },[requestId,revision,refresh]);
  useEffect(()=>{
   if(!user?.id)return;
-  const resume=()=>{if(document.visibilityState!=='hidden'&&navigator.onLine)void refresh();};
+  const resume=()=>{if(document.visibilityState!=='hidden'&&navigator.onLine)void refresh({cancelRefetch:false});};
   window.addEventListener('pageshow',resume);
   return()=>window.removeEventListener('pageshow',resume);
  },[user?.id,refresh]);
@@ -22,7 +27,12 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
  const paid=data?.payment_status==='paid';
  const active=!!data && ['creating','open','processing'].includes(data.state);
  const identity=`${user?.id}:${requestId}`,[openIdentity,setOpenIdentity]=useState<string|null>(null),[preparedIdentity,setPreparedIdentity]=useState<string|null>(null),autoPrepared=useRef('');
- const changed=useCallback(async()=>{await refresh();},[refresh]);
+ const changed=useCallback(async()=>{
+  const cached=client.getQueryData<import('@/lib/ridePayment').RidePaymentState>(['ride-payment-state',user?.id,requestId]);
+  if(cached&&['paid','refunded'].includes(cached.payment_status))return true;
+  const result=await refresh({cancelRefetch:false});
+  return !!result.data&&['paid','refunded'].includes(result.data.payment_status);
+ },[client,user?.id,requestId,refresh]);
  useEffect(()=>{
   if(ended||!data?.eligible||!data.inline_available||!navigator.onLine)return;
   const connection=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection;

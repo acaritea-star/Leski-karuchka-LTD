@@ -21,7 +21,7 @@ export async function rideCheckout(request:Request):Promise<Response> {
    webhookReady:live=>!!Deno.env.get(live?'STRIPE_LIVE_WEBHOOK_SECRET':'STRIPE_WEBHOOK_API'),
    createCustomer:(live,email,key)=>stripeForRide(live).customers.create(email?{email}:{},{idempotencyKey:key}),
    createSession:(live,params,key)=>stripeForRide(live).checkout.sessions.create(params,{idempotencyKey:key}),
-   retrieveSession:(live,id)=>stripeForRide(live).checkout.sessions.retrieve(id),
+   retrieveSession:(live,id)=>stripeForRide(live).checkout.sessions.retrieve(id,{expand:['payment_intent.latest_charge']}),
    retrievePayment:(live,id)=>stripeForRide(live).paymentIntents.retrieve(id,{expand:['latest_charge']}),
    expireSession:(live,id)=>stripeForRide(live).checkout.sessions.expire(id),
   });

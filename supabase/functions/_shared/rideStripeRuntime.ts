@@ -25,7 +25,7 @@ export async function paymentRpc(name:string,args:Record<string,unknown>) {
 }
 export const rideStripeDependenciesForMode=(live:boolean)=>({
  lookup:async(id:string)=>await paymentRpc('lookup_ride_checkout',{p_order_id:id}) as RideOrder|null,
- retrieveSession:async(id:string)=>{await requireRideStripe(live);return stripeForRide(live).checkout.sessions.retrieve(id);},
+ retrieveSession:async(id:string)=>{await requireRideStripe(live);return stripeForRide(live).checkout.sessions.retrieve(id,{expand:['payment_intent.latest_charge']});},
  retrievePayment:async(id:string)=>{await requireRideStripe(live);return stripeForRide(live).paymentIntents.retrieve(id,{expand:['latest_charge']});},
  record:async(snapshot:RideStripeSnapshot)=>await paymentRpc('record_ride_stripe_snapshot',snapshot),
 });

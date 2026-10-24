@@ -17,7 +17,11 @@ export async function runRideCheckout(actor:string,requestId:string,action:'chec
  }else order=await deps.rpc('read_ride_checkout',{p_request_id:requestId,p_actor:actor}) as RideOrder|null;
  if(!order)return {state:'none'};
  const live=order.livemode!==false;
- if(order.request_id!==requestId || await deps.requireStripe(live)!==order.account_id)throw Error('Checkout account mismatch');
+ if(order.request_id!==requestId)throw Error('Checkout account mismatch');
+ // read_ride_checkout has already authenticated this actor against the ride.
+ // A settled database receipt needs no Stripe request or new ledger write.
+ if(action==='reconcile'&&['paid','partially_refunded','refunded','canceled'].includes(order.state))return {state:order.state,environment:live?'live':'test'};
+ if(await deps.requireStripe(live)!==order.account_id)throw Error('Checkout account mismatch');
  if(action==='elements' && actor!==order.customer_id)throw Error('Customer required');
  let session:Record<string,unknown>|undefined;
  if(!order.checkout_session_id && order.state!=='canceled') {

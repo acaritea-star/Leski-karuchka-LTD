@@ -34,7 +34,10 @@ export async function reconcileRideCheckout(order:RideOrder,eventId:string,deps:
  let state:RideStripeSnapshot['p_state']='open', received=0,refunded=0,paymentId:string|null=null;
  if(session.payment_intent!=null) {
   paymentId=stripeId(session.payment_intent,'pi');
-  const payment=stripeObject(await deps.retrievePayment(paymentId));
+  // The server requests an expanded PaymentIntent and charge in one Stripe
+  // read. Fall back only for an unexpanded response; all binding checks remain.
+  const expanded=typeof session.payment_intent==='object'?stripeObject(session.payment_intent):null;
+  const payment=expanded&&typeof expanded.latest_charge!=='string'?expanded:stripeObject(await deps.retrievePayment(paymentId));
   if(payment.object!=='payment_intent' || payment.id!==paymentId || payment.livemode!==live || payment.amount!==order.amount_minor ||
    payment.currency!==order.currency || stripeObject(payment.metadata).leski_ride_order_id!==order.id ||
    order.ui_mode==='elements' && stripeId(payment.customer,'cus')!==order.stripe_customer_id) throw Error('Payment binding rejected');

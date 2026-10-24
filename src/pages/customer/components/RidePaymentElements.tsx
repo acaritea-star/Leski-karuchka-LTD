@@ -18,7 +18,7 @@ class PaymentSdkBoundary extends Component<{children:ReactNode;onRetry:()=>void}
  render(){return this.state.failed?<PaymentLoadRecovery onRetry={this.props.onRetry}/>:this.props.children;}
 }
 
-export default function RidePaymentElements({requestId,userId,onClose,onChanged,open=true,enabled=true,preparation=null}:{requestId:string;userId:string;onClose:()=>void;onChanged:()=>Promise<unknown>;open?:boolean;enabled?:boolean;preparation?:RidePaymentPreparation|null}) {
+export default function RidePaymentElements({requestId,userId,onClose,onChanged,open=true,enabled=true,preparation=null}:{requestId:string;userId:string;onClose:()=>void;onChanged:()=>Promise<boolean|void>;open?:boolean;enabled?:boolean;preparation?:RidePaymentPreparation|null}) {
  const [session,setSession]=useState<RideElementsSession|null>(null),[legacy,setLegacy]=useState<RidePaymentResult|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false);
  const [sdkAttempt,setSdkAttempt]=useState(0);
  const changed=useRef(onChanged);changed.current=onChanged;
@@ -66,7 +66,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged,
  </Modal>;
 }
 
-export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,preparation=null,active=true}:{session:RideElementsSession|null;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<unknown>;onRetry:()=>void;preparation?:RidePaymentPreparation|null;active?:boolean}) {
+export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,preparation=null,active=true}:{session:RideElementsSession|null;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<boolean|void>;onRetry:()=>void;preparation?:RidePaymentPreparation|null;active?:boolean}) {
  const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session?.account_id??preparation?.account_id??'',session?.environment??preparation?.environment??'test');
  const [wallets,setWallets]=useState<boolean|null>(null),[card,setCard]=useState(()=>preferredPaymentMethod(key)==='card'),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
  const [cardReady,setCardReady]=useState(false),[cardFailed,setCardFailed]=useState(false);
@@ -104,8 +104,9 @@ export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,prepara
    if(!alive.current)return;
    if(confirmed.type==='error'){setError(confirmed.error.message||'Плащането не е завършено. Провери данните и опитай отново.');return;}
    rememberPaymentMethod(key,event?'wallet':'card');setAwaiting(true);
-   // The SDK never marks a ride paid. Only verified server reconciliation may do that.
-   try {const checked=await ridePaymentAction(session.request_id,'reconcile');await onChanged();if(alive.current)setAwaiting(!['paid','canceled','open'].includes(checked.state));}
+   // The SDK never marks a ride paid. Prefer the webhook's authoritative DB
+   // result; only contact Stripe again when that result has not arrived.
+   try {if(await onChanged()===true)return;const checked=await ridePaymentAction(session.request_id,'reconcile');await onChanged();if(alive.current)setAwaiting(!['paid','canceled','open'].includes(checked.state));}
    catch {if(alive.current)setError('Потвърждаваме плащането. При прекъсната връзка натисни „Провери плащането“.');}
   }catch {if(alive.current){setAwaiting(true);setError('Връзката прекъсна. Провери плащането преди следващ опит.');}}
   finally {lock.current=false;if(alive.current){setBusy(false);onBusy(false);}}
