@@ -1,5 +1,5 @@
 {
-  "release": "2026.10.24-ride-loading.1",
+  "release": "2026.10.25-ui-resilience.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
@@ -343,6 +343,16 @@
   "rideCancellationLoadingValidation": {
     "unitTests": 824,
     "browserTests": "repository CI",
+    "newDependencies": false,
+    "schemaChanges": false,
+    "livePaymentsEnabled": false
+  },
+  "uiResilienceVersion": 1,
+  "uiResilienceVerifiedSourceCommit": "00ce7519fca086af84886a2e35602e569c590380",
+  "uiResilienceValidation": {
+    "unitTests": 827,
+    "localWebKitScenarios": 30,
+    "fullBrowserTests": "repository CI",
     "newDependencies": false,
     "schemaChanges": false,
     "livePaymentsEnabled": false
