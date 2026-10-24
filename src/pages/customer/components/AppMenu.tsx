@@ -1,5 +1,7 @@
+import Icon, { type IconName } from '@/components/feature/Icon';
+import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { useSignOut } from '@/hooks/useSignOut';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +11,7 @@ import { openCookieSettings } from '@/lib/cookieConsent';
 interface MenuItem {
   path: string;
   labelKey: string;
-  icon: string;
+  icon: IconName;
 }
 
 export default function AppMenu() {
@@ -20,33 +22,49 @@ export default function AppMenu() {
   const { logout: handleLogout, pending: loggingOut, error: logoutError } = useSignOut();
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
 
-  // The native modal traps keyboard focus and stays above the map and booking sheet.
-  useEffect(() => {
-    const element = dialog.current;
-    if (open) element?.showModal();
-    return () => element?.close();
-  }, [open]);
-
-  // Lock background scroll while the drawer is open
-  useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
+  const trigger = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<number | null>(null);
+  const stopClosing = () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  useEffect(() => () => { if (closeTimer.current !== null) window.clearTimeout(closeTimer.current); }, []);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const element = dialog.current, button = trigger.current;
+    if (!element) return;
+    const unlockScroll = lockBodyScroll();
+    const viewport = window.visualViewport;
+    const measure = () => {
+      if (viewport && viewport.scale !== 1) return;
+      element.style.setProperty('--menu-height', `${viewport?.height ?? window.innerHeight}px`);
+      element.style.setProperty('--menu-top', `${viewport?.offsetTop ?? 0}px`);
+    };
+    measure(); element.showModal();
+    viewport?.addEventListener('resize', measure); viewport?.addEventListener('scroll', measure);
+    window.addEventListener('resize', measure);
     return () => {
-      document.body.style.overflow = '';
+      element.close(); unlockScroll();
+      viewport?.removeEventListener('resize', measure); viewport?.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+      if (button?.isConnected) button.focus({ preventScroll: true });
     };
   }, [open]);
 
   const closeMenu = () => {
+    if (closeTimer.current !== null) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setOpen(false); setClosing(false); return; }
     setClosing(true);
-    window.setTimeout(() => {
-      setOpen(false);
-      setClosing(false);
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = null; setOpen(false); setClosing(false);
     }, 200);
   };
 
   const go = (path: string) => {
+    stopClosing();
     setOpen(false);
     setClosing(false);
     navigate(path);
@@ -56,16 +74,16 @@ export default function AppMenu() {
   const initials = `${user?.first_name?.charAt(0) || ''}${user?.last_name?.charAt(0) || ''}`;
 
   const mainItems: MenuItem[] = [
-    { path: '/customer/home', labelKey: 'nav_home', icon: 'ri-home-4-line' },
-    { path: '/customer/orders', labelKey: 'nav_orders', icon: 'ri-file-list-3-line' },
-    { path: '/customer/profile', labelKey: 'nav_profile', icon: 'ri-user-3-line' },
-    { path: '/customer/settings', labelKey: 'nav_settings', icon: 'ri-settings-3-line' },
+    { path: '/customer/home', labelKey: 'nav_home', icon: 'home' },
+    { path: '/customer/orders', labelKey: 'nav_orders', icon: 'orders' },
+    { path: '/customer/profile', labelKey: 'nav_profile', icon: 'user' },
+    { path: '/customer/settings', labelKey: 'nav_settings', icon: 'settings' },
   ];
 
   const secondaryItems: MenuItem[] = [
-    { path: '/contact', labelKey: 'menu_help', icon: 'ri-question-line' },
-    { path: '/privacy', labelKey: 'menu_privacy', icon: 'ri-shield-check-line' },
-    { path: '/terms', labelKey: 'menu_terms', icon: 'ri-file-text-line' },
+    { path: '/contact', labelKey: 'menu_help', icon: 'help' },
+    { path: '/privacy', labelKey: 'menu_privacy', icon: 'shield' },
+    { path: '/terms', labelKey: 'menu_terms', icon: 'document' },
   ];
 
   const renderItem = (item: MenuItem) => {
@@ -84,7 +102,7 @@ export default function AppMenu() {
             active ? 'bg-primary-100' : 'bg-background-100'
           }`}
         >
-          <i className={`${item.icon} ${active ? 'text-primary-600' : 'text-foreground-500'} text-lg`} />
+          <Icon name={item.icon} className={`${active ? 'text-primary-600' : 'text-foreground-500'} text-lg`} />
         </span>
         <span
           className={`text-[15px] flex-1 whitespace-nowrap ${
@@ -98,21 +116,23 @@ export default function AppMenu() {
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const point = e.touches.length === 1 ? e.touches[0] : null;
+    touchStart.current = point ? { x: point.clientX, y: point.clientY } : null;
   };
 
   const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current !== null) {
-      const dx = e.changedTouches[0].clientX - touchStartX.current;
-      if (dx > 60) closeMenu();
-      touchStartX.current = null;
-    }
+    const point = e.changedTouches[0], start = touchStart.current;
+    touchStart.current = null;
+    if (!start || !point) return;
+    const dx = point.clientX - start.x, dy = point.clientY - start.y;
+    if (dx > 60 && dx > Math.abs(dy) * 1.5) closeMenu();
   };
 
   const drawer = open ? (
     <dialog ref={dialog} aria-label={t('menu_open')}
       onCancel={event => { event.preventDefault(); closeMenu(); }}
-      className="fixed inset-0 z-[70] m-0 h-[100dvh] max-h-none w-full max-w-none border-0 bg-transparent p-0">
+      style={{ top: 'var(--menu-top, 0px)', height: 'var(--menu-height, 100dvh)', bottom: 'auto' }}
+      className="customer-app-menu fixed inset-0 z-[70] m-0 h-[100dvh] max-h-none w-full max-w-none border-0 bg-transparent p-0">
       <div
         className={`absolute inset-0 bg-black/40 ${
           closing ? 'animate-out fade-out duration-200' : 'animate-in fade-in duration-200'
@@ -122,7 +142,7 @@ export default function AppMenu() {
       <aside
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className={`absolute right-0 top-0 h-[100dvh] w-[86%] max-w-[360px] bg-white flex flex-col ${
+        className={`absolute right-0 top-0 h-full w-[86%] max-w-[360px] bg-white flex flex-col ${
           closing
             ? 'animate-out slide-out-to-right duration-200'
             : 'animate-in slide-in-from-right-6 duration-300'
@@ -130,7 +150,7 @@ export default function AppMenu() {
       >
         {/* Drawer header */}
         <div
-          className="flex items-center justify-between px-5 pt-3 pb-2"
+          className="shrink-0 flex items-center justify-between px-5 pt-3 pb-2"
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
         >
           <span className="text-[16px] font-bold text-foreground-950 font-heading">
@@ -142,7 +162,7 @@ export default function AppMenu() {
             aria-label={t('cancel')}
             className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
           >
-            <i className="ri-close-line text-foreground-500 text-2xl" />
+            <Icon name="close" className="text-foreground-500 text-2xl" />
           </button>
         </div>
 
@@ -150,7 +170,7 @@ export default function AppMenu() {
         <button
           type="button"
           data-route="/customer/profile" onClick={() => go('/customer/profile')}
-          className="mx-5 mb-3 flex items-center gap-3 rounded-2xl bg-background-50 p-3 text-left cursor-pointer"
+          className="shrink-0 mx-5 mb-3 flex items-center gap-3 rounded-2xl bg-background-50 p-3 text-left cursor-pointer"
         >
           <div className="w-11 h-11 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden flex-shrink-0">
             {user?.avatar_url ? (
@@ -168,19 +188,19 @@ export default function AppMenu() {
         </button>
 
         {/* Main items */}
-        <nav className="flex-1 overflow-y-auto px-4 py-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-2">
           {mainItems.map(renderItem)}
           <div className="h-px bg-background-100 my-2" />
           {secondaryItems.map(renderItem)}
           <button type="button" className="w-full px-3 py-3 text-left text-[15px] text-foreground-800 underline cursor-pointer"
-            onClick={() => { setOpen(false); setClosing(false); openCookieSettings(); }}>
+            onClick={() => { stopClosing(); setOpen(false); setClosing(false); openCookieSettings(); }}>
             {t('cookie_settings')}
           </button>
         </nav>
 
         {/* Logout */}
         <div
-          className="px-4 py-3"
+          className="shrink-0 px-4 py-3"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
         >
           <button
@@ -190,7 +210,7 @@ export default function AppMenu() {
             className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
           >
             <span className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-              <i className="ri-logout-box-r-line text-red-500 text-lg" />
+              <Icon name="logout" className="text-red-500 text-lg" />
             </span>
             <span className="text-[15px] font-medium">{t('logout')}</span>
           </button>
@@ -205,13 +225,13 @@ export default function AppMenu() {
       {/* Trigger button */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        ref={trigger} onClick={() => { stopClosing(); setClosing(false); setOpen(true); }}
         aria-label={t('menu_open')}
         aria-haspopup="dialog"
         aria-expanded={open}
         className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-background-100 transition-colors cursor-pointer"
       >
-        <i className="ri-menu-line text-foreground-600 text-xl" />
+        <Icon name="menu" className="text-foreground-600 text-xl" />
       </button>
 
       {typeof document !== 'undefined' && createPortal(drawer, document.body)}

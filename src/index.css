@@ -613,3 +613,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .ride-cancel-confirm { color:#873e2e; background:#faf0eb; }
 .ride-cancel-choices button:disabled { opacity:.6; }
 .ride-cancel-dialog .ride-cancel-error { color:#873e2e; }
+
+.ui-icon { display:inline-block; width:1em; height:1em; flex-shrink:0; vertical-align:middle; }
+
+@media (prefers-reduced-motion: reduce) { .customer-app-menu *, .customer-app-menu *::before { animation:none !important; transition:none !important; } }

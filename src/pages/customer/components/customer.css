@@ -43,16 +43,16 @@
 .booking-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scroll-padding: 8px; }
 .booking-search { flex-shrink: 0; display: flex; align-items: center; gap: 10px; min-height: 48px; padding-left: 14px; padding-right: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
 .booking-search:focus-within { border-color: #769b80; box-shadow: 0 0 0 3px #edf3ea; }
-.booking-search > i { font-size: 20px; color: var(--muted); }
+.booking-search > :is(i, svg) { font-size: 20px; color: var(--muted); }
 .booking-search input { width: 100%; min-width: 0; height: 46px; background: transparent; outline: none; font-size: 16px; color: var(--ink); }
 .booking-search input::placeholder { color: #727d74; }
 .booking-search input::-webkit-search-cancel-button { display: none; }
 .booking-icon-button { flex-shrink: 0; display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: 12px; font-size: 20px; }
 .booking-gps { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 46px; border-radius: 12px; background: #eff5e9; color: #2c5133; font-size: 14px; font-weight: 600; text-align: left; }
-.booking-gps > i:first-child { font-size: 21px; }
-.booking-gps > i:last-child { margin-left: auto; }
+.booking-gps > :is(i, svg):first-child { font-size: 21px; }
+.booking-gps > :is(i, svg):last-child { margin-left: auto; }
 .booking-place { display: flex; align-items: center; width: 100%; min-height: 46px; gap: 11px; text-align: left; padding: 9px 8px; border-radius: 12px; }
-.booking-place > i { flex-shrink: 0; color: var(--muted); font-size: 19px; }
+.booking-place > :is(i, svg) { flex-shrink: 0; color: var(--muted); font-size: 19px; }
 .booking-place > span:not(.booking-spinner) { display: block; flex: 1; min-width: 0; }
 .booking-place strong, .booking-place small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .booking-place strong { font-size: 14px; font-weight: 500; }
@@ -118,7 +118,7 @@
 .booking-cancel-confirm > div { display: flex; gap: 8px; }
 .booking-cancel-confirm button { flex: 1; }
 .booking-map-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 80px 24px 84px; color: #536756; text-align: center; background: #edf1e8; font-size: 14px; }
-.booking-map-state > i { font-size: 36px; }
+.booking-map-state > :is(i, svg) { font-size: 36px; }
 .tracking-map-controls { position: absolute; right: 12px; bottom: 32px; display: grid; background: white; border-radius: 14px; box-shadow: 0 3px 15px #19382b18; }
 .tracking-driver { display: flex; align-items: center; gap: 10px; padding: 0 2px 10px; }
 .tracking-driver img, .tracking-avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }

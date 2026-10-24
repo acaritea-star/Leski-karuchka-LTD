@@ -182,28 +182,6 @@ export default function CustomerOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, orders, ordersQuery.isLoading, ratingsQuery.isLoading]);
 
-  if (ordersQuery.isError) {
-    return (
-      <div className="min-h-screen bg-background-50 flex items-center justify-center px-4">
-        <EmergencyDock />
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-            <i className="ri-error-warning-line text-2xl text-red-500" />
-          </div>
-          <p className="text-foreground-700 font-medium mb-1">{t('error_general')}</p>
-          <p className="text-foreground-400 text-sm mb-4">
-            {ordersQuery.error instanceof Error ? ordersQuery.error.message : ''}
-          </p>
-          <button
-            onClick={() => ordersQuery.refetch()}
-            className="px-5 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer"
-          >
-            {t('retry')}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background-50 pb-[calc(88px+env(safe-area-inset-bottom))]">
@@ -253,8 +231,13 @@ export default function CustomerOrders() {
 
       {/* Orders list */}
       <div className="px-4 pb-8">
+        {ordersQuery.isError && <div role="alert" className="my-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-foreground-700">
+          <p>{t(ordersQuery.data ? 'orders_refresh_error' : 'orders_load_error')}</p>
+          <button type="button" className="mt-2 min-h-11 font-semibold underline disabled:opacity-50" disabled={ordersQuery.isFetching} onClick={() => void ordersQuery.refetch()}>{t('retry')}</button>
+        </div>}
+
         {ratingsQuery.isError && <p role="alert" className="py-3 text-sm text-red-600">{t('ratings_load_error')} <button type="button" className="underline min-h-11" disabled={ratingsQuery.isFetching} onClick={() => void ratingsQuery.refetch()}>{t('retry')}</button></p>}
-        {ordersQuery.isLoading ? <ContentSkeleton label="Зареждаме твоите поръчки…" /> : displayedOrders.length === 0 ? (
+        {ordersQuery.isLoading ? <ContentSkeleton label="Зареждаме твоите поръчки…" /> : ordersQuery.isError && !ordersQuery.data ? null : displayedOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-20 px-6">
             <div className="relative mb-5">
               <div className="w-20 h-20 rounded-3xl bg-primary-50 flex items-center justify-center">

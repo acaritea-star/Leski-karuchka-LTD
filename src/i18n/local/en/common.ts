@@ -72,6 +72,8 @@ export default {
   notifications_read_error: 'Marking as read could not be confirmed. Please try again.',
   rating_score: 'Rating {{n}} out of 5',
   ratings_load_error: 'Ratings could not be loaded. Refresh them before rating a trip.',
+  orders_load_error: 'Orders could not be loaded. Check your connection and try again.',
+  orders_refresh_error: 'Orders could not be refreshed. Showing the last loaded information.',
   settings_language_sync_error: 'The language changed on this device, but saving it to your profile could not be confirmed.',
   popular_locations: 'Popular Locations',
   search_placeholder: 'Search address...',

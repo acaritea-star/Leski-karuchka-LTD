@@ -1,3 +1,4 @@
+import Icon from '@/components/feature/Icon';
 import { getGpsPosition, subscribeGpsState } from '@/lib/sharedGps';
 import { isInBulgaria } from '@/lib/serviceArea';
 /* global google */
@@ -149,7 +150,7 @@ function BookingMap({ pickup, destination, route, initialCenter, previewOwner, v
     {state === 'ready' && map.current && previewOwner && <NearbyCars map={map.current} origin={nearbyOrigin} owner={previewOwner} vehicleType={vehicleType} />}
     {state !== 'ready' && <div className="booking-map-state" role="status">
       {state === 'loading' ? <><span className="booking-spinner" /><p>{t('booking_map_loading')}</p></>
-        : <><i className="ri-map-2-line" aria-hidden="true" /><p>{t('booking_map_error')}</p>
+        : <><Icon name="map" /><p>{t('booking_map_error')}</p>
           <button type="button" className="booking-secondary" onClick={() => setRetry(n => n + 1)}>{t('booking_retry')}</button></>}
     </div>}
   </>;

@@ -1,8 +1,7 @@
+import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-let locks = 0;
-let previousOverflow = '';
 
 export default function Modal({ label, labelledBy, onClose, busy = false, className = '', children, allowExternalOverlays = false, open = true }: {
   label?: string; labelledBy?: string; onClose: () => void; busy?: boolean; className?: string; children: ReactNode; allowExternalOverlays?: boolean; open?: boolean;
@@ -14,7 +13,7 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
     if (!element || !open) return;
     active.current = true;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (locks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
+    const unlockScroll = lockBodyScroll();
     if (!allowExternalOverlays) {
       const dialog = element as HTMLDialogElement;
       if (typeof dialog.showModal === 'function') dialog.showModal();
@@ -40,7 +39,7 @@ export default function Modal({ label, labelledBy, onClose, busy = false, classN
       if (previousFocus && previousFocus !== document.body && previousFocus.isConnected && !previousFocus.matches(':disabled') && previousFocus.getClientRects().length) {
         previousFocus.focus({ preventScroll: true });
       }
-      if (--locks === 0) document.body.style.overflow = previousOverflow;
+      unlockScroll();
     };
   }, [allowExternalOverlays, open]);
   useLayoutEffect(() => {

@@ -1,3 +1,4 @@
+import Icon from '@/components/feature/Icon';
 import CancelRideButton from './CancelRideButton';
 /* global google */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -315,15 +316,15 @@ export default function DriverTracking({
       </div>}
       {mapReady && roadNetwork && <RoadAttribution />}
       {mapReady && <div className="tracking-map-controls">
-        <button type="button" className="booking-icon-button" onClick={() => changeZoom(1)} aria-label={t('zoom_in')}><i className="ri-add-line" /></button>
-        <button type="button" className="booking-icon-button" onClick={() => changeZoom(-1)} aria-label={t('zoom_out')}><i className="ri-subtract-line" /></button>
+        <button type="button" className="booking-icon-button" onClick={() => changeZoom(1)} aria-label={t('zoom_in')}><Icon name="plus" /></button>
+        <button type="button" className="booking-icon-button" onClick={() => changeZoom(-1)} aria-label={t('zoom_out')}><Icon name="minus" /></button>
       </div>}
     </>}
     header={<>
-      <button type="button" className="booking-icon-button" onClick={() => navigate('/customer/orders')} aria-label={t('nav_orders')}><i className="ri-arrow-left-line" /></button>
+      <button type="button" className="booking-icon-button" onClick={() => navigate('/customer/orders')} aria-label={t('nav_orders')}><Icon name="back" /></button>
       <div className="customer-brand"><span>{t('live_tracking')}<small>{t('app_name')}</small></span></div>
       <div className="customer-header-actions">
-        <button type="button" className="booking-icon-button" onClick={recenter} aria-label={t('recenter_map')}><i className="ri-focus-3-line" /></button><AppMenu />
+        <button type="button" className="booking-icon-button" onClick={recenter} aria-label={t('recenter_map')}><Icon name="locate" /></button><AppMenu />
       </div>
     </>}
     notice={positionStale && location ? <><i className="ri-time-line" />{t('position_not_updating')}</> : undefined}
@@ -339,7 +340,7 @@ export default function DriverTracking({
         </div>
       </div>
       <div className="tracking-trip-tools">
-        {!request.trip_ended_at && driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}><i className="ri-phone-line" aria-hidden="true" />{t('call_driver')}</a>}
+        {!request.trip_ended_at && driverInfo?.phone && <a className="booking-secondary" href={`tel:${driverInfo.phone}`}><Icon name="phone" />{t('call_driver')}</a>}
         {onCancel && <CancelRideButton key={request.id} request={request} onCancelled={onCancel} />}
       </div>
       <div className="booking-scroll tracking-trip-content" data-ended={!!request.trip_ended_at}>

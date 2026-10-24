@@ -1,3 +1,4 @@
+import Icon from '@/components/feature/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isInBulgaria, SERVICE_AREA_ERROR } from '@/lib/serviceArea';
@@ -90,21 +91,21 @@ export default function LocationPicker({ searchQuery: controlledQuery, onSearchC
 
   return <div className="booking-picker booking-enter">
     <div className="booking-search">
-      <i className="ri-search-line" aria-hidden="true" />
+      <Icon name="search" />
       <input ref={input} type="search" value={searchQuery} onChange={e => changeQuery(e.target.value)}
         aria-label={t(showCurrentLocation ? 'pickup_search_title' : 'dest_search_title')}
         placeholder={t('booking_search_hint')} autoComplete="off" spellCheck={false} enterKeyHint="search"
         onKeyDown={e => { if (e.key === 'Escape') { changeQuery(''); input.current?.blur(); } }} />
       {searching && loadingVisible && <span className="booking-spinner" role="status" aria-label={t('places_searching')} />}
       {searchQuery && <button type="button" className="booking-icon-button" aria-label={t('booking_clear')}
-        onClick={() => { changeQuery(''); input.current?.focus(); }}><i className="ri-close-line" aria-hidden="true" /></button>}
+        onClick={() => { changeQuery(''); input.current?.focus(); }}><Icon name="close" /></button>}
     </div>
     <div className="booking-scroll" aria-busy={searching || !!resolving || locating}>
       {showCurrentLocation && !query && <button type="button" className="booking-gps" disabled={locating || !!resolving}
         onClick={onUseCurrent}>
-        {locating ? <span className="booking-spinner" /> : <i className="ri-focus-3-line" aria-hidden="true" />}
+        {locating ? <span className="booking-spinner" /> : <Icon name="locate" />}
         <span>{locating ? t('detecting_location') : t('booking_use_gps')}</span>
-        <i className="ri-arrow-right-up-line" aria-hidden="true" />
+        <Icon name="arrowUpRight" />
       </button>}
       {locationError && <p className="booking-error" role="alert">{locationError}</p>}
       {resolvingPickup && <p className="booking-hint" role="status">{t('booking_resolving_pickup')}</p>}
@@ -120,17 +121,17 @@ export default function LocationPicker({ searchQuery: controlledQuery, onSearchC
         <p className="booking-hint" role="status">{t('no_address_found')}</p>}
       {results.map(place => <button type="button" key={place.place_id} className="booking-place"
         disabled={!!resolving || searching || resultQuery !== query} onClick={() => void resolve(place)}>
-        {resolving === place.place_id ? <span className="booking-spinner" /> : <i className="ri-map-pin-2-line" aria-hidden="true" />}
+        {resolving === place.place_id ? <span className="booking-spinner" /> : <Icon name="pin" />}
         <span><strong>{place.main_text || place.description}</strong>{place.secondary_text && <small>{place.secondary_text}</small>}</span>
       </button>)}
       {!query && recent.length > 0 && <>
         <p className="booking-recent-label">{t('recent_locations')}</p>
         {recent.slice(0, 3).map(place => <button type="button" key={place.address} className="booking-place"
           disabled={!!resolving} onClick={() => choose(place)}>
-          <i className="ri-history-line" aria-hidden="true" />
+          <Icon name="history" />
           <span><strong>{place.name || place.address}</strong>
             {place.name && place.name !== place.address && <small>{place.address}</small>}</span>
-          <i className="ri-arrow-right-up-line" aria-hidden="true" />
+          <Icon name="arrowUpRight" />
         </button>)}
       </>}
       {!query && recent.length === 0 && <p className="booking-hint">{t('booking_address_hint')}</p>}

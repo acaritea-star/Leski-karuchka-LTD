@@ -1,3 +1,4 @@
+import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { useSignOut } from '@/hooks/useSignOut';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -44,8 +45,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
     if (!sidebarOpen) return;
     const trigger = menuButton.current;
     const drawer = document.getElementById('company-navigation');
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlockScroll = lockBodyScroll();
     drawer?.querySelector<HTMLButtonElement>('button')?.focus();
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setSidebarOpen(false);
@@ -58,7 +58,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
     };
     const resize = () => { if (window.innerWidth >= 1024) setSidebarOpen(false); };
     window.addEventListener('keydown', close); window.addEventListener('resize', resize);
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', close); window.removeEventListener('resize', resize); trigger?.focus(); };
+    return () => { unlockScroll(); window.removeEventListener('keydown', close); window.removeEventListener('resize', resize); trigger?.focus(); };
   }, [sidebarOpen, setSidebarOpen]);
 
   return (

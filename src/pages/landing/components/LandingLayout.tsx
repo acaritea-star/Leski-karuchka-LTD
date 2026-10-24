@@ -1,3 +1,4 @@
+import Icon from '@/components/feature/Icon';
 import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -110,7 +111,7 @@ export default function LandingLayout() {
             aria-expanded={menuOpen}
             className="lg:hidden w-10 h-10 rounded-lg flex items-center justify-center text-foreground-950 hover:bg-background-100 transition-colors cursor-pointer"
           >
-            <i className={`${menuOpen ? 'ri-close-line' : 'ri-menu-line'} text-xl`} aria-hidden="true" />
+            <Icon name={menuOpen ? 'close' : 'menu'} className="text-xl" />
           </button>
         </div>
 
