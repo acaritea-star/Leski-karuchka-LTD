@@ -15,7 +15,7 @@ These are observed connected-service records. Browser tests below simulate the t
 ## Changes
 
 - Reuse the webhook-confirmed customer payment state before requesting Stripe reconciliation.
-- A scoped server reconciliation of an already settled order returns the database receipt without a Stripe GET or another settlement write.
+- Automatic customer confirmation uses the database receipt without another Stripe request when settlement has already arrived. Explicit reconciliation still checks Stripe, including already-paid orders, so a missed refund webhook can be recovered.
 - Retrieve the Session with `payment_intent.latest_charge` expanded: one Stripe read instead of sequential Session and PaymentIntent reads. Unexpanded responses retain the existing fallback and all binding checks.
 - Repeated/equivalent settlement snapshots retain event audit records but do not rewrite unchanged ride/order rows or generate extra row-change notifications. Refund changes still update the ledger and ride normally.
 - Both driver panels reuse the exact terminal Realtime snapshot. A missed event uses one bounded receipt read; no idle payment polling is introduced. Notices disappear on a new ride or identity change. Late old events cannot close the next ride's payment dialog, and slow reads cannot overwrite a newer refund.
@@ -29,12 +29,12 @@ A later Stripe API check returned no outstanding deliveries for the relevant suc
 
 ## Validation
 
-- Unit regressions: exact ride/owner/driver scope, missed events, late responses, refund races, expanded response binding, settled response authorization, and no redundant Stripe reconciliation.
+- Unit regressions: exact ride/owner/driver scope, missed events, late responses, refund races, expanded response binding, reconciliation authorization and missed-refund recovery, and no redundant Stripe reconciliation.
 - Browser regressions: Chromium and WebKit, both driver panels, card/wallet, bank authentication overlay, timeout recovery, PWA resume, lost Realtime fallback, next-ride isolation and request counts.
 - SQL regressions: repeated event, distinct equivalent event and old open snapshot leave settled rows/timestamps unchanged while retaining all event audit entries; existing test isolation, refunds and concurrency suite must pass.
-- Validation completed: 820 unit tests (including the late-refund regression), 40 relevant browser scenarios, production build, lint and types. GitHub passed the complete database/concurrency suite and the type check of every Edge function. The real expanded Stripe response from an existing Sandbox payment also passed the updated settlement validator in a read-only local check.
-- Deployed backend: ride-checkout version 8, stripe-webhook version 13; migration `20261024071656_payment_settlement_noop_updates`.
-- Full repository browser CI is tracked on the source commit before release.
+- Validation completed: 817 unit tests (including the late-refund regression), 40 relevant browser scenarios, production build, lint and types. GitHub passed the complete database/concurrency suite and the type check of every Edge function. The real expanded Stripe response from an existing Sandbox payment also passed the updated settlement validator in a read-only local check.
+- Deployed backend: ride-checkout version 9, stripe-webhook version 13; migration `20261024071656_payment_settlement_noop_updates`.
+- The full Check and Database regression workflows passed on source commit `83c9551795ca93374d0ebcb136ea40f5fe133951`. Final manual-refund recovery is additionally covered by the focused checkout regression.
 
 ## Before live activation
 
