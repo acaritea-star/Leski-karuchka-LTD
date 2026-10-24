@@ -113,13 +113,14 @@
   "description": "Цифров посредник между клиенти и доставчици на превоз в Левски. Приложението е в тестов период. Превозът се извършва от съответния превозвач."
 }
     </script>
-    <script type="module" crossorigin src="/assets/index-C3tiqtpl.js"></script>
+    <script type="module" crossorigin src="/assets/index-DY4zy5AP.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-B0Z9INg1.js">
     <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-DpJIb57s.js">
     <link rel="modulepreload" crossorigin href="/assets/useTranslation-BQyAKbG2.js">
     <link rel="modulepreload" crossorigin href="/assets/react-dom-gdz8HrnR.js">
     <link rel="modulepreload" crossorigin href="/assets/preload-helper-BZ1Pz5am.js">
     <link rel="modulepreload" crossorigin href="/assets/chunk-BV7QT456-BCIV4_xk.js">
+    <link rel="modulepreload" crossorigin href="/assets/LoadingState-CuQUyGdE.js">
     <link rel="modulepreload" crossorigin href="/assets/requestTimeout-C1awD_J6.js">
     <link rel="modulepreload" crossorigin href="/assets/browser-C2g0zDt6.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-pYiJerw4.js">
@@ -144,7 +145,7 @@
     <link rel="modulepreload" crossorigin href="/assets/requestSnapshot-D3ej317h.js">
     <link rel="modulepreload" crossorigin href="/assets/queryKeys-DWv0NJeN.js">
     <link rel="modulepreload" crossorigin href="/assets/driverRecord-CHAfZOZp.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BMkt-mpP.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-Dl6-DrwL.css">
   </head>
   <body>
     <!--
@@ -214,10 +215,27 @@
         </p>
       </footer>
     </div>
+    <template id="app-boot-template">
+      <div style="min-height:100svh;background:#f7f8f3;color:#19382b;font-family:system-ui,sans-serif" role="status" aria-label="Подготвяме приложението…">
+        <div style="display:flex;align-items:center;gap:12px;min-height:68px;padding:12px 20px;box-sizing:border-box;background:#fff;border-bottom:1px solid #e4e9e1">
+          <span style="display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:#e8efe3;font-size:12px;font-weight:700" aria-hidden="true">ЛК</span>
+          <strong style="font-size:16px">Лески Каручка</strong>
+        </div>
+        <div style="max-width:640px;margin:auto;padding:28px 20px">
+          <p style="margin:0 0 24px;color:#69756d;font-size:13px">Подготвяме приложението…</p>
+          <div aria-hidden="true" style="padding:24px;border:1px solid #e8ebe4;border-radius:20px;background:#fff">
+            <div style="width:45%;height:13px;background:#e7ede3;border-radius:8px;margin-bottom:24px"></div>
+            <div style="height:10px;background:#edf0e9;border-radius:8px;margin-bottom:16px"></div>
+            <div style="width:64%;height:10px;background:#edf0e9;border-radius:8px"></div>
+          </div>
+        </div>
+      </div>
+    </template>
     <script>
       (function() {
         var root = document.getElementById('root');
-        if (root) root.innerHTML = '';
+        var boot = document.getElementById('app-boot-template');
+        if (root && boot) root.replaceChildren(boot.content.cloneNode(true));
       })();
     </script>
   </body>

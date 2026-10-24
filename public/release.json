@@ -1,5 +1,5 @@
 {
-  "release": "2026.10.24-payment-settlement.1",
+  "release": "2026.10.24-ride-loading.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
@@ -337,5 +337,14 @@
     "edgeTypeCheck": "passed",
     "stripeMode": "test",
     "liveWebhookConfigured": false
+  },
+  "rideCancellationLoadingVersion": 1,
+  "rideCancellationLoadingVerifiedSourceCommit": "8308d6eb28e0ea7bbdf0a428c14b304924ff13d5",
+  "rideCancellationLoadingValidation": {
+    "unitTests": 824,
+    "browserTests": "repository CI",
+    "newDependencies": false,
+    "schemaChanges": false,
+    "livePaymentsEnabled": false
   }
 }
