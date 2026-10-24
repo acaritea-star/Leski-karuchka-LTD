@@ -1,12 +1,12 @@
 {
-  "release": "2026.10.23-pwa-payment-recovery.1",
+  "release": "2026.10.24-payment-settlement.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
   "legalReleaseApproved": false,
   "databaseMigrationVersion": "20261020151835",
   "googleRoutesVersion": 16,
-  "verifiedSourceCommit": "640adaf51c73525fa3f681fa0c9a96db66753af4",
+  "verifiedSourceCommit": "8310eef792ec599b44647ad1e372d2ab3d9bec3b",
   "databaseMigrations": [
     "20261009074806_p1_ride_evidence_and_operations",
     "20261009075942_p1_evidence_access_and_indexes",
@@ -38,7 +38,8 @@
     "20261021174851_post_trip_stripe_payments",
     "20261021191415_allowlisted_test_ride_payments",
     "20261022062508_inline_ride_checkout",
-    "20261023132252_warm_ride_checkout"
+    "20261023132252_warm_ride_checkout",
+    "20261024071656_payment_settlement_noop_updates"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -325,5 +326,16 @@
     "livePaymentsEnabled": false,
     "newDependencies": false
   },
-  "trackingBoundsVersion": 2
+  "trackingBoundsVersion": 2,
+  "paymentSettlementVersion": 1,
+  "paymentSettlementVerifiedSourceCommit": "8310eef792ec599b44647ad1e372d2ab3d9bec3b",
+  "paymentSettlementMigrationVersion": "20261024071656",
+  "paymentSettlementValidation": {
+    "unitTests": 817,
+    "browserScenarios": 40,
+    "databaseRegression": "passed",
+    "edgeTypeCheck": "passed",
+    "stripeMode": "test",
+    "liveWebhookConfigured": false
+  }
 }
