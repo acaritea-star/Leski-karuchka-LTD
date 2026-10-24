@@ -25,15 +25,19 @@ These are observed connected-service records. Browser tests below simulate the t
 
 The preceding 24-hour Edge log window contained 28 successful checkout calls (mean 1289ms, p95 2845ms), 39 successful webhook calls (mean 1318ms, p95 2043ms), and one webhook 503. These are server timings, not card-entry or bank-authentication latency. Removing requests is deterministic; a new physical-device end-to-end latency measurement is still required before making a live performance promise.
 
-The existing failed webhook requires identifying its event/retry outcome; a successful aggregate is not proof that every historical delivery recovered.
+A later Stripe API check returned no outstanding deliveries for the relevant successful-payment, asynchronous Checkout and refund events. The aggregate log alone cannot identify which historical event returned 503.
 
 ## Validation
 
 - Unit regressions: exact ride/owner/driver scope, missed events, late responses, refund races, expanded response binding, settled response authorization, and no redundant Stripe reconciliation.
 - Browser regressions: Chromium and WebKit, both driver panels, card/wallet, bank authentication overlay, timeout recovery, PWA resume, lost Realtime fallback, next-ride isolation and request counts.
 - SQL regressions: repeated event, distinct equivalent event and old open snapshot leave settled rows/timestamps unchanged while retaining all event audit entries; existing test isolation, refunds and concurrency suite must pass.
-- Build, lint, types and Edge type checking are required before release.
+- Validation completed: 820 unit tests (including the late-refund regression), 40 relevant browser scenarios, production build, lint and types. GitHub passed the complete database/concurrency suite and the type check of every Edge function. The real expanded Stripe response from an existing Sandbox payment also passed the updated settlement validator in a read-only local check.
+- Deployed backend: ride-checkout version 8, stripe-webhook version 13; migration `20261024071656_payment_settlement_noop_updates`.
+- Full repository browser CI is tracked on the source commit before release.
 
 ## Before live activation
+
+The connected live account currently has no webhook endpoint; this is a confirmed launch blocker. The database merchant remains test-only.
 
 Verify the live merchant's charge readiness, live key/signing-secret pair, enabled event destination and domain/wallet registration. Run an approved small live payment and refund with the customer and driver on separate physical phones, including bank authentication and reconnect. Verify exact company reporting and no duplicate cash collection. Activate the live merchant explicitly only after these checks. Existing test receipts must remain test receipts.
