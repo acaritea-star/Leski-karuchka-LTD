@@ -1,5 +1,5 @@
 {
-  "release": "2026.10.25-ui-resilience.1",
+  "release": "2026.10.25-compact-booking.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
@@ -353,6 +353,15 @@
     "unitTests": 827,
     "localWebKitScenarios": 30,
     "fullBrowserTests": "repository CI",
+    "newDependencies": false,
+    "schemaChanges": false,
+    "livePaymentsEnabled": false
+  },
+  "compactBookingUiVersion": 1,
+  "compactBookingUiVerifiedSourceCommit": "62b920b534e35337959dfc83fdb080c6fe5ee7b2",
+  "compactBookingUiValidation": {
+    "unitTests": 827,
+    "browserTests": "repository CI",
     "newDependencies": false,
     "schemaChanges": false,
     "livePaymentsEnabled": false
