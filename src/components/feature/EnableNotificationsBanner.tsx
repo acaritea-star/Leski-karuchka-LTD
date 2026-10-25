@@ -48,7 +48,7 @@ export default function EnableNotificationsBanner() {
   };
 
   return (
-    <div className="mx-4 my-1 flex items-center gap-2.5 rounded-xl bg-accent-50 border border-accent-100 px-3 py-2">
+    <div aria-label="Настройка на известията" className="mx-4 my-1 grid grid-cols-[32px_minmax(0,1fr)_44px] items-start gap-x-2.5 gap-y-2 rounded-xl bg-accent-50 border border-accent-100 px-3 py-2">
       <span className="w-8 h-8 rounded-lg bg-accent-100 flex items-center justify-center flex-shrink-0">
         <i className="ri-notification-3-line text-accent-600 text-base" />
       </span>
@@ -59,7 +59,7 @@ export default function EnableNotificationsBanner() {
         <button
           onClick={handleEnable}
           disabled={enabling}
-          className="px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-[14px] font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-60"
+          className="col-start-2 row-start-2 justify-self-start min-h-11 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-[14px] font-semibold hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-60"
         >
           {enabling ? '…' : needsSettings ? t('nav_settings') : error ? t('retry') : t('enable_notifications_btn')}
         </button>
@@ -67,7 +67,7 @@ export default function EnableNotificationsBanner() {
       <button
         onClick={persistDismiss}
         aria-label={t('cancel')}
-        className="w-11 h-11 flex items-center justify-center rounded-full text-foreground-400 hover:text-foreground-600 hover:bg-background-200 transition-colors cursor-pointer flex-shrink-0"
+        className="col-start-3 row-start-1 w-11 h-11 flex items-center justify-center rounded-full text-foreground-400 hover:text-foreground-600 hover:bg-background-200 transition-colors cursor-pointer flex-shrink-0"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
       </button>

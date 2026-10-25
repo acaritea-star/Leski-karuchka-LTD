@@ -26,6 +26,7 @@ This release keeps online payments in TEST mode. It does not enable real charges
 - A server-confirmed online receipt shows +amount in Bulgarian EUR formatting. Its entry animation is suppressed when revisiting the same receipt in the same tab. The total always comes from the server aggregate; the UI never increments it locally.
 - Sandbox receipts are visibly marked and never added to the real total. The wallet is collected ride turnover, not personal wages, cash in hand or money available for withdrawal.
 - Home statistics and wallet share one cached aggregate. No new polling loop, realtime channel, SDK or dependency. Duplicate/stale terminal events do not refetch it; genuine settlement/refund changes do.
+- Narrow-phone visual QA also fixed a pre-existing notification-permission banner that squeezed its text into a vertical column. This changes layout only.
 - Additive database change preserves SECURITY INVOKER, existing driver/company authorization, MFA/RLS and existing API fields. Existing driver/date, request and reversal indexes serve the query.
 
 ## Connected-service evidence

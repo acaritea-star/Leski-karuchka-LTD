@@ -16,4 +16,4 @@
 .driver-wallet-breakdown > div { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e5e7eb; }
 .driver-wallet-breakdown dd { white-space:nowrap; font-variant-numeric:tabular-nums; }
 @media (prefers-reduced-motion:no-preference) { .driver-wallet-receipt[data-new=true] .driver-wallet-credit { animation:wallet-credit-in 500ms ease-out both; } }
-@keyframes wallet-credit-in { from { opacity:0; transform:translateY(5px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes wallet-credit-in { from { transform:translateY(5px) scale(.96); } to { transform:translateY(0) scale(1); } }

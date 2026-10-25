@@ -57,6 +57,7 @@ for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps the wa
  events.send(row);events.send(row);await expect(wallet).toContainText('23,46');expect(reads).toBe(2);
  const credit=page.locator('.driver-wallet-receipt');await expect(credit).toBeInViewport();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ if(path==='/driver/home'){const banner=page.getByLabel('Настройка на известията');await expect(banner).toBeVisible();expect((await banner.locator('p').boundingBox())!.height).toBeLessThan(220);}
  await page.screenshot({path:info.outputPath(path.includes('home')?'driver-home-wallet.png':'driver-requests-wallet.png')});
  await wallet.click();const dialog=page.getByRole('dialog',{name:'Портфейл — днешни курсове'});await expect(dialog.getByText('Онлайн към фирмата')).toBeVisible();
  await dialog.getByRole('button',{name:'Затвори портфейла'}).click();await expect(wallet).toBeFocused();expect(state.errors).toEqual([]);
