@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { cancelTaxiRequest, createTaxiRequest } from '@/lib/rideOperations';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { createRealtimePoll } from '@/lib/realtimePoll';
@@ -29,7 +30,6 @@ import BookingSteps from '@/pages/customer/components/BookingSteps';
 import { recentLocations, stepAfterSelection, type BookingStep } from '@/pages/customer/components/bookingFlow';
 import type { LocationPreset } from '@/lib/geo';
 import { computeRoute, reverseGeocode, type RouteResult } from '@/lib/googleMaps';
-import { LOGO_URL } from '@/lib/logo';
 import { CONSENT_CHANGED_EVENT, CONSENT_STORAGE_KEY, RECENT_LOCATIONS_KEY, readConsent, clearRecentLocations } from '@/lib/cookieConsent';
 
 // Types
@@ -587,7 +587,7 @@ export default function CustomerHome() {
     map={<BookingMap pickup={mapPickup} destination={mapDestination} route={visualRoute?.endpoints === endpoints ? visualRoute.route : null} initialCenter={recent[0]} previewOwner={!activeRequest && !recovering && requestStatus !== 'creating' ? user?.id : undefined} vehicleType={undefined} />}
     header={<>
       <div className="customer-brand">
-        <img src={LOGO_URL} alt="" />
+        <BrandLogo alt="" />
         <span>{t('app_name')}<small>{t('booking_tagline')}</small></span>
       </div>
       <div className="customer-header-actions"><NotificationBell /><AppMenu /></div>

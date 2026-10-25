@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import Icon from '@/components/feature/Icon';
 import type { BookingStep } from './bookingFlow';
 
 export default function BookingSteps({ step, canConfirm, disabled, onChange }: {
@@ -14,7 +15,7 @@ export default function BookingSteps({ step, canConfirm, disabled, onChange }: {
       {steps.map((item, i) => <button type="button" key={item} aria-label={`${i + 1}. ${titles[i]}`}
         aria-current={step === item ? 'step' : undefined}
         disabled={disabled || (item === 'offers' && !canConfirm)} onClick={() => onChange(item)}>
-        <span>{i < index ? <i className="ri-check-line" aria-hidden="true" /> : i + 1}</span>
+        <span>{i < index ? <Icon name="check" /> : i + 1}</span>
       </button>)}
     </nav>
   </div>;

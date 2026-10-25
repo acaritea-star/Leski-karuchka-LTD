@@ -9,7 +9,7 @@ export default function CustomerLayout({ map, header, notice, mapControls, child
   map: ReactNode; header: ReactNode; notice?: ReactNode; mapControls?: ReactNode; children: ReactNode; expanded?: boolean; offers?: boolean; offerView?: CarrierPanelView;
 }) {
   const viewportRef = useCustomerViewport();
-  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers} data-offer-view={offerView}>
+  return <div ref={viewportRef} className="customer-experience" data-expanded={expanded} data-offers={offers} data-offer-view={offerView} data-notice={!!notice}>
     <div className="customer-map">{map}<div className="customer-safety"><EmergencyHelp /></div></div>
     <header className="customer-header">{header}</header>
     {notice && <div className="customer-notice" role="status">{notice}</div>}

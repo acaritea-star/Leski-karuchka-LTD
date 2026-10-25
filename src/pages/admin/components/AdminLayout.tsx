@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { useSignOut } from '@/hooks/useSignOut';
 import { useEffect, useRef, useState } from 'react';
@@ -6,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import NotificationBell from '@/components/feature/NotificationBell';
 import { useAdminCompany } from '@/pages/admin/components/AdminCompanyContext';
-import { LOGO_URL } from '@/lib/logo';
 
 interface AdminLayoutProps {
   title: string;
@@ -73,8 +73,7 @@ function AdminLayoutInner({ title, children, sidebarOpen, setSidebarOpen }: Admi
       >
         <div className="p-5 border-b border-background-100 shrink-0">
           <div className="flex items-center gap-2.5 mb-2">
-            <img
-              src={LOGO_URL}
+            <BrandLogo
               alt="Лески Каручка"
               className="h-8 w-16 object-contain shrink-0 rounded"
             />

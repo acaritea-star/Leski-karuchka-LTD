@@ -1,9 +1,9 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { beginPartnerLogin, consumeAuthReturn, invitationId, partnerEntryPath } from '@/lib/authReturn';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
-import { LOGO_URL } from '@/lib/logo';
 import { socialAuthErrorKey, type SocialProvider } from '@/lib/socialAuth';
 import { legalOperator } from '@/config/legal';
 import { beginLegalIntent } from '@/lib/legalAcceptance';
@@ -53,7 +53,7 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
   return <div className="brand-scope min-h-[100dvh] flex flex-col">
     <header className="w-full px-4 md:px-6 h-16 flex items-center justify-between border-b border-background-200/60">
       <Link to="/" className="flex items-center gap-2" aria-label={t('auth_home')}>
-        <img src={LOGO_URL} alt={t('app_name')} className="h-8 w-auto rounded-lg" />
+        <BrandLogo alt={t('app_name')} className="h-8 w-auto rounded-lg" />
       </Link>
       <a href={'tel:' + legalOperator.phone} aria-label={t('auth_support_phone')}
         className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors whitespace-nowrap">
@@ -64,7 +64,7 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
     <main className="flex-1 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src={LOGO_URL} alt="" className="h-14 w-auto mx-auto mb-3 rounded-lg" />
+          <BrandLogo alt="" className="h-14 w-auto mx-auto mb-3 rounded-lg" />
           <h1 className="text-xl font-semibold text-foreground-950 font-heading tracking-tight">
             {partnerLogin ? companyLogin ? 'Вход за фирми' : 'Вход за шофьори' : t('app_name')}
           </h1>

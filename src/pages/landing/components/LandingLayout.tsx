@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import Icon from '@/components/feature/Icon';
 import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { Suspense, useEffect, useState } from 'react';
@@ -5,7 +6,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import LandingFooter from './LandingFooter';
-import { LOGO_URL } from '@/lib/logo';
 import { roleHomePath } from '@/lib/roleHome';
 
 export default function LandingLayout() {
@@ -55,7 +55,7 @@ export default function LandingLayout() {
         <div className="w-full px-4 md:px-6 lg:px-10 h-16 md:h-20 flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center" aria-label="Лески Каручка — начало">
-            <img src={LOGO_URL} alt="Лески Каручка" className="h-9 md:h-11 w-auto rounded-lg" />
+            <BrandLogo alt="Лески Каручка" className="h-9 md:h-11 w-auto rounded-lg" />
           </Link>
 
           {/* Desktop nav */}

@@ -1,6 +1,6 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LOGO_URL } from '@/lib/logo';
 import { legalOperator, LIABILITY_NOTICE } from '@/config/legal';
 import { openCookieSettings } from '@/lib/cookieConsent';
 
@@ -25,7 +25,7 @@ export default function LandingFooter() {
           {/* Brand */}
           <div>
             <Link to="/" className="inline-flex items-center mb-5">
-              <img src={LOGO_URL} alt="Лески Каручка" className="h-9 w-auto rounded-lg" />
+              <BrandLogo alt="Лески Каручка" className="h-9 w-auto rounded-lg" />
             </Link>
             <p className="text-sm text-foreground-500 leading-relaxed mb-6">
               {t('landing.footer_tagline')}

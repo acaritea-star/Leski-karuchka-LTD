@@ -1,3 +1,4 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import PageLoading from '@/components/feature/LoadingState';
 import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
@@ -28,7 +29,6 @@ import EnableNotificationsBanner from '@/components/feature/EnableNotificationsB
 import NotificationBell from '@/components/feature/NotificationBell';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useDriverDeclines } from '@/hooks/useDriverDeclines';
-import { LOGO_URL } from '@/lib/logo';
 import { loadGoogleMaps } from '@/lib/googleMapsLoader';
 import { BULGARIA_CENTER } from '@/lib/geo';
 
@@ -304,7 +304,7 @@ export default function DriverHome() {
         {/* Header — refined */}
         <header className="px-4 py-3 flex items-center justify-between bg-white border-b border-background-200 sticky top-0 z-30">
           <div className="flex items-center gap-2.5">
-            <img src={LOGO_URL} alt={t('app_name')} className="h-7 w-14 object-contain shrink-0 rounded-md bg-white shadow-sm" />
+            <BrandLogo alt={t('app_name')} className="h-7 w-14 object-contain shrink-0 rounded-md bg-white shadow-sm" />
             <div className="flex flex-col">
               <span className="text-sm font-bold text-foreground-950 font-heading leading-tight tracking-tight">{t('app_name')}</span>
               <span className="text-[10px] font-semibold text-foreground-500 leading-none">{t('role_driver')}</span>

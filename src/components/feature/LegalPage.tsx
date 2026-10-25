@@ -1,6 +1,6 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LOGO_URL } from '@/lib/logo';
 import { dataController, LEGAL_IDENTITY_READY, legalOperator } from '@/config/legal';
 import { openCookieSettings } from '@/lib/cookieConsent';
 
@@ -38,7 +38,7 @@ export default function LegalPage({ title, children, version = legalOperator.ter
         <i className="ri-arrow-left-line" aria-hidden="true" /> Към началото
       </Link>
       <div className="flex items-center gap-3 mb-6">
-        <img src={LOGO_URL} alt="Лески Каручка" className="h-10 w-auto rounded-lg" />
+        <BrandLogo alt="Лески Каручка" className="h-10 w-auto rounded-lg" />
         <h1 className="text-2xl md:text-3xl font-bold text-foreground-950 font-heading">{title}</h1>
       </div>
       <article className="bg-white rounded-2xl border border-background-200 p-5 md:p-8 space-y-8 text-base text-foreground-800 leading-relaxed [&_h2]:font-semibold [&_h2]:text-foreground-950 [&_h2]:mb-3 [&_p+p]:mt-3 [&_li]:mb-2">

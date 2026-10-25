@@ -1,6 +1,9 @@
 const paths = {
   menu: 'M4 6h16M4 12h16M4 18h16',
   close: 'm6 6 12 12M18 6 6 18',
+  check: 'm5 12 4 4L19 6',
+  arrowRight: 'M4 12h16m-6-6 6 6-6 6',
+  car: 'm5 7 2-4h10l2 4M4 7h16l1 5v7h-4v-3H7v3H3v-7l1-5ZM3 12h18M6 9h1m10 0h1',
   back: 'm11 5-7 7 7 7M4 12h16',
   locate: 'M12 2v3m0 14v3M2 12h3m14 0h3M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0ZM14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
   plus: 'M12 5v14M5 12h14',

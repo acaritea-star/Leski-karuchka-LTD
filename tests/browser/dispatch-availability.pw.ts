@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 const actor='11111111-1111-4111-8111-111111111111',a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333';
 async function setup(page:Page) {
- const state={google:0,routes:0,unavailable:[] as string[],extra:0,connectionLost:false,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
+ const state={google:0,routes:0,unavailable:[] as string[],extra:0,names:{} as Record<string,string>,prices:{} as Record<string,number>,connectionLost:false,bookings:[] as Record<string,unknown>[],vanished:false,errors:[] as string[]};
  page.on('pageerror',e=>state.errors.push(e.message));
  page.on('requestfinished',r=>{if(/maps\.google|maps\.googleapis|places\.googleapis|routes\.googleapis/.test(new URL(r.url()).hostname))state.google++;});
  const user={id:actor,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{},app_metadata:{provider:'google'}};
@@ -30,7 +30,7 @@ async function setup(page:Page) {
   else if(u.pathname.endsWith('/google-routes')){
    state.routes++;
    const quotes=[{company_id:b,company_name:'Втора фирма',price:9,quote_id:'quote-b'},{company_id:a,company_name:'Първа фирма',price:5,quote_id:'quote-a'},...Array.from({length:state.extra},(_,i)=>({company_id:'extra-'+i,company_name:i===0?'ОРИОН':'Фирма '+i,price:10+i,quote_id:'quote-extra-'+i}))]
-    .map(c=>({...c,vehicle_type_id:'type-'+c.company_id,type_name:'Стандарт',capacity:4,service_class:'standard',quote_expires_at:new Date(Date.now()+120000).toISOString(),breakdown:{total:c.price}}));
+    .map(c=>({...c,company_name:state.names[c.company_id]??c.company_name,price:state.prices[c.company_id]??c.price,vehicle_type_id:'type-'+c.company_id,type_name:'Стандарт',capacity:4,service_class:'standard',quote_expires_at:new Date(Date.now()+120000).toISOString(),breakdown:{total:state.prices[c.company_id]??c.price}}));
    data={success:true,...quotes[1],quotes,distance_km:1.7,duration_min:5,duration_sec:300,polyline:'',legs:[],alternatives_count:0};
   }
   else if(u.pathname.endsWith('/create_taxi_request')){
@@ -42,6 +42,39 @@ async function setup(page:Page) {
  });return state;
 }
 async function chooseRoute(page:Page){await page.goto('/customer/home');await page.getByRole('button',{name:/Начало.*Иван Вазов/}).click();await page.getByRole('button',{name:/Край.*Гара/}).click();}
+test('long carrier names keep exact prices readable and full details reachable on a narrow phone',async({page},info)=>{
+ const state=await setup(page);
+ state.names[a]='ОРИОН транспорт и таксиметрови услуги Велико Търново';
+ state.names[b]='Лески Каручка междуградски превози и услуги Левски';
+ state.prices[a]=128.50;state.prices[b]=299.99;
+ await page.setViewportSize({width:320,height:568});await chooseRoute(page);
+ const order=page.getByRole('button',{name:/Поръчай каручка/});await expect(order).toBeEnabled();
+ const logo=page.locator('.customer-brand img');
+ await expect.poll(()=>logo.evaluate(el=>(el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+ await expect(logo).toHaveAttribute('src','/pwa-icon.svg');
+ const routeBar=await page.locator('.customer-route-controls').boundingBox(),safety=await page.locator('.customer-safety').boundingBox();
+ const mapMessage=await page.locator('.booking-map-state p').boundingBox(),mapRetry=await page.locator('.booking-map-state button').boundingBox();
+ expect(mapMessage!.y).toBeGreaterThanOrEqual(routeBar!.y+routeBar!.height);
+ expect(mapRetry!.y+mapRetry!.height).toBeLessThanOrEqual(safety!.y);
+ for(const card of await page.locator('.carrier-offer').all()) {
+  await expect(card).toBeInViewport({ratio:1});
+  const name=await card.locator('.carrier-offer-name').boundingBox(),price=await card.locator('.carrier-offer-price').boundingBox();
+  expect(name!.x+name!.width).toBeLessThanOrEqual(price!.x);
+ }
+ await page.screenshot({path:info.outputPath('compact-carrier-prices-320.png')});
+ await page.getByRole('radio',{name:/Лески Каручка/}).click();
+ await expect(order).toContainText('299.99');await expect(order).toBeInViewport({ratio:1});
+ await page.getByRole('button',{name:'Цена, условия и превозвач'}).click();
+ await expect(page.locator('.carrier-price-card')).toContainText(state.names[b]);
+ await expect(page.locator('.carrier-price-card')).toContainText('299.99');
+ await expect(page.getByText('Плащаш след пътуването',{exact:true})).toBeVisible();
+ await expect(order).toBeInViewport({ratio:1});
+ await page.setViewportSize({width:390,height:844});
+ await expect.poll(async()=>(await page.locator('.customer-experience').boundingBox())!.height).toBe(844);
+ await page.screenshot({path:info.outputPath('carrier-price-details.png')});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(state.routes).toBe(1);expect(state.bookings).toHaveLength(0);expect(state.errors).toEqual([]);
+});
 test('customer sees exact sorted carrier offers and books only the chosen firm',async({page},testInfo)=>{
  const state=await setup(page);await chooseRoute(page);const order=page.getByRole('button',{name:/Поръчай каручка/});
  await expect(page.getByRole('option',{name:/Комфорт/})).toHaveAttribute('disabled','');

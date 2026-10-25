@@ -1,4 +1,5 @@
 import Modal from '@/components/feature/Modal';
+import Icon from '@/components/feature/Icon';
 import { onlinePaymentLabel } from '@/lib/ridePayment';
 import CarrierIdentity from '@/components/feature/CarrierIdentity';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +34,7 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
   return <section className="booking-status booking-enter" aria-label={title}>
     <div className="booking-status-heading" role="status" aria-live="polite">
       <div className={`booking-status-icon ${pending ? 'booking-pulse' : ''}`} aria-hidden="true">
-        <i className={pending ? 'ri-taxi-line' : completed ? 'ri-check-line' : cancelled ? 'ri-close-line' : 'ri-car-line'} />
+        <Icon name={completed ? 'check' : cancelled ? 'close' : 'car'} />
       </div><div><h2>{title}</h2><p>{hint}</p></div>
     </div>
     <div className="booking-scroll">

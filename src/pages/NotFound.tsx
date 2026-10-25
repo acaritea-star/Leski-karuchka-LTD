@@ -1,6 +1,6 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LOGO_URL } from '@/lib/logo';
 
 export default function NotFound() {
   const location = useLocation();
@@ -9,8 +9,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-background-50 flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <img
-          src={LOGO_URL}
+        <BrandLogo
           alt="Лески Каручка"
           className="h-20 w-auto mx-auto mb-6 rounded-lg"
         />

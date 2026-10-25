@@ -331,7 +331,7 @@ export default function DriverTracking({
   >
     <div className="booking-status booking-enter">
       <div className="booking-status-heading" role="status">
-        <div className="booking-status-icon"><i className={isWaiting ? 'ri-map-pin-user-line' : 'ri-taxi-line'} aria-hidden="true" /></div>
+        <div className="booking-status-icon"><Icon name={request.trip_ended_at ? 'check' : isWaiting ? 'pin' : 'car'} /></div>
         <div className="min-w-0">
           <h2>{request.trip_ended_at?'Пристигнахте':isWaiting ? t('driver_waiting') : headingToPickup ? t('heading_to_you') : t('status_in_progress')}</h2>
           <p>{request.trip_ended_at?'Пътуването приключи. Остава плащането.':location && !positionStale && etaMinutes != null && !isWaiting
@@ -347,7 +347,7 @@ export default function DriverTracking({
         <div className="tracking-trip-details">
           <div className="tracking-driver">
             {driverInfo?.avatar_url ? <img src={driverInfo.avatar_url} alt="" />
-              : <span className="tracking-avatar" aria-hidden="true"><i className="ri-user-3-line" /></span>}
+              : <span className="tracking-avatar" aria-hidden="true"><Icon name="user" /></span>}
             <div className="min-w-0 flex-1"><strong>{loadingInfo ? t('loading') : driverInfo?.name || t('booking_driver_connecting')}</strong>
               {driverInfo?.vehicle_label && <small>{driverInfo.vehicle_label}</small>}
             </div>

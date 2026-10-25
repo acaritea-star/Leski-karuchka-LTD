@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { CarrierOffer } from '@/lib/googleMaps';
 import { carrierOfferKey } from '@/lib/marketplace';
 import CarrierIdentity from '@/components/feature/CarrierIdentity';
+import Icon from '@/components/feature/Icon';
 import type { CarrierPanelView } from './CustomerLayout';
 
 export function CarrierRoute({ pickup, destination, onFieldClick, onSwap, creating, refreshing, onRefresh }: {
@@ -56,7 +57,11 @@ export default function CarrierOffers({ offers, selected, onSelect, onRequest, o
   const selectedUnavailable = !!selected && availabilityConfirmed && !availableOffers.has(carrierOfferKey(selected));
   return <section className="booking-confirm carrier-panel" aria-label="Оферти от фирмите" data-view={view}>
     <div className="carrier-panel-heading">
-      <h1 aria-label={t('booking_offers')}>{view === 'selected' && selected ? selected.company_name : view === 'details' ? 'Детайли' : 'Фирми'}</h1>
+      {view === 'selected' && selected && <span className="carrier-selected-mark" aria-hidden="true"><Icon name="check" /></span>}
+      <h1 aria-label={t('booking_offers')}>
+        <span title={view === 'selected' ? selected?.company_name : undefined}>{view === 'selected' && selected ? selected.company_name : view === 'details' ? 'Детайли' : 'Фирми'}</span>
+        {view === 'selected' && selected && <small>{selected.type_name} · {t('booking_seats', { count: selected.capacity })}</small>}
+      </h1>
       {view !== 'selected' && view !== 'details' && <label className="carrier-category"><span className="sr-only">Автомобил</span>
         <select aria-label="Категория автомобил" value={vehicleType} disabled={creating} onChange={event => { setSearch(''); onVehicleTypeChange(event.target.value); }}>
           {vehicleOptions.map(option => <option key={option.id} value={option.id} disabled={!option.available}>{option.name}{!option.available ? ' · няма свободни' : ''}</option>)}
@@ -73,7 +78,12 @@ export default function CarrierOffers({ offers, selected, onSelect, onRequest, o
     </div>
     <div className="booking-scroll" id={listId}>
       {view === 'details' ? <div className="carrier-details">
-        <p className="booking-fare-note">Фиксирана цена за избрания маршрут · {t('payment_in_cash')}</p>
+        {selected && <div className="carrier-price-card">
+          <div><span>{t('booking_route_price')}</span><strong>{!expired && !calculating ? `${selected.price.toFixed(2)} ${t('lv')}` : '—'}</strong></div>
+          <p>{t('booking_chosen_carrier')}: <strong>{selected.company_name}</strong></p>
+          <small>{selected.type_name} · {t('booking_seats', { count: selected.capacity })}</small>
+        </div>}
+        <p className="booking-fare-note">{t('booking_pay_after')}</p>
         <p className="booking-fare-note">Заявката е само към избраната фирма. Ако няма кой да я приеме, можеш да избереш друга оферта.</p>
         <p>{t('booking_legal_notice')}{' '}<Link to="/terms">{t('menu_terms')}</Link>{' · '}<Link to="/privacy">{t('menu_privacy')}</Link></p>
         {selected && <CarrierIdentity companyId={selected.company_id} />}
@@ -82,7 +92,10 @@ export default function CarrierOffers({ offers, selected, onSelect, onRequest, o
           <input type="search" aria-label="Търси фирма" placeholder="Търси фирма…" value={search} disabled={creating} onChange={event => setSearch(event.target.value)} />
           {search && <button type="button" disabled={creating} onClick={() => setSearch('')}>Изчисти</button>}
         </div>}
-        {calculating ? <p className="booking-hint" role="status"><span className="booking-spinner" />{t('booking_calculating')}</p>
+        {calculating ? <div className="carrier-offers-loading" role="status" aria-busy="true">
+          <span className="sr-only">{t('booking_calculating')}</span>
+          {[0, 1].map(row => <div key={row} aria-hidden="true"><span /><span /><span /></div>)}
+        </div>
           : <div className="carrier-offer-list" role="radiogroup" aria-label="Избери фирма и цена">
             {visibleOffers.map(offer => <label className="carrier-offer" key={carrierOfferKey(offer)}>
               <input type="radio" name="carrier-offer" checked={!!selected && carrierOfferKey(selected) === carrierOfferKey(offer)}
@@ -91,11 +104,11 @@ export default function CarrierOffers({ offers, selected, onSelect, onRequest, o
                 aria-label={`${offer.company_name}, ${offer.price.toFixed(2)} ${t('lv')}, ${offer.type_name}, ${offer.capacity} места`}
                 onFocus={event => event.currentTarget.closest('label')?.scrollIntoView?.({ block: 'nearest' })} />
               <span className="carrier-offer-body">
-                <span className="carrier-offer-check" aria-hidden="true" />
-                <span className="carrier-offer-info"><strong className="carrier-offer-name">{offer.company_name}</strong>
+                <span className="carrier-offer-mark" aria-hidden="true"><Icon name="car" /><span className="carrier-offer-check"><Icon name="check" /></span></span>
+                <span className="carrier-offer-info"><strong className="carrier-offer-name" title={offer.company_name}>{offer.company_name}</strong>
                   {!availableOffers.has(carrierOfferKey(offer)) ? <small className="carrier-unavailable">{availabilityConfirmed ? 'Няма свободна кола' : 'Непотвърдена наличност'}</small>
                     : expired || !offer.quote_id || Date.parse(offer.quote_expires_at) <= quotedAt ? <small className="carrier-unavailable">Офертата е изтекла</small>
-                    : cheapest === offer && <small>Най-ниска цена</small>}
+                    : cheapest === offer && <small className="carrier-best-price">{t('booking_lowest_price')}</small>}
                 </span>
                 <strong className="carrier-offer-price">{offer.price.toFixed(2)} {t('lv')}</strong>
               </span>
@@ -113,7 +126,7 @@ export default function CarrierOffers({ offers, selected, onSelect, onRequest, o
       <p className="carrier-offer-summary sr-only" aria-live="polite">{selected ? <>Избрано: <strong>{selected.company_name}</strong></> : 'Избери фирма от списъка'}</p>
       <button type="button" className="booking-primary" disabled={!canRequest || creating} onClick={onRequest} aria-busy={creating}>
         {creating ? <><span className="booking-spinner" />{t('booking_sending')}</>
-          : <><span className="carrier-order-label"><span>{t('booking_order')}</span>{selected && <small>{selected.company_name} · {t('payment_in_cash')}</small>}</span><span>{selected && !expired && !calculating ? `${selected.price.toFixed(2)} ${t('lv')}` : '—'} <i className="ri-arrow-right-line" aria-hidden="true" /></span></>}
+          : <><span className="carrier-order-label"><span>{t('booking_order')}</span>{selected && <small>{selected.company_name}</small>}</span><span className="carrier-order-price">{selected && !expired && !calculating ? `${selected.price.toFixed(2)} ${t('lv')}` : '—'} <Icon name="arrowRight" /></span></>}
       </button>
     </div>
   </section>;

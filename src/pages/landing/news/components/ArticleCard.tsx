@@ -1,7 +1,7 @@
+import BrandLogo from '@/components/feature/BrandLogo';
 import { Link } from 'react-router-dom';
 import type { Tables } from '@/lib/database.types';
 import { formatDate, readingTime } from '@/lib/news';
-import { LOGO_URL } from '@/lib/logo';
 
 type Article = Tables<'news_articles'>;
 
@@ -20,7 +20,7 @@ export default function ArticleCard({ article }: { article: Article }) {
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-accent-100">
-            <img src={LOGO_URL} alt="Лески Каручка" className="h-12 w-auto rounded opacity-85" />
+            <BrandLogo alt="Лески Каручка" className="h-12 w-auto rounded opacity-85" />
           </div>
         )}
       </div>
