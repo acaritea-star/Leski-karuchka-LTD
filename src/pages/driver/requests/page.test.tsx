@@ -1,3 +1,4 @@
+vi.mock('@/lib/serverSummaries', () => ({ loadDriverDay: async () => ({ trips: 3, earnings: 12.50, received: { cash: 5, card: 3, online: 4.23, total: 12.23 } }) }));
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

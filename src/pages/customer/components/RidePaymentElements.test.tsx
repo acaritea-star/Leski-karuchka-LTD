@@ -65,12 +65,11 @@ it('offers the card form when wallets are unavailable and needs one payment conf
  expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({redirect:'if_required'}));expect(fake.confirm.mock.calls[0][0]).not.toHaveProperty('returnUrl');expect(screen.queryByText('Платено онлайн')).toBeNull();
  expect(localStorage.getItem(paymentPreferenceKey('owner','acct_fixture','test'))).toBe('card');
 });
-it('shows a wallet first and reveals a card without leaving the ride',async()=>{
- fake.wallet=true;setup();await screen.findByRole('button',{name:'Плати с карта'});expect(screen.queryByRole('button',{name:'Тествай 2.95 €'})).toBeNull();
- fireEvent.click(screen.getByRole('button',{name:'Плати с карта'}));expect(screen.getByRole('button',{name:'Тествай 2.95 €'})).toBeTruthy();
+it('keeps card entry visible alongside a wallet without an extra tap',async()=>{
+ fake.wallet=true;setup();await screen.findByRole('button',{name:'Mock Apple Pay'});
+ expect(screen.getByRole('button',{name:'Тествай 2.95 €'})).toBeTruthy();
  const input=screen.getByLabelText('Защитена форма на Stripe');fireEvent.change(input,{target:{value:'synthetic input'}});
- fireEvent.click(screen.getByRole('button',{name:'Скрий плащането с карта'}));fireEvent.click(screen.getByRole('button',{name:'Плати с карта'}));
- expect(screen.getByLabelText('Защитена форма на Stripe')).toBe(input);expect((input as HTMLInputElement).value).toBe('synthetic input');
+ expect((input as HTMLInputElement).value).toBe('synthetic input');
  fireEvent.click(screen.getByRole('button',{name:'Mock Apple Pay'}));await waitFor(()=>expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({expressCheckoutConfirmEvent:{paymentType:'apple_pay'}})));
 });
 it('keeps a declined card retryable without reporting it paid',async()=>{
@@ -84,9 +83,9 @@ it('blocks a second confirm after a lost response, then reconciles the same paym
  reject(Error('offline'));await screen.findByText('Връзката прекъсна. Провери плащането преди следващ опит.');
  fake.action.mockResolvedValue({state:'paid'});fireEvent.click(screen.getByRole('button',{name:'Провери плащането'}));await waitFor(()=>expect(changed).toHaveBeenCalledOnce());expect(fake.confirm).toHaveBeenCalledOnce();
 });
-it('scopes the remembered method by user, merchant and environment',()=>{
+it('does not hide card entry because of another user or an old wallet preference',()=>{
  localStorage.setItem(paymentPreferenceKey('other','acct_fixture','test'),'card');fake.wallet=true;setup();
- expect(screen.queryByRole('button',{name:'Тествай 2.95 €'})).toBeNull();
+ expect(screen.getByRole('button',{name:'Тествай 2.95 €'})).toBeTruthy();
  expect(paymentPreferenceKey('owner','acct_fixture','test')).not.toBe(paymentPreferenceKey('owner','acct_fixture','live'));
 });
 it.each([{environment:'live'},{request_id:'foreign'},{session_id:'cs_test_foreign'},{publishable_key:'pk_live_wrong'},{amount_minor:295.1},{currency:'usd'}])('rejects a payment configuration mismatch %j',mutation=>{

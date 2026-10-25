@@ -1,10 +1,10 @@
 import BrandLogo from '@/components/feature/BrandLogo';
 import PageLoading from '@/components/feature/LoadingState';
-import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
+import { useDriverPaymentReceipt } from '@/hooks/useDriverPaymentNotice';
+import DriverWallet from '@/pages/driver/components/DriverWallet';
 import { useDriverOfferConnection } from '@/hooks/useDriverOfferConnection';
 import { useDriverDispatchIdentity } from '@/hooks/useDriverDispatchIdentity';
-import { loadDriverDay } from '@/lib/serverSummaries';
-import { useSofiaDay } from '@/hooks/useSofiaDay';
+import { useDriverDay } from '@/hooks/useDriverDay';
 import { acceptTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { driverRecordOptions } from '@/lib/driverRecord';
@@ -37,7 +37,6 @@ type TaxiRequest = Tables<'taxi_requests'>;
 
 export default function DriverHome() {
   const { t } = useTranslation();
-  const day = useSofiaDay();
   const { user, loading: authLoading } = useAuth();
   const activeOwner = useRef(user?.id);
   activeOwner.current = user?.id;
@@ -78,14 +77,10 @@ export default function DriverHome() {
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
-  const paidNotice=useDriverPaymentNotice(user?.id,driver?.id,activeRequest?.id);
+  const paidReceipt=useDriverPaymentReceipt(user?.id,driver?.id,activeRequest?.id);
 
   // ── Today stats ──
-  const todayStatsQuery = useQuery({
-    queryKey: driver?.id ? queryKeys.driverTodayStats(driver.id, day) : ['taxi_requests', 'driver', 'none', 'today'],
-    queryFn: ({ signal }) => loadDriverDay(driver!.id, signal),
-    enabled: !!driver?.id,
-  });
+  const todayStatsQuery = useDriverDay(driver?.id);
   const todayStats = todayStatsQuery.data ?? { trips: 0, earnings: 0 };
 
   // ── Pending list (to surface the next non-declined request) ──
@@ -217,7 +212,6 @@ export default function DriverHome() {
             cacheDriverRequest(queryClient, driver.id, newRow);
           } else if (['completed', 'cancelled'].includes(newRow.status)) {
             cacheDriverRequest(queryClient, driver.id, newRow);
-            queryClient.invalidateQueries({ queryKey: queryKeys.driverTodayStats(driver.id) });
           }
         },
       )
@@ -302,7 +296,7 @@ export default function DriverHome() {
       {/* CONTENT */}
       <div className="flex flex-col min-h-screen">
         {/* Header — refined */}
-        <header className="px-4 py-3 flex items-center justify-between bg-white border-b border-background-200 sticky top-0 z-30">
+        <header className="px-4 py-3 flex flex-wrap items-center justify-between gap-y-2 bg-white border-b border-background-200 sticky top-0 z-30">
           <div className="flex items-center gap-2.5">
             <BrandLogo alt={t('app_name')} className="h-7 w-14 object-contain shrink-0 rounded-md bg-white shadow-sm" />
             <div className="flex flex-col">
@@ -332,6 +326,7 @@ export default function DriverHome() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0116 0v2" /></svg>
             </button>
           </div>
+          <DriverWallet owner={user?.id} driverId={driver?.id} receipt={paidReceipt} />
         </header>
 
         {/* Bottom panel */}
@@ -537,7 +532,7 @@ export default function DriverHome() {
                   <p className="text-[10px] text-foreground-500">{t('driver_rating')}</p>
                 </div>
               </div>
-              <p className="text-xs text-foreground-500 mt-3">Реалните плащания и разходи записваш в отчета.</p>
+              <p className="text-xs text-foreground-500 mt-3">Плащанията по курсовете се записват автоматично. Разходите и предаването на пари са в отчета.</p>
             </section>
             <details className="rounded-2xl border border-background-200 bg-white overflow-hidden" onToggle={event => { if (event.currentTarget.open) { setMapOpened(true); refreshMap.current(); } }}>
               <summary className="p-4 cursor-pointer text-sm font-semibold text-foreground-600">Карта</summary>
@@ -550,7 +545,6 @@ export default function DriverHome() {
       </div>
 
       {/* Bottom Navigation */}
-      {paidNotice&&<p role="status" className="mx-4 mb-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{paidNotice}</p>}
       <BottomNav
         items={[
           { path: '/driver/home', labelKey: 'nav_home', icon: 'ri-home-4-line', iconActive: 'ri-home-4-fill' },

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { parseDashboard } from './serverSummaries';
+import { parseDashboard, parseDriverDay } from './serverSummaries';
 const fixture = () => ({ stats: { totalDrivers: 1200, onlineDrivers: 50, activeOrders: 2,
   completedOrders: 1203, cancelledOrders: 1, totalRevenue: 1209 },
   days: Array.from({ length: 7 }, (_, i) => ({ day: `2026-10-${19+i}`, orders: i === 6 ? 1201 : 0, revenue: i === 6 ? 1202 : 0 })) });
@@ -12,4 +12,11 @@ it('rejects incomplete or non-finite aggregates instead of displaying fabricated
   expect(() => parseDashboard({ ...fixture(), stats: {} })).toThrow();
   expect(() => parseDashboard({ ...fixture(), stats: { ...fixture().stats, totalRevenue: Infinity } })).toThrow();
   expect(() => parseDashboard({ ...fixture(), days: [{ day: '2026-02-30', orders: 1, revenue: 1 }, ...fixture().days.slice(1)] })).toThrow();
+});
+it('keeps estimated ride value separate from collected wallet money and handles an older server', () => {
+  expect(parseDriverDay({ trips: 2, earnings: 50 }).received).toBeNull();
+  expect(parseDriverDay({ trips: 2, earnings: 50, received: { cash: 5, card: 3, online: 4.23, total: 12.23 } })).toMatchObject({ earnings: 50, received: { total: 12.23 } });
+  for (const received of [{ cash: 5, card: 3, online: 4.23, total: 50 }, { cash: -1, card: 0, online: 0, total: -1 }, { total: 0 }]) {
+    expect(() => parseDriverDay({ trips: 2, earnings: 50, received })).toThrow();
+  }
 });

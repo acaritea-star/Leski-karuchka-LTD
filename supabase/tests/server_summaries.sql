@@ -75,6 +75,36 @@ SET LOCAL ROLE authenticated;
 SELECT pg_temp.must_fail('SELECT public.company_dashboard((SELECT company FROM summary_ids))');
 SELECT pg_temp.must_fail('SELECT public.driver_day_summary((SELECT driver FROM summary_ids))');
 RESET ROLE;
+-- Paid money must come from ledger entries, never the quoted/completed fare.
+CREATE TEMP TABLE wallet_ids AS SELECT id FROM public.taxi_requests
+ WHERE driver_id=(SELECT driver FROM summary_ids) AND status='completed'
+ AND completed_at='2026-10-25 10:00:00+00' ORDER BY id LIMIT 1;
+INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,currency,note,request_id,payment_method)
+ SELECT gen_random_uuid(),company,driver,driver_user,driver_user,'income',x.amount,'EUR','Wallet regression',w.id,x.method
+ FROM summary_ids CROSS JOIN wallet_ids w CROSS JOIN (VALUES(5::numeric,'cash'),(3::numeric,'card'),(2::numeric,'cash')) x(amount,method);
+INSERT INTO public.driver_money_entries(id,company_id,driver_id,driver_user_id,actor_id,kind,amount,currency,note,request_id,reference_id,payment_method)
+ SELECT gen_random_uuid(),company_id,driver_id,driver_user_id,actor_id,'reversal',amount,currency,'Wallet reversal',request_id,id,payment_method
+ FROM public.driver_money_entries WHERE request_id=(SELECT id FROM wallet_ids) AND amount=2;
+INSERT INTO public.payment_transactions(request_id,company_id,amount,method,status,provider,provider_ref,paid_at)
+ SELECT w.id,company,4.23,'online','completed','stripe','wallet-test-payment',now() FROM wallet_ids w CROSS JOIN summary_ids;
+INSERT INTO public.payment_transactions(request_id,company_id,amount,method,status,provider,provider_ref,paid_at)
+ SELECT w.id,company,1,'online','refunded','stripe_refund','wallet-test-refund',now() FROM wallet_ids w CROSS JOIN summary_ids;
+SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
+SET LOCAL ROLE authenticated;
+DO $test$ DECLARE result jsonb; BEGIN
+ result:=public.driver_day_summary((SELECT driver FROM summary_ids),'2026-10-25');
+ IF result->'received' <> '{"cash":5,"card":3,"online":3.23,"total":11.23}'::jsonb THEN RAISE EXCEPTION 'FAIL receipt-backed wallet/refund/reversal %',result; END IF;
+ IF (result->>'earnings')::numeric<>1202 THEN RAISE EXCEPTION 'FAIL legacy summary changed'; END IF;
+END $test$;
+RESET ROLE;
+UPDATE public.taxi_requests SET payment_environment='test' WHERE id=(SELECT id FROM wallet_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
+SET LOCAL ROLE authenticated;
+DO $test$ DECLARE result jsonb; BEGIN
+ result:=public.driver_day_summary((SELECT driver FROM summary_ids),'2026-10-25');
+ IF (result#>>'{received,total}')::numeric<>0 THEN RAISE EXCEPTION 'FAIL test payment entered real wallet %',result; END IF;
+END $test$;
+RESET ROLE;
 UPDATE public.profiles SET is_active=false WHERE id=(SELECT driver_user FROM summary_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
 SET LOCAL ROLE authenticated;

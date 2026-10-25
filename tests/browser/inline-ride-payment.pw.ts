@@ -132,8 +132,22 @@ test('card mounts before slow actions and wallets, keeps input after the loading
  await page.clock.fastForward(12001);await expect(dialog.getByRole('button',{name:'Зареди плащането отново'})).toBeVisible();await expect(input).toHaveValue('4242 test input');
  await page.clock.fastForward(3001);await expect(pay).toBeEnabled();await expect(input).toHaveValue('4242 test input');
  await page.clock.fastForward(5001);await expect(dialog.getByRole('button',{name:'Mock Apple Pay'})).toBeVisible();await expect(input).toBeVisible();
- await dialog.getByRole('button',{name:'Скрий плащането с карта'}).click();await expect(input).toBeHidden();
- await dialog.getByRole('button',{name:'Плати с карта'}).click();await expect(input).toHaveValue('4242 test input');
+ await expect(input).toBeVisible();await expect(input).toHaveValue('4242 test input');
  const after=await page.evaluate(()=>(window as unknown as {stripeUiDouble:{paymentMounts:number;paymentDestroys:number;confirms:number}}).stripeUiDouble);
  expect(after.paymentMounts).toBe(1);expect(after.paymentDestroys).toBe(0);expect(after.confirms).toBe(0);expect(sessions).toBe(1);expect(state.errors).toEqual([]);
+});
+
+test('Android Google Pay and manual card entry share one ready payment, with no method-selection step',async({page},info)=>{
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page,true,false,{walletType:'googlePay'});const row=ride();state.rides=[row];let sessions=0;
+ await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}}));
+ await page.route('**/functions/v1/ride-checkout',route=>{
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+  if(route.request().postDataJSON().action==='elements'){sessions++;return route.fulfill({headers:cors,json:config});}
+  Object.assign(row,{payment_status:'paid',payment_method:'online',online_payment_state:'paid'});return route.fulfill({headers:cors,json:{state:'paid',environment:'test'}});
+ });
+ await page.setViewportSize({width:360,height:780});await page.goto('/customer/home');await page.getByRole('button',{name:'Тествай плащане с карта',exact:true}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog.getByRole('button',{name:'Mock Google Pay'})).toBeVisible();await expect(dialog.getByRole('textbox',{name:'Тестова карта'})).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeEnabled();await page.screenshot({path:info.outputPath('google-pay-and-card.png')});
+ await dialog.getByRole('button',{name:'Mock Google Pay'}).click();await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(sessions).toBe(1);
+ expect(await page.evaluate(()=>(window as unknown as {stripeUiDouble:{confirms:number;paymentMounts:number}}).stripeUiDouble)).toMatchObject({confirms:1,paymentMounts:1});expect(state.errors).toEqual([]);
 });

@@ -6,7 +6,8 @@ import { useFreshRequests, isOpenRequest } from '@/hooks/useFreshRequests';
 import { acceptTaxiRequest, transitionTaxiRequest } from '@/lib/rideOperations';
 import { cacheDriverRequest } from '@/lib/driverRequestCache';
 import { endRideTrip } from '@/lib/ridePayment';
-import { useDriverPaymentNotice } from '@/hooks/useDriverPaymentNotice';
+import { useDriverPaymentReceipt } from '@/hooks/useDriverPaymentNotice';
+import DriverWallet from '@/pages/driver/components/DriverWallet';
 import { driverRecordOptions } from '@/lib/driverRecord';
 import { withRequestTimeout } from '@/lib/requestTimeout';
 import { driverActiveRequestOptions } from '@/lib/driverActiveRequest';
@@ -85,7 +86,7 @@ export default function DriverRequests() {
     refetchInterval: requestsRealtime ? 30_000 : 8000,
   });
   const activeRequest = activeRequestQuery.data ?? null;
-  const paidNotice=useDriverPaymentNotice(user?.id,driver?.id,activeRequest?.id);
+  const paidReceipt=useDriverPaymentReceipt(user?.id,driver?.id,activeRequest?.id);
 
   // Reset nav info when active request changes (pickup → destination switch)
   useEffect(() => {
@@ -349,7 +350,7 @@ export default function DriverRequests() {
   return (
     <div className="min-h-screen bg-background-50">
       {/* ── Header ── */}
-      <header className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-background-100">
+      <header className="bg-white px-4 py-3 flex flex-wrap items-center gap-3 sticky top-0 z-50 border-b border-background-100">
         <BackButton to="/driver/home" />
         <h1 className="text-base font-bold text-foreground-950 font-heading">{t('nav_requests')}</h1>
         {!isOnline && (
@@ -364,6 +365,7 @@ export default function DriverRequests() {
             {gps.status === 'tracking' ? t('you_are_online') : gps.status === 'acquiring' ? 'Уточняваме GPS' : 'Изчаква GPS'}
           </span>
         )}
+        <DriverWallet owner={user?.id} driverId={driver?.id} receipt={paidReceipt} />
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
@@ -552,8 +554,7 @@ export default function DriverRequests() {
           </div>
         )}
 
-        {!activeRequest&&!paidNotice&&manualNotice?.owner===user?.id&&manualNotice?.driverId===driver?.id&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.</p>}
-        {paidNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{paidNotice}</p>}
+        {!activeRequest&&!paidReceipt&&manualNotice?.owner===user?.id&&manualNotice?.driverId===driver?.id&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Курсът е приключен. Получената сума или проблемът с плащането са записани в отчета.</p>}
         {user?.id && driver?.id && <Suspense fallback={checkoutRequest ? <p role="status">Зареждане на плащането…</p> : null}><RideCheckout key={`${user.id}:${driver.id}`} owner={user.id} driverId={driver.id} request={checkoutOwner === user.id ? checkoutRequest : null} onClose={() => { setCheckoutRequest(null); void queryClient.invalidateQueries({queryKey:queryKeys.driverActiveRequest(driver.id)}); }} onFinished={ride => {
           if (activeOwner.current !== user.id) return;
           cacheDriverRequest(queryClient, driver.id, ride); setCheckoutRequest(null); setError('');

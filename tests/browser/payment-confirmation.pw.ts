@@ -44,3 +44,20 @@ test('uses an already settled webhook result after card confirmation without a r
  await page.goto('/customer/home');await page.getByRole('button',{name:'Тествай плащане с карта',exact:true}).click();await page.getByRole('button',{name:'Тествай 2.95 €',exact:true}).click();
  await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(sessions).toBe(1);expect(reconciles).toBe(0);expect(state.errors).toEqual([]);
 });
+
+for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps the wallet pinned and refreshes once for a verified payment`,async({page},info)=>{
+ const state=await setupUi(page,'DRIVER'),events=await serverEvents(page),row={...ride(),final_price:4.23,estimated_price:4.23};state.rides=[row];let reads=0,online=4.23;
+ await page.route('**/rest/v1/rpc/driver_day_summary',route=>{reads++;return route.fulfill({headers:cors,json:{trips:7,earnings:50,received:{cash:10,card:5,online,total:15+online}}});});
+ await page.setViewportSize({width:320,height:568});await page.goto(path);
+ const wallet=page.getByRole('button',{name:'Портфейл — получени по днешните курсове'});
+ await expect(wallet).toContainText('19,23');await expect.poll(events.count).toBeGreaterThan(0);expect(reads).toBe(1);
+ await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));await expect(wallet).toBeInViewport();
+ online=8.46;Object.assign(row,{status:'completed',payment_status:'paid',payment_method:'online',online_payment_state:'paid',updated_at:new Date(Date.now()+1000).toISOString()});events.send(row);
+ await expect(page.getByText('+4,23 €',{exact:true})).toBeVisible();await expect(wallet).toContainText('23,46');expect(reads).toBe(2);
+ events.send(row);events.send(row);await expect(wallet).toContainText('23,46');expect(reads).toBe(2);
+ const credit=page.locator('.driver-wallet-receipt');await expect(credit).toBeInViewport();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath(path.includes('home')?'driver-home-wallet.png':'driver-requests-wallet.png')});
+ await wallet.click();const dialog=page.getByRole('dialog',{name:'Портфейл — днешни курсове'});await expect(dialog.getByText('Онлайн към фирмата')).toBeVisible();
+ await dialog.getByRole('button',{name:'Затвори портфейла'}).click();await expect(wallet).toBeFocused();expect(state.errors).toEqual([]);
+});

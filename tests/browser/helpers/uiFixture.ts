@@ -122,7 +122,7 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
       state.cars.push({ ...body.p_details, id: body.p_id, company_id: uiCompany, is_active: true, created_at: new Date().toISOString() }); data = body.p_id;
     } else if (url.pathname.endsWith('/legal_acceptances')) data = { id: uiAccount };
     else if (url.pathname.endsWith('/company_dashboard')) data = { stats: { totalDrivers: 1, onlineDrivers: 0, activeOrders: 0, completedOrders: 0, cancelledOrders: 0, totalRevenue: 0 }, days: Array.from({ length: 7 }, (_, i) => ({ day: '2026-10-' + String(i + 1).padStart(2, '0'), orders: 0, revenue: 0 })) };
-    else if (url.pathname.endsWith('/driver_day_summary')) data = { trips: 7, earnings: 23.5 };
+    else if (url.pathname.endsWith('/driver_day_summary')) data = { trips: 7, earnings: 23.5, received: { cash: 10, card: 5, online: 4.23, total: 19.23 } };
     else if (['/company_customers', '/company_fleet', '/company_driver_page'].some(path => url.pathname.endsWith(path))) data = { rows: [], total: 0 };
     else if (url.pathname.endsWith('/operational_health')) data = { checked_at: new Date().toISOString(), stale_online_drivers: 0, flagged_rides_24h: 0, oldest_push_seconds: 0, metrics: [], route_budget: null };
     else if (url.pathname.endsWith('/resolve_partner_access')) data = { status: 'ready', role, company_id: uiCompany, destination: '/admin/dashboard' };

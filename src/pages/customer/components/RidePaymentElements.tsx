@@ -6,7 +6,7 @@ import { createRideCheckoutPreparation } from '@/lib/rideCheckoutPreparation';
 import { startRidePaymentTiming } from '@/lib/ridePaymentTiming';
 import Modal from '@/components/feature/Modal';
 import { money } from '@/lib/accounting';
-import { paymentPreferenceKey,preferredPaymentMethod,rememberPaymentMethod,ridePaymentAction,type RideElementsSession,type RidePaymentResult,type RidePaymentPreparation } from '@/lib/ridePayment';
+import { paymentPreferenceKey,rememberPaymentMethod,ridePaymentAction,type RideElementsSession,type RidePaymentResult,type RidePaymentPreparation } from '@/lib/ridePayment';
 
 const INITIALIZATION_WAIT_MS=12000;
 function PaymentLoadRecovery({onRetry,delayed=false}:{onRetry:()=>void;delayed?:boolean}) {
@@ -68,7 +68,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged,
 
 export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,preparation=null,active=true}:{session:RideElementsSession|null;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<boolean|void>;onRetry:()=>void;preparation?:RidePaymentPreparation|null;active?:boolean}) {
  const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session?.account_id??preparation?.account_id??'',session?.environment??preparation?.environment??'test');
- const [wallets,setWallets]=useState<boolean|null>(null),[card,setCard]=useState(()=>preferredPaymentMethod(key)==='card'),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
+ const [wallets,setWallets]=useState<boolean|null>(null),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
  const [cardReady,setCardReady]=useState(false),[cardFailed,setCardFailed]=useState(false);
  const ready=result.type==='success'&&(cardReady||wallets===true);
  const [initializationDelayed,setInitializationDelayed]=useState(false);
@@ -118,12 +118,12 @@ export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,prepara
   <div hidden={awaiting} inert={!checkout||busy}><ExpressCheckoutElement options={{buttonHeight:48,buttonTheme:{applePay:'black',googlePay:'black'},buttonType:{applePay:'plain',googlePay:'pay'},paymentMethodOrder:['apple_pay','google_pay'],layout:{maxColumns:1,maxRows:2},paymentMethods:{applePay:'auto',googlePay:'auto',link:'never',amazonPay:'never',paypal:'never',klarna:'never'}}}
    onReady={event=>setWallets(!!(event.availablePaymentMethods?.applePay||event.availablePaymentMethods?.googlePay))}
    onLoadError={()=>setWallets(false)} onConfirm={event=>void confirm(event)} /></div>
-  {!awaiting&&wallets&&<button type="button" className="min-h-11 w-full text-sm underline" disabled={busy} onClick={()=>setCard(v=>!v)}>{card?'Скрий плащането с карта':'Плати с карта'}</button>}
+  {!awaiting&&wallets&&<div className="flex items-center gap-3 text-xs text-foreground-500"><span className="h-px flex-1 bg-background-200"/><span>или с карта</span><span className="h-px flex-1 bg-background-200"/></div>}
   {/* Mount both Elements immediately, even while loadActions/wallet detection
-      are pending. Keep the same iframe when toggling or checking a payment. */}
-  <form hidden={awaiting||(!card&&wallets===true)} className="space-y-3" onSubmit={event=>{event.preventDefault();void confirm();}}>
+      are pending. Keep card entry visible even when a wallet becomes available late. */}
+  <form hidden={awaiting} className="space-y-3" onSubmit={event=>{event.preventDefault();void confirm();}}>
    <div inert={busy||awaiting}><PaymentElement options={{layout:{type:'accordion',defaultCollapsed:false},wallets:{applePay:'never',googlePay:'never',link:'never'}}}
-    onReady={()=>setCardReady(true)} onFocus={()=>setCard(true)} onLoadError={()=>setCardFailed(true)} /></div>
+    onReady={()=>setCardReady(true)} onLoadError={()=>setCardFailed(true)} /></div>
    {cardFailed&&<PaymentLoadRecovery onRetry={onRetry}/>}
    <div className="sticky bottom-0 z-10 bg-white py-2"><button type="submit" className="booking-primary w-full disabled:opacity-40" disabled={!active||!session||busy||awaiting||!cardReady||cardFailed||!checkout?.canConfirm}>{busy?'Потвърждаваме…':session?`${session.environment==='test'?'Тествай':'Плати'} ${money(session.amount_minor/100)}`:'Плати с карта'}</button></div>
   </form>

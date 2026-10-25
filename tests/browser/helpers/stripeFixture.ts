@@ -1,16 +1,16 @@
 import type { Page } from '@playwright/test';
 /** A local UI double, never used in production or as proof of Stripe settlement. */
-export async function installStripeUiDouble(page:Page,wallet=false,challenge=false,options:{initialization?:'stalled-first'|'error-first';scriptedLoader?:boolean;actionsDelayMs?:number;walletDelayMs?:number;paymentDelayMs?:number}={}) {
+export async function installStripeUiDouble(page:Page,wallet=false,challenge=false,options:{walletType?:'applePay'|'googlePay';initialization?:'stalled-first'|'error-first';scriptedLoader?:boolean;actionsDelayMs?:number;walletDelayMs?:number;paymentDelayMs?:number}={}) {
  if(options.scriptedLoader)await page.route('https://js.stripe.com/**',route=>route.fulfill({contentType:'application/javascript',body:'window.stripeUiDouble.scriptDownloads++;window.Stripe=window.stripeUiDoubleFactory;'}));
  await page.addInitScript(({wallet,challenge,options})=>{
   const controls={confirms:0,initialisations:0,scriptDownloads:0,instances:0,paymentMounts:0,paymentDestroys:0,actionsReady:false};Object.assign(window,{stripeUiDouble:controls});
   const session={id:'cs_test_inline',livemode:false,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
   const element=(kind:string,secret:string|Promise<string>)=>{
    const handlers:Record<string,(event:unknown)=>void>={};let node:HTMLElement|null=null;
-   const ready=async()=>{try{await secret;if(node)handlers.ready?.({availablePaymentMethods:wallet?{applePay:true}:null});}catch{/* canceled preparation */}};
+   const ready=async()=>{try{await secret;if(node)handlers.ready?.({availablePaymentMethods:wallet?{[options.walletType??'applePay']:true}:null});}catch{/* canceled preparation */}};
    return {on:(name:string,handler:(event:unknown)=>void)=>{handlers[name]=handler;if(name==='ready'&&node)setTimeout(ready,0);},off:(name:string)=>{delete handlers[name];},update:()=>{},
     mount:(target:HTMLElement)=>{node=target;if(kind==='payment')controls.paymentMounts++;
-     if(kind==='express'&&wallet){const button=document.createElement('button');button.textContent='Mock Apple Pay';button.type='button';button.style.cssText='width:100%;height:48px;background:#111;color:white;border-radius:12px';button.onclick=()=>handlers.confirm?.({paymentType:'apple_pay'});target.appendChild(button);}
+     if(kind==='express'&&wallet){const button=document.createElement('button');button.textContent=options.walletType==='googlePay'?'Mock Google Pay':'Mock Apple Pay';button.type='button';button.style.cssText='width:100%;height:48px;background:#111;color:white;border-radius:12px';button.onclick=()=>handlers.confirm?.({paymentType:options.walletType==='googlePay'?'google_pay':'apple_pay'});target.appendChild(button);}
      if(kind==='payment'){const label=document.createElement('label');label.textContent='Тестова защитена форма на Stripe';const input=document.createElement('input');input.setAttribute('aria-label','Тестова карта');input.placeholder='4242 4242 4242 4242';input.onfocus=()=>handlers.focus?.({});input.style.cssText='width:100%;padding:14px;border:1px solid #ddd;border-radius:12px';label.appendChild(input);target.appendChild(label);}
      setTimeout(ready,kind==='express'?(options.walletDelayMs??0):kind==='payment'?(options.paymentDelayMs??0):0);
     },destroy:()=>{if(kind==='payment')controls.paymentDestroys++;node?.replaceChildren();node=null;},unmount:()=>{node?.replaceChildren();node=null;}};
