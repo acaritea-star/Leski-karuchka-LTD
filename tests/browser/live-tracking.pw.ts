@@ -129,7 +129,10 @@ test('Online grants GPS once, unavailable active ride keeps sharing, completion 
     if (route.request().method() === 'POST') writes++;
     return route.fulfill({ headers: cors, json: { updated_at: await page.evaluate(() => new Date().toISOString()) } });
   });
-  await page.goto('/driver/home'); await page.getByRole('button', { name: 'Включи онлайн', exact: true }).click();
+  await page.goto('/driver/home');
+  await expect(page.getByRole('button', { name: 'Включи онлайн', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Настройки за бисквитки' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Включи онлайн', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-gps-watches', '1');
   await expect.poll(socket.requestCount).toBeGreaterThan(0);
   state.rides = [ride()]; socket.request(state.rides[0]);

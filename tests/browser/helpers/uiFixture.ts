@@ -24,14 +24,18 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
     writeDelay: 0, notificationWrites: 0, notificationStateReads: 0, notificationPageReads: 0, notificationOpens: [] as string[], pushRegistrations: 0, pushDeletes: 0, external: [] as string[], errors: [] as string[],
   };
   page.on('pageerror', error => state.errors.push(error.message));
-  await page.addInitScript(({ user, role, aal }) => {
+  // Seed a prior choice from the test runner's clock. Playwright clock scripts
+  // can run after this initializer, so Date.now() here could otherwise be a few
+  // milliseconds ahead of a later fixed clock and invalidate the consent.
+  const consentSavedAt = Date.now() - 60_000;
+  await page.addInitScript(({ user, role, aal, consentSavedAt }) => {
     localStorage.setItem('i18nextLng', 'bg'); if (!localStorage.getItem('leski:auto-location:' + user.id)) localStorage.setItem('leski:auto-location:' + user.id, 'off');
-    const savedAt = Date.now(); localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt, expiresAt: savedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
+    localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt: consentSavedAt, expiresAt: consentSavedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
     if (role !== 'visitor') {
       const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', aal, exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
       localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, user }));
     }
-  }, { user, role, aal });
+  }, { user, role, aal, consentSavedAt });
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === 'http://127.0.0.1:4100') return route.continue();

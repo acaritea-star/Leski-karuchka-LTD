@@ -43,6 +43,8 @@ Read on 25 October 2026. The current merchant is the main Leski account in TEST 
 
 Unit, browser and database regressions cover manual-card availability with/without wallets; Google Pay UI dispatch; persistent iframes; duplicate confirmation and delayed responses; the pinned driver wallet; one aggregate refresh per paid event; exact previous-ride/owner scope; repeat partial refunds; test exclusion; receipt/reversal arithmetic; and tenant isolation. Browser wallet buttons are explicit test doubles, not an Android or Apple wallet certification. Physical device payment authorization and public-host rollout still require verification.
 
+The full CI run also exposed a browser-fixture clock ordering issue: saved cookie consent could be a few milliseconds in the future relative to Playwright's fixed clock, unexpectedly opening the consent banner over the driver online control. The fixture now seeds a prior choice using the runner clock, and the GPS scenario checks that it remains valid. Production consent validation is unchanged.
+
 ## Before live
 
 1. Enable Google Pay in the currently used TEST account. Test real Android Chrome/PWA with Google Wallet set up; card entry must work even if no wallet is available.
