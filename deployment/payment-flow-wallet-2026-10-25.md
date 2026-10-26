@@ -54,4 +54,12 @@ The full CI run also exposed a browser-fixture clock ordering issue: saved cooki
 5. With separately signed-in customer/driver physical phones, verify card, Apple Pay, Google Pay, required bank authentication, declined card, network loss, reconnect, refund and duplicate-event handling. An approved small real charge/refund must wait for explicit live activation.
 6. Verify the public PWA is serving the new release; pushing main does not prove a Readdy/hosting deploy.
 
+The existing legal-release gate is also still a draft (`legalReleaseApproved: false`). The source/version integrity check passes, but `check:legal-release` reports missing verified operator details and review acknowledgements. This payment UI release does not approve or fill those declarations.
+
 Official references: https://docs.stripe.com/elements/express-checkout-element ; https://docs.stripe.com/payments/elements/build-a-payment-page ; https://docs.stripe.com/payments/payment-element/best-practices ; https://supabase.com/docs/guides/realtime/postgres-changes .
+
+## Final verification — 26 October 2026
+
+Source commit `f46ee4db3e14abe51421c2444773def894ae3f70`: [Check](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40292405583) and [Database regression](https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40292405501) succeeded. Check includes 832 unit tests, 271 browser tests passed and one existing WebKit background-service-worker skip, production build, lint, type checking, production dependency audit and Edge Function type checking. The database concurrency regression verifies 12 concurrent Stripe deliveries apply once.
+
+Release `2026.10.26-payment-wallet.1` keeps the existing hashed assets for already open tabs. All 766 local JS/CSS chunk references resolve. The main JS entry is 392,674 bytes, versus 392,702 bytes in the previous release. No additional SDK, dependency, polling loop or Realtime channel was introduced.

@@ -1,5 +1,5 @@
 {
-  "release": "2026.10.25-compact-booking.1",
+  "release": "2026.10.26-payment-wallet.1",
   "baseCommit": "6ecf7a68bab4f4235500b0c3868fd211f59780c9",
   "databaseMigration": "launch_api_hardening",
   "pricingVersion": "fixed-fare-v2",
@@ -39,7 +39,8 @@
     "20261021191415_allowlisted_test_ride_payments",
     "20261022062508_inline_ride_checkout",
     "20261023132252_warm_ride_checkout",
-    "20261024071656_payment_settlement_noop_updates"
+    "20261024071656_payment_settlement_noop_updates",
+    "20261025181609_driver_wallet_received_totals"
   ],
   "driverTermsVersion": "2026-10-11-driver.1",
   "driverTrainingVersion": "2026-10-11.1",
@@ -365,5 +366,24 @@
     "newDependencies": false,
     "schemaChanges": false,
     "livePaymentsEnabled": false
+  },
+  "driverWalletVersion": 1,
+  "driverWalletVerifiedSourceCommit": "f46ee4db3e14abe51421c2444773def894ae3f70",
+  "driverWalletMigrationVersion": "20261025181609",
+  "driverWalletDeployedMigrationVersion": "20261025182624",
+  "driverWalletValidation": {
+    "unitTests": 832,
+    "localWebKitPaymentScenarios": 23,
+    "fullBrowserTests": 271,
+    "databaseRegression": "passed",
+    "newDependencies": false,
+    "newRealtimeChannels": false,
+    "livePaymentsEnabled": false,
+    "googlePayEnabledInStripe": false,
+    "physicalPhoneCheck": "required",
+    "skippedBrowserTests": 1,
+    "checkRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40292405583",
+    "databaseRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40292405501",
+    "legalReleaseApproved": false
   }
 }
