@@ -62,3 +62,25 @@ for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps the wa
  await wallet.click();const dialog=page.getByRole('dialog',{name:'Портфейл — днешни курсове'});await expect(dialog.getByText('Онлайн към фирмата')).toBeVisible();
  await dialog.getByRole('button',{name:'Затвори портфейла'}).click();await expect(wallet).toBeFocused();expect(state.errors).toEqual([]);
 });
+
+for(const path of ['/driver/home','/driver/requests'])test(`${path} retains a separate 2.97 test wallet after reload and gives the dialog room on phones`,async({page},info)=>{
+ const state=await setupUi(page,'DRIVER'),events=await serverEvents(page),row={...ride(),final_price:2.97,estimated_price:2.97,payment_environment:'test'};state.rides=[row];let paid=false,reads=0;
+ await page.route('**/rest/v1/rpc/driver_day_summary',route=>{reads++;return route.fulfill({headers:cors,json:{trips:0,earnings:0,received:{cash:0,card:0,online:0,total:0},test_payments:{total:paid?2.97:0,count:paid?1:0,refunded_count:0}}});});
+ await page.setViewportSize({width:390,height:844});await page.goto(path);await expect.poll(events.count).toBeGreaterThan(0);
+ const wallet=page.getByRole('button',{name:'Портфейл — получени по днешните курсове'});
+ await expect(wallet.locator('.driver-wallet-value')).toContainText('0,00');expect(reads).toBe(1);
+ paid=true;Object.assign(row,{status:'completed',payment_status:'paid',payment_method:'online',online_payment_state:'paid',updated_at:new Date(Date.now()+1000).toISOString()});events.send(row);
+ await expect(wallet.locator('.driver-wallet-test-summary')).toContainText('2,97');await expect(wallet.locator('.driver-wallet-value')).toContainText('0,00');expect(reads).toBe(2);
+ events.send(row);await expect(wallet.locator('.driver-wallet-test-summary')).toContainText('2,97');expect(reads).toBe(2);
+ await page.reload();await expect(wallet.locator('.driver-wallet-test-summary')).toContainText('2,97');expect(reads).toBe(3);
+ for(const width of [390,320]){
+  await page.setViewportSize({width,height:width===320?568:844});await wallet.click();const dialog=page.getByRole('dialog',{name:'Портфейл — днешни курсове'});
+  await expect(dialog.getByRole('region',{name:'Тестови плащания за днес'})).toContainText('2,97');await expect(dialog.locator('.driver-wallet-total')).toContainText('0,00');
+  const geometry=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.driver-wallet-dialog-body')!;return{left:r.left,right:r.right,width:innerWidth,padding:parseFloat(getComputedStyle(body).paddingLeft),overflow:el.scrollWidth>el.clientWidth};});
+  expect(geometry.left).toBeGreaterThanOrEqual(15);expect(geometry.right).toBeLessThanOrEqual(geometry.width-15);expect(geometry.padding).toBeGreaterThanOrEqual(18);expect(geometry.overflow).toBe(false);
+  await dialog.evaluate(el=>{el.scrollTop=0;});await page.screenshot({path:info.outputPath(`${path.includes('home')?'home':'requests'}-test-wallet-${width}.png`)});
+  await dialog.getByRole('button',{name:'Обнови',exact:true}).click();await expect(dialog.getByRole('region',{name:'Тестови плащания за днес'})).toContainText('2,97');
+  await dialog.getByRole('button',{name:'Затвори портфейла'}).click();await expect(wallet).toBeFocused();
+ }
+ expect(state.errors).toEqual([]);
+});

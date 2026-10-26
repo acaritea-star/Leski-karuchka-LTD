@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Tables } from '@/lib/database.types';
 import DriverWallet from './DriverWallet';
-const fake = vi.hoisted(() => ({ navigate: vi.fn(), refetch: vi.fn(), failed: false, total: 12.23 }));
+const fake = vi.hoisted(() => ({ navigate: vi.fn(), refetch: vi.fn(), failed: false, total: 12.23, testTotal: 0, refundedCount: 0 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => fake.navigate }));
-vi.mock('@/hooks/useDriverDay', () => ({ useDriverDay: () => ({ data: { received: { cash: 5, card: 3, online: 4.23, total: fake.total } }, isError: fake.failed, refetch: fake.refetch }) }));
+vi.mock('@/hooks/useDriverDay', () => ({ useDriverDay: () => ({ data: { received: { cash: 5, card: 3, online: 4.23, total: fake.total }, testPayments: { total: fake.testTotal, count: fake.testTotal > 0 ? 1 : 0, refundedCount: fake.refundedCount } }, isError: fake.failed, refetch: fake.refetch }) }));
 const row = { id: 'paid-ride', driver_id: 'driver', status: 'completed', payment_status: 'paid', payment_method: 'online', payment_environment: 'live', final_price: 4.23 } as Tables<'taxi_requests'>;
-beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); fake.failed = false; fake.total = 12.23; });
+beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); fake.failed = false; fake.total = 12.23; fake.testTotal = 0; fake.refundedCount = 0; });
 afterEach(cleanup);
 it('shows a persisted total, amount and distinct company funds without adding the receipt again', () => {
  const view = render(<DriverWallet owner="owner" driverId="driver" receipt={row} />);
@@ -30,4 +30,20 @@ it('hides another driver receipt and exposes refresh when the total is stale', (
  fake.failed = true; render(<DriverWallet owner="owner" driverId="other" receipt={row} />);
  expect(screen.queryByText('Платено онлайн')).toBeNull();
  fireEvent.click(screen.getByRole('button', { name: /Сумата не е обновена/ })); expect(fake.refetch).toHaveBeenCalledOnce();
+});
+it('retains the server test total without a transient receipt and never merges it into real money', () => {
+ fake.total = 0; fake.testTotal = 2.97;
+ const view = render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
+ expect(screen.getByText('2,97 €')).toBeTruthy(); expect(screen.getByText('0,00 €')).toBeTruthy();
+ expect(screen.queryByText('Платено онлайн')).toBeNull();
+ view.unmount(); render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
+ fireEvent.click(screen.getByRole('button', { name: 'Портфейл — получени по днешните курсове' }));
+ expect(screen.getByRole('region', { name: 'Тестови плащания за днес' }).textContent).toContain('2,97');
+ expect(screen.getByText('Потвърдени в Stripe тестове. Няма движение на реални пари.')).toBeTruthy();
+});
+it('identifies refunded tests instead of showing their original amount as collected money', () => {
+ fake.total = 0; fake.refundedCount = 1;
+ render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
+ fireEvent.click(screen.getByRole('button', { name: 'Портфейл — получени по днешните курсове' }));
+ expect(screen.getByText('Плащания с възстановяване извън този сбор: 1.')).toBeTruthy();
 });

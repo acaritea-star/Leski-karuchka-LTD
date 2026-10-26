@@ -105,6 +105,28 @@ DO $test$ DECLARE result jsonb; BEGIN
  IF (result#>>'{received,total}')::numeric<>0 THEN RAISE EXCEPTION 'FAIL test payment entered real wallet %',result; END IF;
 END $test$;
 RESET ROLE;
+-- A confirmed sandbox receipt remains visible separately after a new page load.
+UPDATE public.taxi_requests SET payment_status='paid',payment_method='online',online_payment_state='paid',final_price=2.97
+ WHERE id=(SELECT id FROM wallet_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
+SET LOCAL ROLE authenticated;
+DO $test$ DECLARE result jsonb; BEGIN
+ result:=public.driver_day_summary((SELECT driver FROM summary_ids),'2026-10-25');
+ IF result->'test_payments' <> '{"total":2.97,"count":1,"refunded_count":0}'::jsonb
+  OR (result#>>'{received,total}')::numeric<>0 THEN RAISE EXCEPTION 'FAIL separate sandbox wallet %',result; END IF;
+ result:=public.driver_day_summary((SELECT driver FROM summary_ids),'2026-10-26');
+ IF (result#>>'{test_payments,total}')::numeric<>0 THEN RAISE EXCEPTION 'FAIL test crossed Sofia day'; END IF;
+END $test$;
+RESET ROLE;
+UPDATE public.taxi_requests SET payment_status='refunded',online_payment_state='partially_refunded' WHERE id=(SELECT id FROM wallet_ids);
+SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
+SET LOCAL ROLE authenticated;
+DO $test$ DECLARE result jsonb; BEGIN
+ result:=public.driver_day_summary((SELECT driver FROM summary_ids),'2026-10-25');
+ IF result->'test_payments' <> '{"total":0,"count":0,"refunded_count":1}'::jsonb
+  OR (result#>>'{received,total}')::numeric<>0 THEN RAISE EXCEPTION 'FAIL refunded test reported as received %',result; END IF;
+END $test$;
+RESET ROLE;
 UPDATE public.profiles SET is_active=false WHERE id=(SELECT driver_user FROM summary_ids);
 SELECT set_config('request.jwt.claims',json_build_object('sub',driver_user,'role','authenticated')::text,true) FROM summary_ids;
 SET LOCAL ROLE authenticated;

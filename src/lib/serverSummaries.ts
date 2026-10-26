@@ -37,14 +37,18 @@ export async function loadCompanyDashboard(companyId: string, signal?: AbortSign
   if (error) throw new Error(error.message);
   return parseDashboard(data);
 }
-export type DriverDay = { trips: number; earnings: number; received: { cash: number; card: number; online: number; total: number } | null };
+export type DriverDay = { trips: number; earnings: number; received: { cash: number; card: number; online: number; total: number } | null;
+  testPayments: { total: number; count: number; refundedCount: number } | null };
 export function parseDriverDay(data: unknown): DriverDay {
   const result = record(data);
   // Older servers must show an unknown wallet, never estimated fares as money.
   const received = result.received == null ? null : record(result.received);
   const amounts = received ? { cash: numeric(received.cash), card: numeric(received.card), online: numeric(received.online), total: numeric(received.total) } : null;
   if (amounts && Math.abs(amounts.total - amounts.cash - amounts.card - amounts.online) > .005) throw new Error('Невалиден сбор на получените плащания.');
-  return { trips: numeric(result.trips, true), earnings: numeric(result.earnings), received: amounts };
+  const test = result.test_payments == null ? null : record(result.test_payments);
+  const testPayments = test ? { total: numeric(test.total), count: numeric(test.count, true), refundedCount: numeric(test.refunded_count, true) } : null;
+  if (testPayments && (testPayments.count === 0) !== (testPayments.total === 0)) throw new Error('Невалиден сбор на тестовите плащания.');
+  return { trips: numeric(result.trips, true), earnings: numeric(result.earnings), received: amounts, testPayments };
 }
 export async function loadDriverDay(driverId: string, signal?: AbortSignal): Promise<DriverDay> {
   const { data, error } = await withRequestTimeout(abort => supabase.rpc('driver_day_summary', { p_driver_id: driverId })

@@ -20,3 +20,10 @@ it('keeps estimated ride value separate from collected wallet money and handles 
     expect(() => parseDriverDay({ trips: 2, earnings: 50, received })).toThrow();
   }
 });
+it('keeps confirmed test totals separate and rejects invalid test summaries', () => {
+ const base = { trips: 0, earnings: 0, received: { cash: 0, card: 0, online: 0, total: 0 } };
+ expect(parseDriverDay(base).testPayments).toBeNull();
+ expect(parseDriverDay({ ...base, test_payments: { total: 2.97, count: 1, refunded_count: 0 } })).toMatchObject({ received: { total: 0 }, testPayments: { total: 2.97, count: 1, refundedCount: 0 } });
+ expect(parseDriverDay({ ...base, test_payments: { total: 0, count: 0, refunded_count: 1 } }).testPayments?.refundedCount).toBe(1);
+ for (const test_payments of [{ total: -1, count: 1, refunded_count: 0 }, { total: 2.97, count: 0, refunded_count: 0 }, { total: 0, count: 1, refunded_count: 0 }, { total: 2.97, count: 1.5, refunded_count: 0 }]) expect(() => parseDriverDay({ ...base, test_payments })).toThrow();
+});

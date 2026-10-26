@@ -1,5 +1,5 @@
 .driver-wallet { flex-basis:100%; min-width:0; }
-.driver-wallet-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:54px; border:1px solid #cce7d3; border-radius:14px; padding:8px 12px; background:#f1f9f3; color:#166534; text-align:left; }
+.driver-wallet-summary { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; width:100%; min-height:54px; border:1px solid #cce7d3; border-radius:14px; padding:8px 12px; background:#f1f9f3; color:#166534; text-align:left; }
 .driver-wallet-summary:focus-visible { outline:3px solid #86c89a; outline-offset:2px; }
 .driver-wallet-heading,.driver-wallet-value { display:flex; align-items:center; gap:10px; }
 .driver-wallet-heading strong { display:block; font-size:12px; line-height:16px; }
@@ -15,5 +15,27 @@
 .driver-wallet-breakdown { margin:20px 0; font-size:14px; }
 .driver-wallet-breakdown > div { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e5e7eb; }
 .driver-wallet-breakdown dd { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.driver-wallet-test-summary { grid-column:1/-1; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; padding-top:6px; border-top:1px solid #d8e6d9; color:#92400e; font-size:11px; }
+.driver-wallet-test-summary strong { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.app-dialog.driver-wallet-dialog { max-width:440px; border-radius:24px; }
+.driver-wallet-dialog-body { padding:24px; }
+.driver-wallet-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+.driver-wallet-dialog-header p { font-size:10px; font-weight:600; letter-spacing:.08em; color:#6b7280; margin-bottom:4px; }
+.driver-wallet-dialog-header h2 { font-size:22px; font-weight:700; line-height:1.25; }
+.driver-wallet-dialog-header button { width:44px; height:44px; flex-shrink:0; border-radius:50%; background:#f3f2ef; font-size:26px; }
+.driver-wallet-total { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 12px; padding:16px; border-radius:16px; background:#f1f9f3; color:#166534; }
+.driver-wallet-total span { font-size:12px; font-weight:600; }
+.driver-wallet-total strong { font-size:28px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.driver-wallet-test-detail { padding:14px; margin:16px 0; border:1px solid #f2dbb6; border-radius:14px; background:#fff8eb; color:#92400e; }
+.driver-wallet-test-detail > div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 12px; font-size:13px; }
+.driver-wallet-test-detail > div strong:last-child { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.driver-wallet-test-detail p { font-size:12px; line-height:1.5; margin-top:6px; }
+.driver-wallet-help { font-size:12px; color:#6b7280; line-height:1.5; margin-top:16px; }
+.driver-wallet-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+.driver-wallet-actions button { min-height:44px; border-radius:12px; padding:10px 14px; font-size:13px; font-weight:600; }
+.driver-wallet-actions button:first-child { flex:1; background:#166534; color:white; }
+.driver-wallet-actions button:last-child { background:#f3f2ef; }
+.driver-wallet-actions button:disabled { opacity:.6; }
+@media (max-width:360px) { .driver-wallet-dialog-body { padding:18px; } .driver-wallet-dialog-header h2 { font-size:20px; } }
 @media (prefers-reduced-motion:no-preference) { .driver-wallet-receipt[data-new=true] .driver-wallet-credit { animation:wallet-credit-in 500ms ease-out both; } }
 @keyframes wallet-credit-in { from { transform:translateY(5px) scale(.96); } to { transform:translateY(0) scale(1); } }
