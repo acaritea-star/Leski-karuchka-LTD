@@ -17,3 +17,7 @@ The previous wallet only displayed real collected money. Its transient test rece
 Regression coverage includes independent real/test totals, reload persistence, one refresh after settlement, duplicate events, invalid aggregate rejection, refunds, Sofia day boundaries, and existing driver/company/customer/anonymous scope checks. Browser tests assert dialog insets and overflow at 390px and 320px, and exercise refresh, close and focus restoration.
 
 Stripe remains in TEST mode. This change neither charges money nor enables Google Pay or live payments.
+
+Final source checks: 835 unit tests and 275 browser tests passed; one existing WebKit background-service-worker case is skipped. Check run 40332266950 and database run 40332267023 succeeded for source 9921e5b51979a972cefcead0f9b8794411cd0663. The production migration is recorded as 20261026134209, with SECURITY INVOKER and original grants preserved. The reported driver/day returns a separate test total of 2.97 and one successful test. Security and performance advisor findings are unchanged.
+
+The production build resolves all 766 checked JS/CSS references; the main entry remains 392,674 bytes. Existing hashed assets are retained for open PWA tabs.
