@@ -1,3 +1,4 @@
+import legalOperator from '../../src/config/legalOperator.json';
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -31,7 +32,7 @@ test('driver completes training with one explicit acceptance and recovers a lost
       attempts++;
       const body = route.request().postDataJSON();
       expect(body.p_driver).toBe(driver); expect(body.p_hash).toBe(contentHash);
-      expect(body.p_general_terms).toBe('2026-10-08-draft.3'); expect(body.p_general_privacy).toBe('2026-10-08.1');
+      expect(body.p_general_terms).toBe(legalOperator.termsVersion); expect(body.p_general_privacy).toBe(legalOperator.privacyVersion);
       if (body.p_answers.cash !== 'reconcile') return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: '22023', message: 'Прегледай обучението и трите отговора. Не всички са верни.' }), headers: { 'access-control-allow-origin': '*' } });
       receipt = { id: '44444444-4444-4444-8444-444444444444', driver_id: driver, user_id: account, company_id: company, terms_version: document.termsVersion, training_version: document.trainingVersion, content_hash: contentHash, accepted_at: '2026-10-09T19:00:00Z', training_completed_at: '2026-10-09T19:00:00Z' };
       // Simulates a committed write whose response was lost. The subsequent
