@@ -371,7 +371,7 @@
     "livePaymentsEnabled": false
   },
   "driverWalletVersion": 4,
-  "driverWalletVerifiedSourceCommit": "d1800610b3b473c639934517211f2371e86c2fc4",
+  "driverWalletVerifiedSourceCommit": "c51ad6b3f669734eb969df924d71b6d6e28cd853",
   "driverWalletMigrationVersion": "20261025181609",
   "driverWalletDeployedMigrationVersion": "20261025182624",
   "driverWalletValidation": {
@@ -419,17 +419,17 @@
     "performanceAdvisorDelta": 0
   },
   "livePaymentVersion": 1,
-  "livePaymentVerifiedSourceCommit": "d1800610b3b473c639934517211f2371e86c2fc4",
+  "livePaymentVerifiedSourceCommit": "c51ad6b3f669734eb969df924d71b6d6e28cd853",
   "livePaymentMode": "live",
   "livePaymentDomain": "leskikaruchka.com",
   "livePaymentReadiness": true,
   "productionTestPaymentUi": false,
   "livePaymentValidation": {
     "unitTests": 863,
-    "browserTests": "pending-final-CI",
+    "browserTests": 277,
     "databaseRegression": "passed",
-    "checkRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40543114282",
-    "databaseRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40543114258",
+    "checkRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40546866409",
+    "databaseRun": "https://github.com/acaritea-star/Leski-karuchka-LTD/actions/runs/40546866384",
     "serverAccountAndChargesVerified": true,
     "webhookEndpointEnabled": true,
     "webhookEvents": 12,
@@ -441,7 +441,15 @@
     "newRealtimeChannels": false,
     "realLiveRideSettlementVerified": false,
     "physicalPhoneCheck": "required",
-    "historicalSandboxMoneyConverted": false
+    "historicalSandboxMoneyConverted": false,
+    "unsignedWebhookStatus": 400,
+    "serverCredentialPatternsInBuild": 0,
+    "publicFrontendPublicationVerified": false,
+    "publicFrontendReleaseAtCheck": "2026.10.27-cash-payment-choice.1",
+    "skippedBrowserTests": 1,
+    "edgeTypeCheck": "passed",
+    "securityAdvisorDelta": 0,
+    "performanceAdvisorDelta": 0
   },
   "legalTermsVersion": "2026-10-27-draft.4",
   "legalSourceMigrationVersion": "20261027161923",
