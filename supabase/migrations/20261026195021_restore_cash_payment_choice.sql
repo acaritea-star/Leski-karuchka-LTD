@@ -83,10 +83,10 @@ BEGIN
   OR p_state='canceled' AND p_received_minor<>0 OR r.company_id<>o.company_id OR r.customer_id<>o.customer_id OR r.driver_id<>o.driver_id
   OR r.status NOT IN ('in_progress','completed') OR r.trip_ended_at IS NULL OR r.final_price*100<>o.amount_minor THEN RAISE EXCEPTION 'Payment binding rejected'; END IF;
  -- A delayed expiry of an already canceled test order is harmless after a real
- -- manual receipt. Every account/session/amount/actor binding above still applies.
+ -- receipt or a new live attempt. All account/session/amount/actor bindings apply.
  IF o.livemode IS DISTINCT FROM (r.payment_environment='live') AND NOT
   (NOT o.livemode AND r.payment_environment='live' AND o.state='canceled' AND o.received_minor=0
-   AND p_state='canceled' AND p_received_minor=0 AND EXISTS(SELECT 1 FROM public.ride_payment_receipts WHERE request_id=r.id)) THEN
+   AND p_state='canceled' AND p_received_minor=0) THEN
   RAISE EXCEPTION 'Payment environment binding rejected';END IF;
  SELECT order_id INTO old_event FROM private.ride_stripe_events WHERE account_id=p_account_id AND event_id=p_event_id;
  IF FOUND AND old_event<>o.id THEN RAISE EXCEPTION 'Payment event collision'; END IF;

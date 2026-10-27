@@ -55,6 +55,7 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
    const result=await ridePaymentAction(requestId,action);
    if(action==='checkout' && result.url){window.location.assign(result.url);return;}
    const current=await refresh();
+   if(current.isError)throw Error('Плащането не е проверено. Обнови, преди да платиш по друг начин.');
    if(current.data&&['paid','refunded'].includes(current.data.payment_status)){setMessage('');return;}
    setMessage(result.state==='paid'?onlinePaymentLabel(result.environment??data?.environment,'paid'):action==='cancel'&&['canceled','none'].includes(result.state)?'Плати в брой на шофьора. Той ще потвърди получената сума.':'Проверяваме онлайн плащането. Изчакай потвърждението, преди да платиш в брой.');
   }catch(cause){setError(cause instanceof Error?cause.message:'Плащането не е потвърдено.');}

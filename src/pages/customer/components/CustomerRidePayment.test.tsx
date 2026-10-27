@@ -76,3 +76,9 @@ for (const outcome of ['processing', 'paid', 'error'] as const) {
     expect(screen.queryByText(/Плати в брой на шофьора\./)).toBeNull();
   });
 }
+it('does not ask for cash if the final ride refresh fails after cancellation', async () => {
+  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, state: 'open' }));
+  vi.mocked(ridePaymentAction).mockImplementation(async () => { vi.mocked(loadRidePayment).mockRejectedValue(new Error('offline')); return { state: 'canceled' }; });
+  show(); fireEvent.click(await screen.findByRole('button', { name: 'Плащане в брой' }));
+  await screen.findByRole('alert'); expect(screen.queryByText(/Плати в брой на шофьора\./)).toBeNull();
+});

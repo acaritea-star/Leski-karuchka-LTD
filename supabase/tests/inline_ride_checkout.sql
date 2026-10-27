@@ -69,6 +69,12 @@ BEGIN
  SELECT to_jsonb(s) INTO o FROM private.ride_stripe_orders s WHERE checkout_session_id='cs_test_second';
  PERFORM public.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_second',NULL,'evt_late_old_expiry','canceled',1234,0,0);
  IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride2 AND online_payment_state='creating') THEN RAISE EXCEPTION 'FAIL expired old session hid the current payment';END IF;
+ PERFORM public.attach_ride_checkout((next_order->>'id')::uuid,'cs_test_hostedLast','https://checkout.stripe.com/c/pay/cs_test_hostedLast');
+ PERFORM public.record_ride_stripe_snapshot((next_order->>'id')::uuid,aid,'cs_test_hostedLast',NULL,'evt_expired_before_live','canceled',1234,0,0);
+ UPDATE private.ride_stripe_merchants SET livemode=true,publishable_key='pk_live_synthetic' WHERE account_id=aid;
+ next_order:=public.begin_ride_elements_checkout(ride2,customer,aid);
+ PERFORM public.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_second',NULL,'evt_old_test_after_live','canceled',1234,0,0);
+ IF NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride2 AND online_payment_state='creating' AND payment_environment='live') THEN RAISE EXCEPTION 'FAIL canceled test corrupted live attempt';END IF;
 
 END $t$;
 ROLLBACK;
