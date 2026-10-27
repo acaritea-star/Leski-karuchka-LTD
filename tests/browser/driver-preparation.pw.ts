@@ -1,4 +1,4 @@
-import legalOperator from '../../src/config/legalOperator.json';
+import legalOperator from '../../src/config/legalOperator.json' with { type: 'json' };
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
