@@ -1,8 +1,10 @@
 import Stripe from 'npm:stripe@22.6.0';
 import { admin } from './auth.ts';
 import { LIVE_RIDE_ACCOUNT, type RideOrder, type RideStripeSnapshot } from './rideStripe.ts';
-const testKey=(Deno.env.get('STRIPE_API_KEY')??'').trim();
-const liveKey=(Deno.env.get('STRIPE_LIVE_SECRET_KEY')??testKey).trim();
+import { resolveRideStripeCredentials } from './rideStripeCredentials.ts';
+export const rideStripeCredentials=resolveRideStripeCredentials(name=>Deno.env.get(name));
+const {testKey,liveKey}=rideStripeCredentials;
+export const rideWebhookSecret=(live:boolean)=>live?rideStripeCredentials.liveWebhookSecret:rideStripeCredentials.testWebhookSecret;
 export const testRideStripe=new Stripe(testKey||'not_configured',{timeout:6000,maxNetworkRetries:0});
 export const rideStripe=new Stripe(liveKey||'not_configured',{timeout:6000,maxNetworkRetries:0});
 export const stripeForRide=(live:boolean)=>live?rideStripe:testRideStripe;

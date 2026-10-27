@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { createStripeSandboxHandler, SANDBOX_ACCOUNT, TEST_MODE_ACCOUNT } from '../_shared/stripeSandbox.ts';
 import { createStripeWebhookDispatcher } from '../_shared/stripeWebhookDispatcher.ts';
 import { createRideStripeWebhook } from '../_shared/rideStripe.ts';
-import { rideStripe,rideStripeDependencies,rideStripeDependenciesForMode } from '../_shared/rideStripeRuntime.ts';
+import { rideStripe,rideStripeDependencies,rideStripeDependenciesForMode,rideWebhookSecret } from '../_shared/rideStripeRuntime.ts';
 
 const sandboxKey=(Deno.env.get('STRIPE_API_KEY')??'').trim();
 const stripe = new Stripe(sandboxKey||'not_configured',{timeout:6000,maxNetworkRetries:0});
@@ -21,9 +21,10 @@ async function checkAccount() {
  }).catch(error => { accountCheck=undefined; throw error; });
  return await accountCheck;
 }
-function verifier(client:Stripe,variable:string,environment:'sandbox'|'live') {
+function verifier(client:Stripe,readSecret:()=>string,environment:'sandbox'|'live') {
  return async(body:string,signature:string)=>{
-  const secret=(Deno.env.get(variable)??'').trim();
+  const secret=readSecret();
+  if(!secret)throw Error('Signing secret unavailable');
   try{return await client.webhooks.constructEventAsync(body,signature,secret,undefined,Stripe.createSubtleCryptoProvider());}
   catch(error){
    // Never log the key, signing secret, signature, raw body or SDK error message.
@@ -41,8 +42,8 @@ function verifier(client:Stripe,variable:string,environment:'sandbox'|'live') {
   }
  };
 }
-const sandboxVerify=verifier(stripe,'STRIPE_WEBHOOK_API','sandbox');
-const liveVerify=verifier(rideStripe,'STRIPE_LIVE_WEBHOOK_SECRET','live');
+const sandboxVerify=verifier(stripe,()=>rideWebhookSecret(false),'sandbox');
+const liveVerify=verifier(rideStripe,()=>rideWebhookSecret(true),'live');
 const legacySandboxHandler=createStripeSandboxHandler({
  accountId:checkAccount,
  verify: sandboxVerify,
