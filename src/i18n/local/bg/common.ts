@@ -140,7 +140,6 @@ export default {
   login_here: 'Влезте',
   auth_home: 'Лески Каручка — начало',
   auth_support_phone: 'Телефон за връзка с платформата',
-  service_testing_period: 'Тестов период',
   auth_continue_google: 'Продължи с Google',
   auth_continue_facebook: 'Продължи с Facebook',
   auth_continue_accept_prefix: 'С натискането на „Продължи“ приемате нашите',

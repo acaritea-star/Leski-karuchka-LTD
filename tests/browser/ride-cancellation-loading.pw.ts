@@ -37,11 +37,11 @@ for (const status of ['pending', 'accepted', 'arrived']) test(`orders can cancel
 test('tracking cancellation stays reachable with payment enabled on a short phone', async ({ page }, testInfo) => {
   const state = await setupUi(page, 'CUSTOMER'); state.rides = [ride()];
   await page.route('**/rest/v1/rpc/ride_payment_state', route => route.fulfill({ headers: cors, json: {
-    request_id: id, eligible: true, inline_available: true, environment: 'test', amount: 5, state: 'none', ended_at: null, payment_status: 'pending', payment_method: 'cash' } }));
+    request_id: id, eligible: true, inline_available: true, environment: 'live', amount: 5, state: 'none', ended_at: null, payment_status: 'pending', payment_method: 'cash' } }));
   await page.setViewportSize({ width: 320, height: 568 }); await page.goto('/customer/home');
   const cancel = page.getByRole('button', { name: 'Отмени заявката', exact: true });
   await expect(cancel).toBeInViewport({ ratio: 1 });
-  await page.getByRole('button', { name: 'Тествай плащане с карта', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Плати онлайн с карта', exact: true }).scrollIntoViewIfNeeded();
   await expect(cancel).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath('tracking-actions-320.png') });
   await cancel.click(); await expect(page.getByRole('dialog')).toBeInViewport({ ratio: 1 });

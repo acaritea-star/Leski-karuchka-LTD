@@ -96,3 +96,4 @@ ROLLBACK;
 \ir test_ride_checkouts.sql
 \ir inline_ride_checkout.sql
 \ir cash_payment_choice.sql
+\ir live_service_terms_status.sql

@@ -24,7 +24,7 @@ export function useDriverPaymentReceipt(owner:string|undefined,driverId:string|u
   queryFn:async({signal})=>{
    if(!scoped)return null;
    const {data,error}=await withRequestTimeout(abort=>supabase.from('taxi_requests').select('*')
-    .eq('id',previous.requestId).eq('driver_id',driverId).abortSignal(abort).maybeSingle(),8000,signal);
+    .eq('id',previous.requestId).eq('driver_id',driverId).eq('payment_environment','live').abortSignal(abort).maybeSingle(),8000,signal);
    if(error)throw error;
    if(data&&(data.id!==previous.requestId||data.driver_id!==driverId))throw Error('Wrong ride receipt');
    const latest=client.getQueryData<Tables<'taxi_requests'>|null>(queryKey);
@@ -34,7 +34,7 @@ export function useDriverPaymentReceipt(owner:string|undefined,driverId:string|u
   },
  });
  const row=receipt.data;
- return scoped&&!requestId&&row?.id===previous.requestId&&row.driver_id===driverId&&row.status==='completed'&&row.payment_status==='paid'&&row.payment_method==='online'
+ return scoped&&!requestId&&row?.id===previous.requestId&&row.driver_id===driverId&&row.status==='completed'&&row.payment_status==='paid'&&row.payment_method==='online'&&row.payment_environment==='live'
   ?row:null;
 }
 

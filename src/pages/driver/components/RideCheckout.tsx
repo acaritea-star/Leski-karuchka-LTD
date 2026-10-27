@@ -33,7 +33,7 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
  const requestId = request?.id;
  const payment=useQuery({queryKey:['ride-payment-state',owner,requestId],enabled:!!requestId,
   queryFn:({signal})=>loadRidePayment(requestId!,signal),refetchInterval:q=>q.state.data?.payment_status==='pending'&&(q.state.data.eligible||['creating','open','processing'].includes(q.state.data.state))?10000:false,refetchIntervalInBackground:false,retry:1});
- const testMode=payment.data?.environment==='test';
+ const archived=payment.data?.environment==='test';
  const onlineBusy=!!payment.data&&['creating','open','processing'].includes(payment.data.state);
  const onlinePaid=payment.data?.payment_status==='paid'&&payment.data.payment_method==='online';
  const cancelOnline=async()=>{
@@ -87,12 +87,12 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={() => void run()}>Повтори същия запис</button>
     </div> : request && <>
      <div className="rounded-2xl bg-primary-50 p-5 text-center"><p className="text-xs text-foreground-600">Цена от заявката</p><p className="mt-1 text-4xl font-bold tabular-nums">{money(request.estimated_price == null ? null : Number(request.estimated_price))}</p><p className="mt-2 text-xs">Курс {request.id.slice(0,8)}</p></div>
-     {payment.isPending?<p role="status" className="text-sm">Проверяваме плащането…</p>:payment.isError?<><p role="alert" className="text-sm">Плащането не е проверено. Обнови, преди да приемеш пари.</p><button className={`${button} w-full border border-background-200`} disabled={payment.isFetching} onClick={()=>void payment.refetch()}>Обнови плащането</button></>:onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">{onlinePaymentLabel(payment.data?.environment,'paid')}</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:payment.data?.payment_status!=='pending'?<><p role="status" className="text-sm">Плащането вече е отчетено. Провери подробностите в отчета.</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
-      <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{testMode?'Тестов режим · Клиентът плаща с тестова карта.':'Клиентът плаща онлайн. Изчакай потвърждението от Stripe.'}</p>
+     {payment.isPending?<p role="status" className="text-sm">Проверяваме плащането…</p>:payment.isError?<><p role="alert" className="text-sm">Плащането не е проверено. Обнови, преди да приемеш пари.</p><button className={`${button} w-full border border-background-200`} disabled={payment.isFetching} onClick={()=>void payment.refetch()}>Обнови плащането</button></>:archived?<p role="status" className="text-sm">Този платежен запис е архивиран.</p>:onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">{onlinePaymentLabel(payment.data?.environment,'paid')}</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:payment.data?.payment_status!=='pending'?<><p role="status" className="text-sm">Плащането вече е отчетено. Провери подробностите в отчета.</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
+      <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">Клиентът плаща онлайн. Изчакай потвърждението от Stripe.</p>
       <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>Провери и премини към плащане в брой</button>
       <p className="text-xs text-foreground-500">Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.</p>
      </>:!problem ? <>
-      {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">{testMode?'Онлайн картата е в тестов режим. Кешът и терминалът по-долу записват реално получени пари.':'Клиентът може да плати от телефона си или в брой. Онлайн плащането се потвърждава автоматично тук.'}</p>}
+      {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">Клиентът може да плати от телефона си или в брой. Онлайн плащането се потвърждава автоматично тук.</p>}
       <p className="text-sm text-foreground-600">Как получи парите? Потвърждението приключва курса и добавя плащането в отчета.</p>
       <button className={`${button} w-full bg-primary-500 text-white`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('cash')}>Получих в брой · приключи</button>
       <button className={`${button} w-full border border-primary-300 text-primary-800`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('card')}>Получих на ПОС терминал · приключи</button>

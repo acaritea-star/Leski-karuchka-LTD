@@ -10,7 +10,7 @@ vi.mock('@/lib/ridePayment', async original => ({ ...await original<typeof impor
 vi.mock('@/lib/rideCheckout', async original => ({ ...await original<typeof import('@/lib/rideCheckout')>(), completeRidePayment: vi.fn() }));
 const owner = '11111111-1111-4111-8111-111111111111', driverId = '22222222-2222-4222-8222-222222222222';
 const request = { id: '33333333-3333-4333-8333-333333333333', driver_id: driverId, estimated_price: 2.97, status: 'in_progress' } as Tables<'taxi_requests'>;
-const state = (overrides: Partial<RidePaymentState> = {}): RidePaymentState => ({ request_id: request.id, eligible: true, environment: 'test', ended_at: '2026-10-26T12:00:00Z', amount: 2.97, state: 'none', payment_status: 'pending', payment_method: 'cash', ...overrides });
+const state = (overrides: Partial<RidePaymentState> = {}): RidePaymentState => ({ request_id: request.id, eligible: true, environment: 'live', ended_at: '2026-10-26T12:00:00Z', amount: 2.97, state: 'none', payment_status: 'pending', payment_method: 'cash', ...overrides });
 function show() {
  const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
  const onFinished = vi.fn();
@@ -19,7 +19,7 @@ function show() {
 }
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(cleanup);
-for (const environment of ['test', 'live'] as const) for (const choice of ['cash', 'card'] as const) {
+for (const environment of ['live'] as const) for (const choice of ['cash', 'card'] as const) {
  it(`records ${choice} once when online eligibility is ${environment}`, async () => {
   vi.mocked(loadRidePayment).mockResolvedValue(state({ environment }));
   let resolve!: (row: Tables<'taxi_requests'>) => void;
@@ -41,7 +41,7 @@ it('never exposes cash while the server payment check is unresolved or unavailab
 });
 it('keeps cash locked when a concurrent card confirmation is still processing', async () => {
  vi.mocked(loadRidePayment).mockResolvedValue(state({ state: 'processing' }));
- vi.mocked(ridePaymentAction).mockResolvedValue({ state: 'processing', environment: 'test' }); show();
+ vi.mocked(ridePaymentAction).mockResolvedValue({ state: 'processing', environment: 'live' }); show();
  fireEvent.click(await screen.findByRole('button', { name: 'Провери и премини към плащане в брой' }));
  await screen.findByText(/Не приемай второ плащане/);
  expect(screen.queryByRole('button', { name: 'Получих в брой · приключи' })).toBeNull();
@@ -55,7 +55,7 @@ it('opens cash after verified cancellation and blocks new receipts after online 
  await screen.findByRole('button', { name: 'Получих в брой · приключи' });
  vi.mocked(loadRidePayment).mockResolvedValue(state({ state: 'paid', payment_status: 'paid', payment_method: 'online' }));
  await act(async () => { await client.refetchQueries(); });
- expect(await screen.findByText('Тестово плащане успешно')).toBeTruthy();
+ expect(await screen.findByText('Платено онлайн')).toBeTruthy();
  expect(screen.queryByRole('button', { name: 'Получих в брой · приключи' })).toBeNull();
 });
 it('retains the exact receipt identity after an uncertain network response and reload', async () => {
@@ -67,4 +67,10 @@ it('retains the exact receipt identity after an uncertain network response and r
  view.unmount(); show();
  expect(await screen.findByRole('button', { name: 'Повтори същия запис' })).toBeTruthy();
  expect(prepareCheckout(driverId, { p_request_id: request.id, p_actor: owner, p_choice: 'cash', p_partial_amount: null, p_note: '' })).toEqual(original);
+});
+it('does not let an archived paid record become a real cash receipt or payment confirmation', async () => {
+ vi.mocked(loadRidePayment).mockResolvedValue(state({ environment: 'test', state: 'paid', payment_status: 'paid', payment_method: 'online' }));
+ show(); await screen.findByText('Този платежен запис е архивиран.');
+ expect(screen.queryByRole('button', { name: 'Получих в брой · приключи' })).toBeNull();
+ expect(screen.queryByText('Платено онлайн')).toBeNull(); expect(completeRidePayment).not.toHaveBeenCalled();
 });

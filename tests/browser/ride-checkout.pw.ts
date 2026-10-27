@@ -8,7 +8,7 @@ for(const choice of ['cash','card','unpaid','partial_cash'] as const){
   const ride={id:rideId,company_id:uiCompany,driver_id:uiDriver,customer_id:'99999999-9999-4999-8999-999999999999',status:'in_progress',estimated_price:12.34,final_price:null as number|null,pickup_latitude:43.08,pickup_longitude:25.63,destination_latitude:43.12,destination_longitude:25.7,pickup_address:'Велико Търново, център',destination_address:'Горна Оряховица, гара',payment_method:'cash',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   state.rides=[ride];let writes=0,receipt:Record<string,unknown>|null=null,patches=0;
   // Eligibility for sandbox online payments must not remove manual tenders.
-  await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:rideId,eligible:true,environment:'test',ended_at:new Date().toISOString(),amount:12.34,state:'none',payment_status:'pending',payment_method:'cash'}}));
+  await page.route('**/rest/v1/rpc/ride_payment_state',route=>route.fulfill({headers:cors,json:{request_id:rideId,eligible:true,environment:'live',ended_at:new Date().toISOString(),amount:12.34,state:'none',payment_status:'pending',payment_method:'cash'}}));
   await page.route('**/rest/v1/taxi_requests*',async route=>{
    if(route.request().method()==='PATCH'){patches++;return route.abort();}
    const url=new URL(route.request().url());

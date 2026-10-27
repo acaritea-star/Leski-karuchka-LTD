@@ -61,6 +61,6 @@ export function rememberPaymentMethod(key:string,method:'wallet'|'card') {try{lo
 
 
 export function onlinePaymentLabel(environment:string|undefined,status:string|undefined) {
- if(environment==='test')return status==='refunded'?'Тестово възстановяване':status==='paid'?'Тестово плащане успешно':'Тестово онлайн плащане';
+ if(environment==='test')return 'Архивиран запис';
  return status==='refunded'?'Възстановено онлайн':status==='paid'?'Платено онлайн':'Онлайн плащане';
 }

@@ -140,7 +140,6 @@ export default {
   login_here: 'Login',
   auth_home: 'Leski Karuchka — home',
   auth_support_phone: 'Platform contact phone',
-  service_testing_period: 'Testing period',
   auth_continue_google: 'Continue with Google',
   auth_continue_facebook: 'Continue with Facebook',
   auth_continue_accept_prefix: 'By selecting “Continue”, you accept the',

@@ -47,3 +47,8 @@ it('does not let a slow receipt read overwrite a newer refund event',async()=>{
  act(()=>cacheDriverRequest(view.client,'driver',{...row('A','completed','refunded'),updated_at:'2026-10-23T20:01:00Z'}));
  await act(async()=>resolve({data:row('A'),error:null}));expect(view.result.current).toBe('');
 });
+it('never celebrates a cached sandbox receipt as a real live payment',async()=>{
+ const view=setup();act(()=>cacheDriverRequest(view.client,'driver',{...row('A'),payment_environment:'test'}));
+ view.rerender({owner:'owner',driver:'driver',id:undefined});await act(async()=>{});
+ expect(view.result.current).toBe('');expect(fake.read).not.toHaveBeenCalled();
+});

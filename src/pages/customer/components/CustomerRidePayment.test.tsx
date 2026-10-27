@@ -42,21 +42,21 @@ for (const [method, label] of [['cash', 'Платено в брой'], ['card', 
 it('refreshes server eligibility when an installed app resumes even if its ride row is unchanged', async () => {
   vi.mocked(loadRidePayment).mockResolvedValue(state());
   const client = show(); await act(async () => { await client.refetchQueries(); });
-  expect(screen.queryByRole('button', { name: 'Тествай плащане с карта' })).toBeNull();
-  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, environment: 'test' }));
+  expect(screen.queryByRole('button', { name: 'Плати онлайн с карта' })).toBeNull();
+  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, environment: 'live' }));
   await act(async () => { fireEvent(window, new Event('pageshow')); });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Тествай плащане с карта' })).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Плати онлайн с карта' })).toBeTruthy());
 });
-it('keeps cash available in sandbox and only creates the card session after an explicit card choice', async () => {
-  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, inline_available: true, environment: 'test' }));
+it('keeps cash available in live mode and only creates the card session after an explicit card choice', async () => {
+  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, inline_available: true, environment: 'live' }));
   show();
   await screen.findByRole('button', { name: 'Плащане в брой' });
   await waitFor(() => expect(elements).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, open: false })));
   expect(ridePaymentAction).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Тествай плащане с карта' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Плати онлайн с карта' }));
   await waitFor(() => expect(elements).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true, open: true })));
 });
-for (const environment of ['test', 'live'] as const) {
+for (const environment of ['live'] as const) {
   it(`checks cancellation before directing ${environment} customers to pay cash`, async () => {
     vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, environment, state: 'open' }));
     vi.mocked(ridePaymentAction).mockResolvedValue({ state: 'canceled', environment });
@@ -81,4 +81,11 @@ it('does not ask for cash if the final ride refresh fails after cancellation', a
   vi.mocked(ridePaymentAction).mockImplementation(async () => { vi.mocked(loadRidePayment).mockRejectedValue(new Error('offline')); return { state: 'canceled' }; });
   show(); fireEvent.click(await screen.findByRole('button', { name: 'Плащане в брой' }));
   await screen.findByRole('alert'); expect(screen.queryByText(/Плати в брой на шофьора\./)).toBeNull();
+});
+for (const payment_status of ['pending', 'paid', 'refunded']) it(`never presents an archived ${payment_status} payment as real money or a payable card`, async () => {
+  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, inline_available: true, environment: 'test', payment_status, payment_method: 'online' }));
+  show(); await screen.findByText('Този платежен запис е архивиран.');
+  expect(screen.queryByRole('button', { name: 'Плати онлайн с карта' })).toBeNull();
+  expect(screen.queryByText('Платено онлайн')).toBeNull();
+  expect(elements).not.toHaveBeenCalled(); expect(ridePaymentAction).not.toHaveBeenCalled();
 });

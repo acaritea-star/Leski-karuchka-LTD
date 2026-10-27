@@ -32,12 +32,12 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged,
   const abort=new AbortController(),finishTiming=startRidePaymentTiming('session');setError('');setSession(null);setLegacy(null);
   void ridePaymentAction(requestId,'elements',abort.signal).then(result=>{
    if(abort.signal.aborted)return;
-   finishTiming();if('ui_mode' in result)setSession(result);
+   finishTiming();if('ui_mode' in result){if(result.environment!=='live')throw Error('Archived payment');setSession(result);}
    else {setLegacy(result);void changed.current();}
   }).catch(()=>{if(!abort.signal.aborted)setError('Не успяхме да заредим плащането. Опитай отново със същия курс.');});
   return()=>abort.abort();
  },[requestId,userId,attempt,enabled]);
- const publicKey=preparation?.publishable_key??session?.publishable_key;
+ const publicKey=preparation&&preparation.environment!=='live'?undefined:preparation?.publishable_key??session?.publishable_key;
  const sdk=useMemo(()=>publicKey?{key:sdkAttempt,stripe:loadStripe(publicKey)}:null,[publicKey,sdkAttempt]);
  const cancel=async()=>{
   if(busy)return;setBusy(true);setError('');
@@ -48,7 +48,7 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged,
  return <Modal open={open} label="Плащане на пътуването" onClose={onClose} busy={busy} allowExternalOverlays className="ride-payment-dialog">
   <div className="ride-payment-header flex items-center justify-between gap-3 mb-4"><h2 className="text-xl font-bold">Пристигнахте</h2><button type="button" aria-label="Затвори плащането" className="h-11 w-11 shrink-0 rounded-full bg-background-100 text-2xl" onClick={onClose}><span aria-hidden="true">×</span></button></div>
   {session&&<><div className="flex justify-between items-baseline gap-3 mb-3"><span>Сума за плащане</span><strong className="text-3xl font-bold tabular-nums">{money(session.amount_minor/100)}</strong></div>
-   {session.environment==='test'&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 mb-3">Тестов режим · Не се теглят реални пари</p>}</>}
+  </>}
   {sdk&&!error&&!legacy&&<PaymentSdkBoundary key={sdk.key} onRetry={retrySdk}>
    <CheckoutElementsProvider stripe={sdk.stripe} options={{clientSecret:gate.clientSecret,elementsOptions:{appearance:{theme:'stripe',variables:{colorPrimary:'#15803d',borderRadius:'12px',fontFamily:'system-ui, sans-serif',fontSizeBase:'16px'}},loader:'auto',savedPaymentMethod:{enableSave:'auto',enableRedisplay:'auto'}}}}>
     <RidePaymentForm session={session} preparation={preparation} active={open&&enabled} userId={userId} onBusy={setBusy} onChanged={onChanged} onRetry={retrySdk} />
@@ -61,13 +61,13 @@ export default function RidePaymentElements({requestId,userId,onClose,onChanged,
   {error&&<div role="alert" className="booking-error mt-3"><p>{error}</p><button type="button" className="min-h-11 underline" onClick={()=>{setSession(null);setAttempt(v=>v+1);retrySdk();}}>Опитай отново</button></div>}
   <div className="mt-4 border-t border-background-200 pt-3 text-center">
    <p className="text-xs text-foreground-500"><i className="ri-lock-line" aria-hidden="true" /> Сигурно плащане през Stripe</p>
-   {(session||legacy?.url)&&<button type="button" className="min-h-11 text-sm underline" disabled={busy} onClick={()=>void cancel()}>{(session?.environment??legacy?.environment)==='test'?'Отмени тестовото плащане':'Предпочитам в брой'}</button>}
+   {(session||legacy?.url)&&<button type="button" className="min-h-11 text-sm underline" disabled={busy} onClick={()=>void cancel()}>Предпочитам в брой</button>}
   </div>
  </Modal>;
 }
 
 export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,preparation=null,active=true}:{session:RideElementsSession|null;userId:string;onBusy:(busy:boolean)=>void;onChanged:()=>Promise<boolean|void>;onRetry:()=>void;preparation?:RidePaymentPreparation|null;active?:boolean}) {
- const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session?.account_id??preparation?.account_id??'',session?.environment??preparation?.environment??'test');
+ const result=useCheckoutElements(),key=paymentPreferenceKey(userId,session?.account_id??preparation?.account_id??'',session?.environment??preparation?.environment??'live');
  const [wallets,setWallets]=useState<boolean|null>(null),[busy,setBusy]=useState(false),[awaiting,setAwaiting]=useState(false),[error,setError]=useState('');
  const [cardReady,setCardReady]=useState(false),[cardFailed,setCardFailed]=useState(false);
  const ready=result.type==='success'&&(cardReady||wallets===true);
@@ -92,6 +92,7 @@ export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,prepara
   const timer=window.setTimeout(online,2500);
   return()=>{clearTimeout(timer);window.removeEventListener('online',online);document.removeEventListener('visibilitychange',online);};
  },[awaiting,reconcile]);
+ if(session&&session.environment!=='live')return <p role="alert" className="booking-error">Плащането по този курс не е достъпно.</p>;
  if(result.type==='error')return <PaymentLoadRecovery onRetry={onRetry}/>;
  const checkout=session&&result.type==='success'?result.checkout:null;
  if(session&&checkout&&(checkout.id!==session.session_id || checkout.livemode!==(session.environment==='live') || checkout.currency!=='eur' || checkout.total.total.minorUnitsAmount!==session.amount_minor))return <p role="alert" className="booking-error">Сумата не съвпада. Обнови курса преди плащане.</p>;
@@ -125,7 +126,7 @@ export function RidePaymentForm({session,userId,onBusy,onChanged,onRetry,prepara
    <div inert={busy||awaiting}><PaymentElement options={{layout:{type:'accordion',defaultCollapsed:false},wallets:{applePay:'never',googlePay:'never',link:'never'}}}
     onReady={()=>setCardReady(true)} onLoadError={()=>setCardFailed(true)} /></div>
    {cardFailed&&<PaymentLoadRecovery onRetry={onRetry}/>}
-   <div className="sticky bottom-0 z-10 bg-white py-2"><button type="submit" className="booking-primary w-full disabled:opacity-40" disabled={!active||!session||busy||awaiting||!cardReady||cardFailed||!checkout?.canConfirm}>{busy?'Потвърждаваме…':session?`${session.environment==='test'?'Тествай':'Плати'} ${money(session.amount_minor/100)}`:'Плати с карта'}</button></div>
+   <div className="sticky bottom-0 z-10 bg-white py-2"><button type="submit" className="booking-primary w-full disabled:opacity-40" disabled={!active||!session||busy||awaiting||!cardReady||cardFailed||!checkout?.canConfirm}>{busy?'Потвърждаваме…':session?`Плати ${money(session.amount_minor/100)}`:'Плати с карта'}</button></div>
   </form>
   {awaiting&&<div role="status"><p>Потвърждаваме плащането…</p><button type="button" className="min-h-11 underline" disabled={busy} onClick={()=>void reconcile()}>Провери плащането</button></div>}
   {error&&<p role="alert" className="booking-error">{error}</p>}

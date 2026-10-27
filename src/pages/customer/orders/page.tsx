@@ -49,12 +49,12 @@ export default function CustomerOrders() {
       const { data, error } = await withRequestTimeout(abort => supabase
         .from('taxi_requests')
         .select('*')
-        .eq('customer_id', customerId as string)
+        .eq('customer_id', customerId as string).eq('payment_environment', 'live')
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
         .limit(50).abortSignal(abort), 10_000, signal);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter(row => row.payment_environment !== 'test');
     },
     enabled: !!customerId,
   });

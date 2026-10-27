@@ -30,19 +30,19 @@ for(const path of ['/driver/home','/driver/requests'])test(`${path} receives the
  expect(state.errors).toEqual([]);
 });
 test('uses an already settled webhook result after card confirmation without a redundant checkout call',async({page})=>{
- const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page);const row={...ride(),payment_environment:'test'};state.rides=[row];let sessions=0,reconciles=0;
+ const state=await setupUi(page,'CUSTOMER');await installStripeUiDouble(page);const row={...ride(),payment_environment:'live'};state.rides=[row];let sessions=0,reconciles=0;
  await page.route('**/rest/v1/rpc/ride_payment_state',async route=>{
   const confirmed=await page.evaluate(()=>(window as unknown as {stripeUiDouble?:{confirms:number}}).stripeUiDouble?.confirms??0);
   if(confirmed)Object.assign(row,{payment_status:'paid',payment_method:'online',online_payment_state:'paid'});
-  return route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',inline_available:true,environment:'test',ended_at:row.trip_ended_at,amount:2.95,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}});
+  return route.fulfill({headers:cors,json:{request_id:id,eligible:row.payment_status!=='paid',inline_available:true,environment:'live',ended_at:row.trip_ended_at,amount:2.95,state:row.online_payment_state,payment_status:row.payment_status,payment_method:row.payment_method}});
  });
  await page.route('**/functions/v1/ride-checkout',route=>{
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
   if(route.request().postDataJSON().action!=='elements'){reconciles++;return route.abort();}
-  sessions++;return route.fulfill({headers:cors,json:{state:'open',environment:'test',ui_mode:'elements',request_id:id,session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'}});
+  sessions++;return route.fulfill({headers:cors,json:{state:'open',environment:'live',ui_mode:'elements',request_id:id,session_id:'cs_live_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_live_fixture',client_secret:'cs_live_inline_secret_fixture'}});
  });
- await page.goto('/customer/home');await page.getByRole('button',{name:'Тествай плащане с карта',exact:true}).click();await page.getByRole('button',{name:'Тествай 2.95 €',exact:true}).click();
- await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();expect(sessions).toBe(1);expect(reconciles).toBe(0);expect(state.errors).toEqual([]);
+ await page.goto('/customer/home');await page.getByRole('button',{name:'Плати онлайн с карта',exact:true}).click();await page.getByRole('button',{name:'Плати 2.95 €',exact:true}).click();
+ await expect(page.getByText('Платено онлайн',{exact:true})).toBeVisible();expect(sessions).toBe(1);expect(reconciles).toBe(0);expect(state.errors).toEqual([]);
 });
 
 for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps the wallet pinned and refreshes once for a verified payment`,async({page},info)=>{
@@ -70,7 +70,7 @@ for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps histor
  const wallet=page.getByRole('button',{name:'Портфейл — получени по днешните курсове'});
  await expect(wallet.locator('.driver-wallet-value')).toContainText('0,00');expect(reads).toBe(1);
  paid=true;Object.assign(row,{status:'completed',payment_status:'paid',payment_method:'online',online_payment_state:'paid',updated_at:new Date(Date.now()+1000).toISOString()});events.send(row);
- await expect(page.getByText('Тестово плащане успешно',{exact:true})).toBeVisible();await expect.poll(()=>reads).toBe(2);
+ await expect(page.getByText('Тестово плащане успешно',{exact:true})).toHaveCount(0);await expect(page.locator('.driver-wallet-receipt')).toHaveCount(0);await expect.poll(()=>reads).toBe(2);
  await expect(wallet.locator('.driver-wallet-test-summary')).toHaveCount(0);await expect(wallet.locator('.driver-wallet-value')).toContainText('0,00');expect(reads).toBe(2);
  events.send(row);await expect(wallet.locator('.driver-wallet-test-summary')).toHaveCount(0);expect(reads).toBe(2);
  await page.reload();await expect(wallet.locator('.driver-wallet-value')).toContainText('0,00');await expect(wallet.locator('.driver-wallet-test-summary')).toHaveCount(0);expect(reads).toBe(3);

@@ -47,7 +47,7 @@ export function parseDriverDay(data: unknown): DriverDay {
   if (amounts && Math.abs(amounts.total - amounts.cash - amounts.card - amounts.online) > .005) throw new Error('Невалиден сбор на получените плащания.');
   const test = result.test_payments == null ? null : record(result.test_payments);
   const testPayments = test ? { total: numeric(test.total), count: numeric(test.count, true), refundedCount: numeric(test.refunded_count, true) } : null;
-  if (testPayments && (testPayments.count === 0) !== (testPayments.total === 0)) throw new Error('Невалиден сбор на тестовите плащания.');
+  if (testPayments && (testPayments.count === 0) !== (testPayments.total === 0)) throw new Error('Невалиден архивиран сбор.');
   return { trips: numeric(result.trips, true), earnings: numeric(result.earnings), received: amounts, testPayments };
 }
 export async function loadDriverDay(driverId: string, signal?: AbortSignal): Promise<DriverDay> {

@@ -21,10 +21,10 @@ it('shows a persisted total, amount and distinct company funds without adding th
  expect(screen.getByText('Онлайн към фирмата')).toBeTruthy();
  fireEvent.click(screen.getByRole('button', { name: 'Отвори отчета' })); expect(fake.navigate).toHaveBeenCalledWith('/driver/earnings');
 });
-it('labels a sandbox payment and keeps it out of the real balance', () => {
+it('hides a sandbox receipt and keeps it out of the real balance', () => {
  fake.total = 0; render(<DriverWallet owner="owner" driverId="driver" receipt={{ ...row, payment_environment: 'test' }} />);
- expect(screen.getByText('0,00 €')).toBeTruthy(); expect(screen.getByText('Тест · без реално постъпление')).toBeTruthy();
- expect(screen.getByText('Тестово плащане успешно')).toBeTruthy();
+ expect(screen.getByText('0,00 €')).toBeTruthy(); expect(screen.queryByRole('status')).toBeNull();
+ expect(screen.queryByText('+4,23 €')).toBeNull();expect(screen.queryByText('Платено онлайн')).toBeNull();
 });
 it('hides another driver receipt and exposes refresh when the total is stale', () => {
  fake.failed = true; render(<DriverWallet owner="owner" driverId="other" receipt={row} />);

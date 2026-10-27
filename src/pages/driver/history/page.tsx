@@ -30,7 +30,7 @@ export default function DriverHistory() {
       let query = supabase
         .from('taxi_requests')
         .select('id,status,payment_method,payment_status,payment_environment,completed_at,cancelled_at,pickup_address,destination_address,estimated_distance_km,estimated_duration_min,final_price,estimated_price')
-        .eq('driver_id', driverId!);
+        .eq('driver_id', driverId!).eq('payment_environment', 'live');
       if (filter === 'completed') {
         query = query.eq('status', 'completed');
       } else if (filter === 'cancelled') {
@@ -41,7 +41,7 @@ export default function DriverHistory() {
       const { data, error } = await withRequestTimeout(abort => query.order('created_at', { ascending: false })
         .order('id', { ascending: false }).limit(50).abortSignal(abort), 10_000, signal);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter(row => row.payment_environment !== 'test');
     },
     enabled: !!driverId,
   });

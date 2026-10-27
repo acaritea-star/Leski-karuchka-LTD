@@ -115,7 +115,6 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
               <div className="flex justify-center gap-5 pt-3"><Link to="/company/login" className="underline">Вход за фирми</Link><Link to="/driver/login" className="underline">Вход за шофьори</Link></div>
             </details>}
         </div>
-        <p className="text-center text-foreground-500 text-xs mt-6">{t('service_testing_period')}</p>
       </div>
     </main>
   </div>;

@@ -15,8 +15,8 @@ vi.mock('@/lib/stripeCheckout',()=>({
   return fake.wallet?<button onClick={()=>onConfirm({paymentType:'apple_pay'})}>Mock Apple Pay</button>:null;
  },PaymentElement:({onReady}:{onReady:()=>void})=>{useEffect(()=>onReady(),[onReady]);return <input aria-label="Защитена форма на Stripe"/>;},
 }));
-vi.mock('@/lib/stripeCheckoutState',()=>({useCheckoutElements:()=>fake.phase==='success'?({type:'success',checkout:{id:'cs_test_inline',livemode:false,currency:'eur',total:{total:{minorUnitsAmount:fake.amount}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}):({type:fake.phase,error:{message:'SDK unavailable'}})}));
-const session:RideElementsSession={state:'open',environment:'test',ui_mode:'elements',request_id:'ride',session_id:'cs_test_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_test_fixture',client_secret:'cs_test_inline_secret_fixture'};
+vi.mock('@/lib/stripeCheckoutState',()=>({useCheckoutElements:()=>fake.phase==='success'?({type:'success',checkout:{id:'cs_live_inline',livemode:true,currency:'eur',total:{total:{minorUnitsAmount:fake.amount}},email:'stripe-test@example.invalid',canConfirm:true,confirm:fake.confirm}}):({type:fake.phase,error:{message:'SDK unavailable'}})}));
+const session:RideElementsSession={state:'open',environment:'live',ui_mode:'elements',request_id:'ride',session_id:'cs_live_inline',account_id:'acct_fixture',amount_minor:295,currency:'eur',publishable_key:'pk_live_fixture',client_secret:'cs_live_inline_secret_fixture'};
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.wallet=false;fake.phase='success';fake.amount=295;fake.confirm.mockResolvedValue({type:'success',session:{}});fake.action.mockResolvedValue({state:'open'});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 const setup=()=>{const changed=vi.fn(async()=>undefined),busy=vi.fn(),retry=vi.fn();render(<RidePaymentForm session={session} userId="owner" onBusy={busy} onChanged={changed} onRetry={retry}/>);return {changed,busy,retry};};
@@ -38,7 +38,7 @@ it('keeps the form mounted during slow actions and offers recovery without confi
  vi.useFakeTimers();fake.phase='loading';const {retry,changed}=setup();
  expect(screen.getByText('Подготвяме начините за плащане…')).toBeTruthy();
  const input=screen.getByLabelText('Защитена форма на Stripe');fireEvent.change(input,{target:{value:'synthetic input'}});
- fireEvent.click(screen.getByRole('button',{name:'Тествай 2.95 €'}));expect(fake.confirm).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Плати 2.95 €'}));expect(fake.confirm).not.toHaveBeenCalled();
  act(()=>{vi.advanceTimersByTime(12000);});
  expect(screen.getByLabelText('Защитена форма на Stripe')).toBe(input);expect((input as HTMLInputElement).value).toBe('synthetic input');
  fireEvent.click(screen.getByRole('button',{name:'Зареди плащането отново'}));
@@ -60,41 +60,46 @@ it('does not restart the Session request for a new parent callback identity',asy
  await act(async()=>{});expect(fake.action).toHaveBeenCalledOnce();
 });
 it('offers the card form when wallets are unavailable and needs one payment confirmation',async()=>{
- const {changed}=setup();await screen.findByRole('button',{name:'Тествай 2.95 €'});fireEvent.click(screen.getByRole('button',{name:'Тествай 2.95 €'}));
+ const {changed}=setup();await screen.findByRole('button',{name:'Плати 2.95 €'});fireEvent.click(screen.getByRole('button',{name:'Плати 2.95 €'}));
  await waitFor(()=>expect(fake.confirm).toHaveBeenCalledOnce());await waitFor(()=>expect(changed).toHaveBeenCalledTimes(2));
  expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({redirect:'if_required'}));expect(fake.confirm.mock.calls[0][0]).not.toHaveProperty('returnUrl');expect(screen.queryByText('Платено онлайн')).toBeNull();
- expect(localStorage.getItem(paymentPreferenceKey('owner','acct_fixture','test'))).toBe('card');
+ expect(localStorage.getItem(paymentPreferenceKey('owner','acct_fixture','live'))).toBe('card');
 });
 it('keeps card entry visible alongside a wallet without an extra tap',async()=>{
  fake.wallet=true;setup();await screen.findByRole('button',{name:'Mock Apple Pay'});
- expect(screen.getByRole('button',{name:'Тествай 2.95 €'})).toBeTruthy();
+ expect(screen.getByRole('button',{name:'Плати 2.95 €'})).toBeTruthy();
  const input=screen.getByLabelText('Защитена форма на Stripe');fireEvent.change(input,{target:{value:'synthetic input'}});
  expect((input as HTMLInputElement).value).toBe('synthetic input');
  fireEvent.click(screen.getByRole('button',{name:'Mock Apple Pay'}));await waitFor(()=>expect(fake.confirm).toHaveBeenCalledWith(expect.objectContaining({expressCheckoutConfirmEvent:{paymentType:'apple_pay'}})));
 });
 it('keeps a declined card retryable without reporting it paid',async()=>{
  fake.confirm.mockResolvedValue({type:'error',error:{message:'Картата е отказана.'}});const {changed}=setup();
- fireEvent.click(await screen.findByRole('button',{name:'Тествай 2.95 €'}));await screen.findByText('Картата е отказана.');expect(changed).not.toHaveBeenCalled();expect(fake.action).not.toHaveBeenCalled();
- expect((screen.getByRole('button',{name:'Тествай 2.95 €'}) as HTMLButtonElement).disabled).toBe(false);
+ fireEvent.click(await screen.findByRole('button',{name:'Плати 2.95 €'}));await screen.findByText('Картата е отказана.');expect(changed).not.toHaveBeenCalled();expect(fake.action).not.toHaveBeenCalled();
+ expect((screen.getByRole('button',{name:'Плати 2.95 €'}) as HTMLButtonElement).disabled).toBe(false);
 });
 it('blocks a second confirm after a lost response, then reconciles the same payment',async()=>{
  let reject:(error:Error)=>void=()=>{};fake.confirm.mockImplementation(()=>new Promise((_resolve,no)=>{reject=no;}));const {changed}=setup();
- const pay=await screen.findByRole('button',{name:'Тествай 2.95 €'});fireEvent.click(pay);fireEvent.click(pay);expect(fake.confirm).toHaveBeenCalledOnce();
+ const pay=await screen.findByRole('button',{name:'Плати 2.95 €'});fireEvent.click(pay);fireEvent.click(pay);expect(fake.confirm).toHaveBeenCalledOnce();
  reject(Error('offline'));await screen.findByText('Връзката прекъсна. Провери плащането преди следващ опит.');
  fake.action.mockResolvedValue({state:'paid'});fireEvent.click(screen.getByRole('button',{name:'Провери плащането'}));await waitFor(()=>expect(changed).toHaveBeenCalledOnce());expect(fake.confirm).toHaveBeenCalledOnce();
 });
 it('does not hide card entry because of another user or an old wallet preference',()=>{
- localStorage.setItem(paymentPreferenceKey('other','acct_fixture','test'),'card');fake.wallet=true;setup();
- expect(screen.getByRole('button',{name:'Тествай 2.95 €'})).toBeTruthy();
+ localStorage.setItem(paymentPreferenceKey('other','acct_fixture','live'),'card');fake.wallet=true;setup();
+ expect(screen.getByRole('button',{name:'Плати 2.95 €'})).toBeTruthy();
  expect(paymentPreferenceKey('owner','acct_fixture','test')).not.toBe(paymentPreferenceKey('owner','acct_fixture','live'));
 });
-it.each([{environment:'live'},{request_id:'foreign'},{session_id:'cs_test_foreign'},{publishable_key:'pk_live_wrong'},{amount_minor:295.1},{currency:'usd'}])('rejects a payment configuration mismatch %j',mutation=>{
+it.each([{environment:'test'},{request_id:'foreign'},{session_id:'cs_test_foreign'},{publishable_key:'pk_test_wrong'},{amount_minor:295.1},{currency:'usd'}])('rejects a payment configuration mismatch %j',mutation=>{
  expect(()=>parseRideElementsSession({...session,...mutation},'ride')).toThrow();
 });
 
 it('uses the webhook-confirmed database receipt without a second Stripe reconciliation',async()=>{
  const changed=vi.fn(async()=>true);render(<RidePaymentForm session={session} userId="owner" onBusy={()=>{}} onChanged={changed} onRetry={()=>{}}/>);
- fireEvent.click(await screen.findByRole('button',{name:'Тествай 2.95 €'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Плати 2.95 €'}));
  await waitFor(()=>expect(changed).toHaveBeenCalledOnce());expect(fake.action).not.toHaveBeenCalled();expect(fake.confirm).toHaveBeenCalledOnce();
  expect(screen.queryByText('Платено онлайн')).toBeNull();
+});
+it('rejects an unexpected sandbox Session before any card confirmation',async()=>{
+ fake.action.mockResolvedValue({...session,environment:'test',session_id:'cs_test_archived',client_secret:'cs_test_archived_secret_fixture',publishable_key:'pk_test_fixture'});
+ render(<RidePaymentElements requestId="ride" userId="owner" onClose={()=>{}} onChanged={async()=>{}}/>);
+ await screen.findByRole('alert');expect(screen.queryByText('Сума за плащане')).toBeNull();expect(fake.confirm).not.toHaveBeenCalled();
 });

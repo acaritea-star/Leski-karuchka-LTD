@@ -4,7 +4,7 @@ export async function installStripeUiDouble(page:Page,wallet=false,challenge=fal
  if(options.scriptedLoader)await page.route('https://js.stripe.com/**',route=>route.fulfill({contentType:'application/javascript',body:'window.stripeUiDouble.scriptDownloads++;window.Stripe=window.stripeUiDoubleFactory;'}));
  await page.addInitScript(({wallet,challenge,options})=>{
   const controls={confirms:0,initialisations:0,scriptDownloads:0,instances:0,paymentMounts:0,paymentDestroys:0,actionsReady:false};Object.assign(window,{stripeUiDouble:controls});
-  const session={id:'cs_test_inline',livemode:false,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
+  const session={id:'cs_live_inline',livemode:true,currency:'eur',email:'stripe-test@example.invalid',canConfirm:true,total:{total:{minorUnitsAmount:295}},savedPaymentMethods:[],status:{type:'open'}};
   const element=(kind:string,secret:string|Promise<string>)=>{
    const handlers:Record<string,(event:unknown)=>void>={};let node:HTMLElement|null=null;
    const ready=async()=>{try{await secret;if(node)handlers.ready?.({availablePaymentMethods:wallet?{[options.walletType??'applePay']:true}:null});}catch{/* canceled preparation */}};

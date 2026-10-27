@@ -1,8 +1,20 @@
 import { authorize,cors,json } from '../_shared/auth.ts';
 import { runRideCheckout } from '../_shared/rideCheckout.ts';
 import { paymentRpc,requireRideStripe,stripeForRide } from '../_shared/rideStripeRuntime.ts';
+let liveHealth:{checkedAt:number;pending:Promise<boolean>}|undefined;
 export async function rideCheckout(request:Request):Promise<Response> {
  if(request.method==='OPTIONS')return new Response('ok',{headers:cors});
+ // Public availability only: no keys, account identifiers, actor or ride data.
+ // Cache the probe so concurrent health checks share one Stripe account read.
+ if(request.method==='GET'&&new URL(request.url).searchParams.get('health')==='live') {
+  if(!liveHealth||Date.now()-liveHealth.checkedAt>=60000) {
+   liveHealth={checkedAt:Date.now(),pending:(async()=>{
+    if(!(Deno.env.get('STRIPE_LIVE_WEBHOOK_SECRET')??'').trim().startsWith('whsec_'))return false;
+    try{await requireRideStripe(true,true);return true;}catch{return false;}
+   })()};
+  }
+  return json({ready:await liveHealth.pending});
+ }
  if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
  try {
   const actor=await authorize(request);

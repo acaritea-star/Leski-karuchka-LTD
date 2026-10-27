@@ -23,7 +23,7 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   window.addEventListener('pageshow',resume);
   return()=>window.removeEventListener('pageshow',resume);
  },[user?.id,refresh]);
- const data=payment.data,testMode=data?.environment==='test',ended=!!endedAt || !!data?.ended_at;
+ const data=payment.data,ended=!!endedAt || !!data?.ended_at;
  const paid=data?.payment_status==='paid';
  const active=!!data && ['creating','open','processing'].includes(data.state);
  const identity=`${user?.id}:${requestId}`,[openIdentity,setOpenIdentity]=useState<string|null>(null),[preparedIdentity,setPreparedIdentity]=useState<string|null>(null),[armedIdentity,setArmedIdentity]=useState<string|null>(null),autoPrepared=useRef('');
@@ -34,7 +34,7 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   return !!result.data&&['paid','refunded'].includes(result.data.payment_status);
  },[client,user?.id,requestId,refresh]);
  useEffect(()=>{
-  if(ended||!data?.eligible||!data.inline_available||!navigator.onLine)return;
+  if(ended||data?.environment!=='live'||!data?.eligible||!data.inline_available||!navigator.onLine)return;
   const connection=(navigator as Navigator&{connection?:{saveData?:boolean}}).connection;
   if(connection?.saveData)return;
   let active=true;
@@ -42,10 +42,10 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   const idle=typeof window.requestIdleCallback==='function'?window.requestIdleCallback(warm,{timeout:1500}):null;
   const timer=idle===null?window.setTimeout(warm,750):null;
   return()=>{active=false;if(idle!==null)window.cancelIdleCallback(idle);if(timer!==null)window.clearTimeout(timer);};
- },[identity,ended,data?.eligible,data?.inline_available,data?.preparation]);
+ },[identity,ended,data?.eligible,data?.inline_available,data?.preparation,data?.environment]);
  useEffect(()=>{
-  if(ended&&data?.eligible&&data.inline_available&&!['processing','canceled'].includes(data.state)&&autoPrepared.current!==identity){autoPrepared.current=identity;setPreparedIdentity(identity);}
- },[ended,data?.eligible,data?.inline_available,data?.state,identity]);
+  if(ended&&data?.environment==='live'&&data?.eligible&&data.inline_available&&!['processing','canceled'].includes(data.state)&&autoPrepared.current!==identity){autoPrepared.current=identity;setPreparedIdentity(identity);}
+ },[ended,data?.eligible,data?.inline_available,data?.state,data?.environment,identity]);
  useEffect(()=>{if(paid||data?.state==='canceled'){setOpenIdentity(null);setPreparedIdentity(null);setArmedIdentity(null);}},[paid,data?.state]);
  useEffect(()=>{setMessage('');setError('');},[identity]);
  const run=async(action:'checkout'|'cancel'|'reconcile')=>{
@@ -61,15 +61,15 @@ export default function CustomerRidePayment({requestId,price,endedAt,revision}:{
   }catch(cause){setError(cause instanceof Error?cause.message:'Плащането не е потвърдено.');}
   finally{lock.current=false;setBusy(false);}
  };
+ if(data?.environment==='test')return <p role="status" className="text-sm text-foreground-500">Този платежен запис е архивиран.</p>;
  return <div className="w-full space-y-2" aria-label="Плащане по пътуването">
   <div className="flex items-center justify-between gap-3 text-sm"><span>{paid?'Платена сума':ended?'Дължима сума':'Цена на пътуването'}</span><strong className="text-xl tabular-nums">{money(data?.amount??price)}</strong></div>
-  {testMode&&(data?.eligible||data?.payment_method==='online')&&<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">Онлайн картата е в тестов режим · Не се теглят реални пари</p>}
   {paid?<p role="status" className="font-semibold text-primary-700">{data.payment_method==='online'?onlinePaymentLabel(data.environment,'paid'):data.payment_method==='card'?'Платено с карта на шофьора':'Платено в брой'}</p>:data?.payment_status==='refunded'?<p role="status">{data.payment_method==='online'?onlinePaymentLabel(data.environment,'refunded'):'Плащането е възстановено'}</p>:payment.isPending?<p role="status" className="text-sm">Проверяваме начините за плащане…</p>:data?.eligible?<>
    <button type="button" className="booking-primary w-full disabled:opacity-40" disabled={!ended || busy || payment.isError || data.state==='processing'} onClick={()=>{setMessage('');setError('');if(data.inline_available){setPreparedIdentity(identity);setArmedIdentity(identity);setOpenIdentity(identity);}else void run('checkout');}}>
-    <i className="ri-bank-card-line" aria-hidden="true" />{busy?'Проверка…':data.state==='processing'?'Проверяваме плащането…':active&&!data.inline_available?'Продължи плащането':testMode?'Тествай плащане с карта':'Плати онлайн с карта'}
+    <i className="ri-bank-card-line" aria-hidden="true" />{busy?'Проверка…':data.state==='processing'?'Проверяваме плащането…':active&&!data.inline_available?'Продължи плащането':'Плати онлайн с карта'}
    </button>
    <button type="button" className="min-h-12 w-full rounded-xl border border-background-200 px-4 py-3 text-sm font-semibold disabled:opacity-40" disabled={!ended||busy||payment.isError} onClick={()=>void run('cancel')}>Плащане в брой</button>
-   <p className="text-xs text-foreground-500">{ended?(testMode?'Само онлайн картата е тестова. Плащането в брой се отчита от шофьора като реално получена сума.':'С банкова карта, Apple Pay / Google Pay или в брой на шофьора.'):'Плащането се отключва, когато шофьорът отбележи края на пътуването.'}</p>
+   <p className="text-xs text-foreground-500">{ended?'С банкова карта, наличния Apple Pay / Google Pay или в брой на шофьора.':'Плащането се отключва, когато шофьорът отбележи края на пътуването.'}</p>
    {active&&<button type="button" className="min-h-11 text-xs underline" disabled={busy} onClick={()=>void run('reconcile')}>Провери плащането</button>}
   </>:ended&&data&&!payment.isError&&<p className="text-sm">Плати на шофьора. Онлайн плащането не е включено за този курс.</p>}
   {payment.isError&&<button type="button" className="min-h-11 text-xs underline" onClick={()=>void refresh()}>Обнови възможностите за плащане</button>}

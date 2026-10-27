@@ -18,11 +18,9 @@ function Receipt({ row, owner }: { row: Tables<'taxi_requests'>; owner: string }
   });
   useEffect(() => { try { sessionStorage.setItem(key, row.id); } catch { /* Optional presentation storage. */ } }, [key, row.id]);
   const amount = row.final_price == null ? null : Number(row.final_price);
-  const test = row.payment_environment === 'test';
-  return <div role="status" className={`driver-wallet-receipt ${test ? 'is-test' : ''}`} data-new={fresh}>
+  return <div role="status" className="driver-wallet-receipt" data-new={fresh}>
     <span>{onlinePaymentLabel(row.payment_environment, row.payment_status)}</span>
     {amount != null && Number.isFinite(amount) && amount > 0 && <strong className="driver-wallet-credit">+{walletMoney(amount)}</strong>}
-    {test && <small>Тест · без реално постъпление</small>}
   </div>;
 }
 
@@ -30,7 +28,7 @@ export default function DriverWallet({ owner, driverId, receipt }: { owner?: str
   const query = useDriverDay(driverId), navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const received = query.data?.received;
-  const scoped = receipt?.driver_id === driverId && !!owner && receipt?.status === 'completed' && receipt.payment_status === 'paid' && receipt.payment_method === 'online';
+  const scoped = receipt?.payment_environment === 'live' && receipt?.driver_id === driverId && !!owner && receipt?.status === 'completed' && receipt.payment_status === 'paid' && receipt.payment_method === 'online';
   return <div className="driver-wallet" aria-label="Портфейл на шофьора">
     <button type="button" className="driver-wallet-summary" aria-label="Портфейл — получени по днешните курсове" onClick={() => setOpen(true)}>
       <span className="driver-wallet-heading"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 8V5a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v11H6a3 3 0 0 1-3-3V6"/><path d="M20 12h-5v4h5"/></svg><span><strong>Портфейл</strong><small>Получени днес</small></span></span>
