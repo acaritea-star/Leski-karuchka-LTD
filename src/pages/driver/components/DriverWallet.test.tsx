@@ -31,19 +31,13 @@ it('hides another driver receipt and exposes refresh when the total is stale', (
  expect(screen.queryByText('Платено онлайн')).toBeNull();
  fireEvent.click(screen.getByRole('button', { name: /Сумата не е обновена/ })); expect(fake.refetch).toHaveBeenCalledOnce();
 });
-it('retains the server test total without a transient receipt and never merges it into real money', () => {
- fake.total = 0; fake.testTotal = 2.97;
+it('shows only real wallet totals even when historical tests and test refunds exist', () => {
+ fake.total = 12.23; fake.testTotal = 2.97; fake.refundedCount = 1;
  const view = render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
- expect(screen.getByText('2,97 €')).toBeTruthy(); expect(screen.getByText('0,00 €')).toBeTruthy();
- expect(screen.queryByText('Платено онлайн')).toBeNull();
+ expect(screen.getByText('12,23 €')).toBeTruthy(); expect(screen.queryByText('2,97 €')).toBeNull();
  view.unmount(); render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
  fireEvent.click(screen.getByRole('button', { name: 'Портфейл — получени по днешните курсове' }));
- expect(screen.getByRole('region', { name: 'Тестови плащания за днес' }).textContent).toContain('2,97');
- expect(screen.getByText('Потвърдени в Stripe тестове. Няма движение на реални пари.')).toBeTruthy();
-});
-it('identifies refunded tests instead of showing their original amount as collected money', () => {
- fake.total = 0; fake.refundedCount = 1;
- render(<DriverWallet owner="owner" driverId="driver" receipt={null} />);
- fireEvent.click(screen.getByRole('button', { name: 'Портфейл — получени по днешните курсове' }));
- expect(screen.getByText('Плащания с възстановяване извън този сбор: 1.')).toBeTruthy();
+ expect(screen.queryByRole('region', { name: 'Тестови плащания за днес' })).toBeNull();
+ expect(screen.queryByText('Тестови плащания')).toBeNull(); expect(screen.queryByText('2,97 €')).toBeNull();
+ expect(screen.getByText('Онлайн към фирмата')).toBeTruthy();
 });

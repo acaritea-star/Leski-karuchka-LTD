@@ -17,7 +17,7 @@ test('prepares during the ride without payment access and opens the same frames 
  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');expect(calls).toBe(0);
  await page.clock.fastForward(1800000);expect(calls).toBe(0);
  row.trip_ended_at=new Date().toISOString();await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- await expect.poll(()=>calls).toBe(1);await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Тествай плащане с карта',exact:true})).toBeEnabled();expect(calls).toBe(0);await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.getByRole('button',{name:'Тествай плащане с карта',exact:true}).click();
  const dialog=page.getByRole('dialog');await expect(dialog.getByRole('button',{name:'Тествай 2.95 €',exact:true})).toBeEnabled();
  expect(await before?.evaluate(el=>el===document.querySelector('input[aria-label="Тестова карта"]'))).toBe(true);

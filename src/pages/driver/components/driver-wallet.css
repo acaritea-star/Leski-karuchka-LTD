@@ -15,8 +15,6 @@
 .driver-wallet-breakdown { margin:20px 0; font-size:14px; }
 .driver-wallet-breakdown > div { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e5e7eb; }
 .driver-wallet-breakdown dd { white-space:nowrap; font-variant-numeric:tabular-nums; }
-.driver-wallet-test-summary { grid-column:1/-1; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; padding-top:6px; border-top:1px solid #d8e6d9; color:#92400e; font-size:11px; }
-.driver-wallet-test-summary strong { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .app-dialog.driver-wallet-dialog { max-width:440px; border-radius:24px; }
 .driver-wallet-dialog-body { padding:24px; }
 .driver-wallet-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
@@ -26,10 +24,6 @@
 .driver-wallet-total { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 12px; padding:16px; border-radius:16px; background:#f1f9f3; color:#166534; }
 .driver-wallet-total span { font-size:12px; font-weight:600; }
 .driver-wallet-total strong { font-size:28px; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.driver-wallet-test-detail { padding:14px; margin:16px 0; border:1px solid #f2dbb6; border-radius:14px; background:#fff8eb; color:#92400e; }
-.driver-wallet-test-detail > div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 12px; font-size:13px; }
-.driver-wallet-test-detail > div strong:last-child { white-space:nowrap; font-variant-numeric:tabular-nums; }
-.driver-wallet-test-detail p { font-size:12px; line-height:1.5; margin-top:6px; }
 .driver-wallet-help { font-size:12px; color:#6b7280; line-height:1.5; margin-top:16px; }
 .driver-wallet-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
 .driver-wallet-actions button { min-height:44px; border-radius:12px; padding:10px 14px; font-size:13px; font-weight:600; }

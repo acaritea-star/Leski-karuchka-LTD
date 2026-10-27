@@ -14,6 +14,7 @@ beforeEach(()=>{
   if(name==='bind_ride_stripe_customer')saved={...saved,stripe_customer_id:args.p_stripe_customer_id};
   if(name==='attach_ride_checkout')saved={...saved,checkout_session_id:args.p_session_id,checkout_url:args.p_url,state:'open'};
   if(name==='record_ride_stripe_snapshot')return {state:args.p_state};
+  if(name==='cancel_uninitialized_ride_checkout')saved={...saved,state:'canceled'};
   return {...saved};
  });
 });
@@ -78,4 +79,18 @@ it('explicit reconciliation recovers a missed refund even when the database alre
 it('still requires actor-scoped database access before using a terminal receipt',async()=>{
  rpc.mockRejectedValue(Error('not allowed'));
  await expect(runRideCheckout('outsider',order.request_id,'reconcile',deps)).rejects.toThrow('not allowed');expect(retrieveSession).not.toHaveBeenCalled();
+});
+it.each(['driver','customer'])('lets %s cancel a pre-customer order without creating a Stripe Session or accessing saved cards',async actor=>{
+ expect(await runRideCheckout(actor,order.request_id,'cancel',deps)).toMatchObject({state:'canceled'});
+ expect(rpc).toHaveBeenCalledWith('cancel_uninitialized_ride_checkout',{p_order_id:order.id,p_actor:actor});
+ expect(createCustomer).not.toHaveBeenCalled();expect(createSession).not.toHaveBeenCalled();expect(retrieveSession).not.toHaveBeenCalled();
+ expect(rpc.mock.calls.some(([name])=>name==='ride_stripe_customer_context')).toBe(false);
+});
+it('recovers the same Stripe Session and expires it if customer binding won the cancel race',async()=>{
+ const fn=rpc.getMockImplementation()!;
+ rpc.mockImplementation((name,args)=>{if(name==='cancel_uninitialized_ride_checkout'){saved={...saved,stripe_customer_id:'cus_inline'};return {...saved};}return fn(name,args);});
+ retrieveSession.mockResolvedValue({...session(),status:'expired'});
+ expect(await runRideCheckout('driver',order.request_id,'cancel',deps)).toMatchObject({state:'canceled'});
+ expect(createCustomer).not.toHaveBeenCalled();expect(createSession).toHaveBeenCalledOnce();expect(expireSession).toHaveBeenCalledWith(false,'cs_test_inline');
+ expect(rpc).toHaveBeenCalledWith('record_ride_stripe_snapshot',expect.objectContaining({p_state:'canceled',p_received_minor:0}));
 });

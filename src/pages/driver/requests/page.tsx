@@ -258,6 +258,9 @@ export default function DriverRequests() {
         { event: 'UPDATE', schema: 'public', table: 'taxi_requests', filter: `driver_id=eq.${driver.id}` },
         (payload) => {
           const newRow = payload.new as TaxiRequest;
+          // Refresh only a mounted checkout, so a customer's tender change is
+          // reflected immediately without adding background payment reads.
+          void queryClient.invalidateQueries({queryKey:['ride-payment-state',user.id,newRow.id],exact:true});
           if (['accepted', 'arrived', 'in_progress'].includes(newRow.status)) {
             cacheDriverRequest(queryClient, driver.id, newRow);
             queryClient.invalidateQueries({ queryKey: queryKeys.driverIncomingRequests(user.id) });

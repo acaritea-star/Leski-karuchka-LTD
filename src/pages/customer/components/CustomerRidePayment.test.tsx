@@ -2,11 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { loadRidePayment, type RidePaymentState } from '@/lib/ridePayment';
+import { loadRidePayment, ridePaymentAction, type RidePaymentState } from '@/lib/ridePayment';
 import CustomerRidePayment from './CustomerRidePayment';
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'customer' } }) }));
-vi.mock('@/lib/ridePayment', async original => ({ ...await original<typeof import('@/lib/ridePayment')>(), loadRidePayment: vi.fn() }));
-vi.mock('./RidePaymentElements', () => ({ default: () => null }));
+vi.mock('@/lib/ridePayment', async original => ({ ...await original<typeof import('@/lib/ridePayment')>(), loadRidePayment: vi.fn(), ridePaymentAction: vi.fn() }));
+const elements = vi.hoisted(() => vi.fn());
+vi.mock('./RidePaymentElements', () => ({ default: (props: unknown) => { elements(props); return null; } }));
 const state = (overrides: Partial<RidePaymentState> = {}): RidePaymentState => ({ request_id: 'ride', eligible: false, inline_available: false,
   environment: 'live', ended_at: '2026-10-23T19:24:46Z', amount: 3.24, state: 'none', payment_status: 'pending', payment_method: 'cash', ...overrides });
 function show() {
@@ -46,3 +47,32 @@ it('refreshes server eligibility when an installed app resumes even if its ride 
   await act(async () => { fireEvent(window, new Event('pageshow')); });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Тествай плащане с карта' })).toBeTruthy());
 });
+it('keeps cash available in sandbox and only creates the card session after an explicit card choice', async () => {
+  vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, inline_available: true, environment: 'test' }));
+  show();
+  await screen.findByRole('button', { name: 'Плащане в брой' });
+  await waitFor(() => expect(elements).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, open: false })));
+  expect(ridePaymentAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Тествай плащане с карта' }));
+  await waitFor(() => expect(elements).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true, open: true })));
+});
+for (const environment of ['test', 'live'] as const) {
+  it(`checks cancellation before directing ${environment} customers to pay cash`, async () => {
+    vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, environment, state: 'open' }));
+    vi.mocked(ridePaymentAction).mockResolvedValue({ state: 'canceled', environment });
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Плащане в брой' }));
+    expect(await screen.findByText('Плати в брой на шофьора. Той ще потвърди получената сума.')).toBeTruthy();
+    expect(ridePaymentAction).toHaveBeenCalledExactlyOnceWith('ride', 'cancel');
+  });
+}
+for (const outcome of ['processing', 'paid', 'error'] as const) {
+  it(`does not promise cash fallback when online cancellation returns ${outcome}`, async () => {
+    vi.mocked(loadRidePayment).mockResolvedValue(state({ eligible: true, state: 'open' }));
+    if (outcome === 'error') vi.mocked(ridePaymentAction).mockRejectedValue(new Error('Няма проверка'));
+    else vi.mocked(ridePaymentAction).mockResolvedValue({ state: outcome, environment: 'live' });
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Плащане в брой' }));
+    if (outcome === 'error') await screen.findByRole('alert');
+    else await screen.findByText(outcome === 'paid' ? 'Платено онлайн' : /Изчакай потвърждението, преди да платиш в брой/);
+    expect(screen.queryByText(/Плати в брой на шофьора\./)).toBeNull();
+  });
+}

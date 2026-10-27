@@ -32,17 +32,17 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
  }, [owner, driverId]);
  const requestId = request?.id;
  const payment=useQuery({queryKey:['ride-payment-state',owner,requestId],enabled:!!requestId,
-  queryFn:({signal})=>loadRidePayment(requestId!,signal),refetchInterval:10000,refetchIntervalInBackground:false,retry:1});
+  queryFn:({signal})=>loadRidePayment(requestId!,signal),refetchInterval:q=>q.state.data?.payment_status==='pending'&&(q.state.data.eligible||['creating','open','processing'].includes(q.state.data.state))?10000:false,refetchIntervalInBackground:false,retry:1});
  const testMode=payment.data?.environment==='test';
  const onlineBusy=!!payment.data&&['creating','open','processing'].includes(payment.data.state);
  const onlinePaid=payment.data?.payment_status==='paid'&&payment.data.payment_method==='online';
  const cancelOnline=async()=>{
   if(inFlight.current||!requestId)return;inFlight.current=true;setBusy(true);setError('');
-  try{await ridePaymentAction(requestId,'cancel');await payment.refetch();}
+  try{const result=await ridePaymentAction(requestId,'cancel');await payment.refetch();if(['creating','open','processing'].includes(result.state))setError('Онлайн плащането още не е приключило. Не приемай второ плащане, преди да бъде проверено.');}
   catch(cause){setError(cause instanceof Error?cause.message:'Онлайн плащането не е проверено.');}
   finally{inFlight.current=false;if(mounted.current)setBusy(false);}
  };
- useEffect(() => { if (requestId) { setHidden(false); setProblem(false); setPartial(''); setNote(''); } }, [requestId]);
+ useEffect(() => { if (requestId) { setHidden(false); setProblem(false); setPartial(''); setNote(''); setChoice('unpaid'); setError(''); } }, [requestId]);
  const finish = (command: CheckoutCommand, ride: Tables<'taxi_requests'>) => {
   if (!mounted.current) return;
   clearCheckout(command); setPending(null); setError(''); onFinished(ride); onClose();
@@ -87,15 +87,15 @@ export default function RideCheckout({ owner, driverId, request, onClose, onFini
      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={() => void run()}>Повтори същия запис</button>
     </div> : request && <>
      <div className="rounded-2xl bg-primary-50 p-5 text-center"><p className="text-xs text-foreground-600">Цена от заявката</p><p className="mt-1 text-4xl font-bold tabular-nums">{money(request.estimated_price == null ? null : Number(request.estimated_price))}</p><p className="mt-2 text-xs">Курс {request.id.slice(0,8)}</p></div>
-     {onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">{onlinePaymentLabel(payment.data?.environment,'paid')}</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
+     {payment.isPending?<p role="status" className="text-sm">Проверяваме плащането…</p>:payment.isError?<><p role="alert" className="text-sm">Плащането не е проверено. Обнови, преди да приемеш пари.</p><button className={`${button} w-full border border-background-200`} disabled={payment.isFetching} onClick={()=>void payment.refetch()}>Обнови плащането</button></>:onlinePaid?<><p role="status" className="rounded-xl bg-emerald-50 p-4 font-semibold text-emerald-800">{onlinePaymentLabel(payment.data?.environment,'paid')}</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:payment.data?.payment_status!=='pending'?<><p role="status" className="text-sm">Плащането вече е отчетено. Провери подробностите в отчета.</p><button className={`${button} w-full bg-primary-500 text-white`} onClick={close}>Готово</button></>:onlineBusy?<>
       <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{testMode?'Тестов режим · Клиентът плаща с тестова карта.':'Клиентът плаща онлайн. Изчакай потвърждението от Stripe.'}</p>
-      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>{testMode?'Отмени тестовото плащане':'Провери и премини към плащане в брой'}</button>
-      <p className="text-xs text-foreground-500">{testMode?'Този тест не добавя приходи или пари в касата.':'Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.'}</p>
-     </>:testMode?<p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Тестов режим · Клиентът може да отвори Stripe от телефона си. Изчакваме тестово плащане; суми не се добавят в реалния отчет.</p>:!problem ? <>
-      {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">Клиентът вече може да плати от собствения си телефон. След потвърждение тук ще се появи „Платено онлайн“.</p>}
+      <button className={`${button} w-full border border-background-200`} disabled={busy} onClick={()=>void cancelOnline()}>Провери и премини към плащане в брой</button>
+      <p className="text-xs text-foreground-500">Плащането в брой се отключва само след проверка, че онлайн плащането не е извършено.</p>
+     </>:!problem ? <>
+      {payment.data?.eligible&&<p className="rounded-xl bg-primary-50 p-3 text-sm">{testMode?'Онлайн картата е в тестов режим. Кешът и терминалът по-долу записват реално получени пари.':'Клиентът може да плати от телефона си или в брой. Онлайн плащането се потвърждава автоматично тук.'}</p>}
       <p className="text-sm text-foreground-600">Как получи парите? Потвърждението приключва курса и добавя плащането в отчета.</p>
       <button className={`${button} w-full bg-primary-500 text-white`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('cash')}>Получих в брой · приключи</button>
-      <button className={`${button} w-full border border-primary-300 text-primary-800`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('card')}>Получих с карта · приключи</button>
+      <button className={`${button} w-full border border-primary-300 text-primary-800`} disabled={busy || storageBlocked || request.estimated_price == null} onClick={() => void run('card')}>Получих на ПОС терминал · приключи</button>
       <p className="text-xs text-foreground-500">При карта потвърди след успешно плащане на терминала. Бутонът не тегли пари от картата.</p>
       <button className={`${button} w-full underline text-foreground-600`} disabled={busy || storageBlocked} onClick={() => setProblem(true)}>Проблем с плащането</button>
      </> : <form className="space-y-3" onSubmit={e => { e.preventDefault(); void run(choice); }}>

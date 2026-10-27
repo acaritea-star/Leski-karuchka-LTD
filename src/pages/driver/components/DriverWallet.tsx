@@ -30,14 +30,11 @@ export default function DriverWallet({ owner, driverId, receipt }: { owner?: str
   const query = useDriverDay(driverId), navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const received = query.data?.received;
-  const testPayments = query.data?.testPayments;
-  const hasTests = !!testPayments && (testPayments.count > 0 || testPayments.refundedCount > 0);
   const scoped = receipt?.driver_id === driverId && !!owner && receipt?.status === 'completed' && receipt.payment_status === 'paid' && receipt.payment_method === 'online';
   return <div className="driver-wallet" aria-label="Портфейл на шофьора">
     <button type="button" className="driver-wallet-summary" aria-label="Портфейл — получени по днешните курсове" onClick={() => setOpen(true)}>
-      <span className="driver-wallet-heading"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 8V5a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v11H6a3 3 0 0 1-3-3V6"/><path d="M20 12h-5v4h5"/></svg><span><strong>Портфейл</strong><small>Реални · днес</small></span></span>
+      <span className="driver-wallet-heading"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 8V5a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v11H6a3 3 0 0 1-3-3V6"/><path d="M20 12h-5v4h5"/></svg><span><strong>Портфейл</strong><small>Получени днес</small></span></span>
       <span className="driver-wallet-value"><strong>{received ? walletMoney(received.total) : '— €'}</strong><span aria-hidden="true">›</span></span>
-      {hasTests && testPayments && <span className="driver-wallet-test-summary"><span>Тестови плащания</span><strong>{walletMoney(testPayments.total)}</strong></span>}
     </button>
     {query.isError && <button type="button" className="driver-wallet-retry" disabled={query.isFetching} onClick={() => void query.refetch()}>Сумата не е обновена · опитай отново</button>}
     {scoped && receipt && <Receipt key={`${owner}:${driverId}:${receipt.id}`} row={receipt} owner={owner!} />}
@@ -52,11 +49,6 @@ export default function DriverWallet({ owner, driverId, receipt }: { owner?: str
             <div><dt>Онлайн към фирмата</dt><dd>{walletMoney(received.online)}</dd></div>
           </dl>
         </> : <p role="status" className="driver-wallet-help">{query.isFetching ? 'Зареждаме потвърдените суми…' : 'Няма актуален сбор. Обнови портфейла.'}</p>}
-        {hasTests && testPayments && <section className="driver-wallet-test-detail" aria-label="Тестови плащания за днес">
-          <div><strong>Тестови плащания</strong><strong>{walletMoney(testPayments.total)}</strong></div>
-          <p>Потвърдени в Stripe тестове. Няма движение на реални пари.</p>
-          {testPayments.refundedCount > 0 && <p>Плащания с възстановяване извън този сбор: {testPayments.refundedCount}.</p>}
-        </section>}
         <p className="driver-wallet-help">Оборот по приключените днес курсове, след реалните корекции и възстановявания. Това не е сума за теглене или лично възнаграждение.</p>
         {query.isError && <p role="status" className="driver-wallet-help">Сумите не са обновени. Опитай отново.</p>}
         <div className="driver-wallet-actions"><button type="button" onClick={() => { setOpen(false); navigate('/driver/earnings'); }}>Отвори отчета</button><button type="button" disabled={query.isFetching} onClick={() => void query.refetch()}>{query.isFetching ? 'Обновяване…' : 'Обнови'}</button></div>

@@ -50,8 +50,12 @@ BEGIN
  o:=private.begin_ride_checkout(ride2,customer,aid);PERFORM private.attach_ride_checkout((o->>'id')::uuid,'cs_test_cancel','https://checkout.stripe.com/c/pay/cs_test_cancel');
  PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_cancel',NULL,'evt_test_expired','canceled',1234,0,0);
  EXECUTE 'SET LOCAL ROLE authenticated';
- PERFORM pg_temp.test_ride_denied(format('SELECT public.complete_ride_payment(%L,%L,%L,''cash'')',gen_random_uuid(),ride2,duid));
  PERFORM pg_temp.test_ride_denied(format('SELECT public.record_driver_money_method(%L,''income'',12.34,''Fake test cash'',%L,''cash'',%L)',gen_random_uuid(),duid,ride2));
+ PERFORM public.complete_ride_payment(gen_random_uuid(),ride2,duid,'cash');
+ IF public.ride_payment_state(ride2)->>'environment'<>'live' OR (public.ride_payment_state(ride2)->>'eligible')::boolean THEN RAISE EXCEPTION 'FAIL cash mislabeled as sandbox';END IF;
  EXECUTE 'RESET ROLE';
+ IF (SELECT count(*) FROM public.driver_money_entries WHERE request_id=ride2)<>1 OR NOT EXISTS(SELECT 1 FROM public.taxi_requests WHERE id=ride2 AND payment_environment='live' AND payment_status='paid' AND payment_method='cash') THEN RAISE EXCEPTION 'FAIL canceled test cash fallback';END IF;
+ PERFORM private.record_ride_stripe_snapshot((o->>'id')::uuid,aid,'cs_test_cancel',NULL,'evt_delayed_test_expiry','canceled',1234,0,0);
+ PERFORM pg_temp.test_ride_denied(format('SELECT private.record_ride_stripe_snapshot(%L,%L,''cs_test_cancel'',''pi_nope'',''evt_impossible_paid'',''paid'',1234,1234,0)',o->>'id',aid));
 END $t$;
 ROLLBACK;

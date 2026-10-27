@@ -42,7 +42,7 @@ export default function RequestStatusCard(props: RequestStatusCardProps) {
         <p><span className="route-dot" aria-hidden="true" /><span title={request.pickup_address}>{request.pickup_address}</span></p>
         <p><span className="route-dot route-dot-end" aria-hidden="true" /><span title={request.destination_address}>{request.destination_address}</span></p>
       </div>
-      {props.price != null && <div className="booking-meta"><span>{request.payment_method==='online'?(onlinePaymentLabel(request.payment_environment,request.payment_status)):t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
+      {props.price != null && <div className="booking-meta"><span>{request.payment_method==='online'?(onlinePaymentLabel(request.payment_environment,request.payment_status)):request.payment_method==='card'?'С карта на ПОС терминал':t('payment_in_cash')}</span><strong>{pending && props.priceRange ? displayPriceRange(props.priceRange) : props.price.toFixed(2)} {t('lv')}</strong></div>}
       <CarrierIdentity companyId={request.company_id} />
       {props.requestError && <p className="booking-error" role="alert">{props.requestError}</p>}
     </div>

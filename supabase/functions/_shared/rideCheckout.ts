@@ -22,6 +22,9 @@ export async function runRideCheckout(actor:string,requestId:string,action:'chec
  // The client avoids this path when it already has the verified receipt.
  if(await deps.requireStripe(live)!==order.account_id)throw Error('Checkout account mismatch');
  if(action==='elements' && actor!==order.customer_id)throw Error('Customer required');
+ if(action==='cancel' && order.ui_mode==='elements' && !order.checkout_session_id && !order.stripe_customer_id && order.state==='creating') {
+  order=await deps.rpc('cancel_uninitialized_ride_checkout',{p_order_id:order.id,p_actor:actor}) as RideOrder;
+ }
  let session:Record<string,unknown>|undefined;
  if(!order.checkout_session_id && order.state!=='canceled') {
   if(order.ui_mode==='elements'&&!order.stripe_customer_id) {
