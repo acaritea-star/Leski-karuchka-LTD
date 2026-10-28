@@ -14,6 +14,8 @@ for (const role of Object.keys(routes) as UiRole[]) test(`${role} screens fit na
   for (const path of routes[role]) for (const size of [{ width: 320, height: 568 }, { width: 1440, height: 900 }]) {
     await page.setViewportSize(size); await page.goto(path);
     await expect(page.getByRole('heading').first()).toBeVisible();
+    if (path === '/driver/profile') await expect(page.getByLabel('Проверка за верификация')).toContainText('За верификация остава:');
+    if (path === '/driver/preparation') await expect(page.getByRole('button', { name: 'Продължи', exact: true })).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/тестов(?:ия|ият)? период|в тестов режим|демо версия|testing period|demo version/i);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

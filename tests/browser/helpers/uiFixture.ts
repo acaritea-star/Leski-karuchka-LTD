@@ -1,4 +1,10 @@
 import type { Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+const preparationSource = readFileSync('src/config/driverPreparation.json', 'utf8');
+const preparationDocument = JSON.parse(preparationSource);
+const preparationHash = createHash('sha256').update(preparationSource).digest('hex');
 
 export type UiRole = 'visitor' | 'CUSTOMER' | 'DRIVER' | 'COMPANY_ADMIN' | 'SUPER_ADMIN';
 export const uiAccount = '11111111-1111-4111-8111-111111111111';
@@ -49,6 +55,18 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
     if (url.origin !== 'http://127.0.0.1:54329') { state.external.push(url.href); return route.abort(); }
     let data: unknown = [];
     if (url.pathname.endsWith('/rpc/claim_customer_welcome')) { state.welcomeClaims++; data = state.welcomeFirst; state.welcomeFirst = false; }
+    // The screen sweep needs valid authoritative read models. Returning the
+    // generic empty array leaves a parsing failure retrying during navigation.
+    else if (url.pathname.endsWith('/rpc/driver_verification_status')) data = {
+      driver_id: uiDriver, is_verified: true, can_verify: false,
+      blockers: [{ code: 'license', message: 'Шофьорска книжка: качи документ.' }], warnings: [],
+      documents: { license: { state: 'missing', expires_at: null }, insurance: { state: 'missing', expires_at: null } },
+      preparation: { complete: false, terms_version: preparationDocument.termsVersion, training_version: preparationDocument.trainingVersion, accepted_at: null, training_completed_at: null },
+    };
+    else if (url.pathname.endsWith('/rpc/driver_preparation_materials')) data = {
+      driver_id: uiDriver, user_id: uiAccount, company_id: uiCompany,
+      document: preparationDocument, content_hash: preparationHash, receipt: null,
+    };
     else if(url.pathname.endsWith('/rpc/end_ride_trip')){const id=request.postDataJSON().p_request_id;const ride=state.rides.find(r=>r.id===id);if(!ride)return reply({message:'not found'},404);ride.trip_ended_at=new Date().toISOString();ride.final_price=ride.estimated_price;ride.updated_at=new Date().toISOString();data=ride;}
     else if(url.pathname.endsWith('/rpc/ride_payment_state')){const id=request.postDataJSON().p_request_id;const ride=state.rides.find(r=>r.id===id);data={request_id:id,eligible:false,ended_at:ride?.trip_ended_at??null,amount:ride?.estimated_price??null,state:'none',payment_status:'pending',payment_method:'cash'};}
     else if (url.pathname.endsWith('/auth/v1/user')) data = user;
