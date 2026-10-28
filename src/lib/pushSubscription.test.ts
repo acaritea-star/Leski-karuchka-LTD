@@ -195,6 +195,13 @@ describe('push account and device isolation', () => {
     expect(subscription.unsubscribe).toHaveBeenCalledOnce();expect(manager.subscribe).toHaveBeenCalledOnce();
     expect(storage.get('leski_push_browser_owner')).toBe('bob');
   });
+  it('releases the old browser endpoint on account switch before the new account registers',async()=>{
+    storage.set('leski_push_owner','alice');await push.registerPush('alice');
+    mocks.session.mockResolvedValue({data:{session:{user:{id:'bob'}}}});
+    await push.changePushSession('bob');
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();expect(push.getPushOwner()).toBeNull();
+    expect(storage.has('leski_push_owner')).toBe(false);expect(storage.has('leski_push_browser_owner')).toBe(false);
+  });
   it('unsubscribes as a fail-closed fallback if logout cannot revoke server delivery',async()=>{
     storage.set('leski_push_owner','alice');await push.registerPush('alice');
     mocks.from.mockReturnValueOnce({delete:()=>({eq:()=>({eq:()=>({abortSignal:async()=>({error:new Error('Offline')})})})})});

@@ -10,8 +10,8 @@ const ride = () => ({ id: '55555555-5555-4555-8555-555555555555', customer_id: u
 
 // Only the external renderer/native device are synthetic. Hooks, SDK socket
 // decoding, RLS-filtered HTTP reads, timers and rendered app are the real code.
-async function installDevice(page: Page) {
-  await page.addInitScript(() => {
+async function installDevice(page: Page, permissionQueries = true) {
+  await page.addInitScript(permissionQueries => {
     class Point { constructor(public lat = 0, public lng = 0) {} }
     class Bounds {
       extend() { return this; }
@@ -40,8 +40,8 @@ async function installDevice(page: Page) {
     const position = () => ({ timestamp: Date.now(), coords: { latitude, longitude: 25.14, heading: 0,
       speed: 7, accuracy: 10, altitude: null, altitudeAccuracy: null } }) as GeolocationPosition;
     const count = () => { document.documentElement.dataset.gpsWatches = String(watches.size); };
-    Object.defineProperty(navigator, 'permissions', { configurable: true, value: { query: async () =>
-      Object.assign(new EventTarget(), { state: permission }) } });
+    Object.defineProperty(navigator, 'permissions', { configurable: true, value: permissionQueries ? { query: async () =>
+      Object.assign(new EventTarget(), { state: permission }) } : undefined });
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
       getCurrentPosition: (success: PositionCallback) => { permission = 'granted'; success(position()); },
       watchPosition: (success: PositionCallback) => { watches.set(++serial, success); count(); success(position()); return serial; },
@@ -50,7 +50,7 @@ async function installDevice(page: Page) {
     window.addEventListener('synthetic-gps', event => {
       latitude = (event as CustomEvent<number>).detail; watches.forEach(callback => callback(position()));
     });
-  });
+  }, permissionQueries);
 }
 
 async function socketHarness(page: Page) {
@@ -171,10 +171,7 @@ test('a completed trip aborts its pending customer context route', async ({ page
 });
 
 test('a remembered driver restores GPS without a permission query, across reloads, until Settings turns it off',async({page})=>{
- const state=await setupUi(page,'DRIVER','aal2','on');await installDevice(page);await socketHarness(page);
- await page.addInitScript(()=>{
-  Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>{throw new Error('Synthetic unsupported permission query');}}});
- });
+ const state=await setupUi(page,'DRIVER','aal2','on');await installDevice(page,false);await socketHarness(page);
  let online=true,writes=0,availabilityWrites=0;
  await page.route('**/rest/v1/drivers?*',async route=>{
   if(route.request().method()==='PATCH'){availabilityWrites++;online=route.request().postDataJSON().is_online;}

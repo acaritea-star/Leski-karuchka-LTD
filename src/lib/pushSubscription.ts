@@ -62,7 +62,9 @@ export function changePushSession(userId: string | null): Promise<void> {
   // Auth can end outside the logout button. Revoke the old browser endpoint
   // as well, so providers do not keep sending suppressed, account-mismatched pushes.
   if (previousOwner && previousOwner !== userId) {
-    return Promise.all([boundary, detachPush(previousOwner)]).then(() => undefined);
+    // A different account must release the old browser endpoint immediately,
+    // even if its token can no longer delete the previous owner's server row.
+    return Promise.all([boundary, detachPush(previousOwner, userId === null)]).then(() => undefined);
   }
   return boundary;
 }
