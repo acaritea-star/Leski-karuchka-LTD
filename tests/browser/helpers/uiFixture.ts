@@ -11,7 +11,7 @@ const cors = {
   'access-control-expose-headers': 'content-range',
 };
 
-export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = role === 'CUSTOMER' ? 'aal1' : 'aal2') {
+export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = role === 'CUSTOMER' ? 'aal1' : 'aal2', locationChoice: 'on' | 'off' = 'off') {
   const user = { id: uiAccount, email: 'very.long.synthetic.account.name.for.layout@example.invalid', aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: { provider: 'google' } };
   const company = { id: uiCompany, name: 'ОРИОН транспорт и таксиметрови услуги Велико Търново', is_active: true, currency: 'EUR', base_fare: 2, price_per_km: 1, price_per_minute: 0.2, min_fare: 2, dispatch_radius_km: 5, updated_at: new Date().toISOString(), created_at: new Date().toISOString(), setup_completed_at: new Date().toISOString(), drivers: [{ count: 1 }] };
   const state = {
@@ -28,14 +28,14 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
   // can run after this initializer, so Date.now() here could otherwise be a few
   // milliseconds ahead of a later fixed clock and invalidate the consent.
   const consentSavedAt = Date.now() - 60_000;
-  await page.addInitScript(({ user, role, aal, consentSavedAt }) => {
-    localStorage.setItem('i18nextLng', 'bg'); if (!localStorage.getItem('leski:auto-location:' + user.id)) localStorage.setItem('leski:auto-location:' + user.id, 'off');
+  await page.addInitScript(({ user, role, aal, consentSavedAt, locationChoice }) => {
+    localStorage.setItem('i18nextLng', 'bg'); if (!localStorage.getItem('leski:auto-location:' + user.id)) localStorage.setItem('leski:auto-location:' + user.id, locationChoice);
     localStorage.setItem('lk_cookie_consent_v3', JSON.stringify({ version: 3, savedAt: consentSavedAt, expiresAt: consentSavedAt + 180 * 86400000, consent: { necessary: true, functional: true, analytics: false, marketing: false } }));
     if (role !== 'visitor') {
       const token = [btoa(JSON.stringify({ alg: 'HS256' })), btoa(JSON.stringify({ sub: user.id, role: 'authenticated', aal, exp: Math.floor(Date.now() / 1000) + 3600 })), 'synthetic'].join('.');
       localStorage.setItem('sb-127-auth-token', JSON.stringify({ access_token: token, refresh_token: 'synthetic', token_type: 'bearer', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, user }));
     }
-  }, { user, role, aal, consentSavedAt });
+  }, { user, role, aal, consentSavedAt, locationChoice });
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === 'http://127.0.0.1:4100') return route.continue();
