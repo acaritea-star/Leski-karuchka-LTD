@@ -46,6 +46,9 @@ test('uses an already settled webhook result after card confirmation without a r
 });
 
 for(const path of ['/driver/home','/driver/requests'])test(`${path} keeps the wallet pinned and refreshes once for a verified payment`,async({page},info)=>{
+ // Exercise the first-visit banner intentionally; headless Chromium may
+ // otherwise start with a denied permission, which must not be re-solicited.
+ await page.addInitScript(()=>Object.defineProperty(window,'Notification',{configurable:true,value:{permission:'default',requestPermission:async()=>'denied'}}));
  const state=await setupUi(page,'DRIVER'),events=await serverEvents(page),row={...ride(),final_price:4.23,estimated_price:4.23};state.rides=[row];let reads=0,online=4.23;
  await page.route('**/rest/v1/rpc/driver_day_summary',route=>{reads++;return route.fulfill({headers:cors,json:{trips:7,earnings:50,received:{cash:10,card:5,online,total:15+online}}});});
  await page.setViewportSize({width:320,height:568});await page.goto(path);

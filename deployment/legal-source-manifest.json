@@ -4,7 +4,7 @@
     "src/pages/landing/terms/page.tsx",
     "src/pages/landing/privacy/page.tsx"
   ],
-  "sha256": "09b66e5e78ac2d72b14c1c96248286a7ad4b8126718d437775e751e3a675d7e7",
-  "termsVersion": "2026-10-27-draft.4",
-  "privacyVersion": "2026-10-08.1"
+  "sha256": "91a0a40b87b50091ee28ef1b0a595b4901a59261f9f09691c910044c2bf2a26f",
+  "termsVersion": "2026-10-28-draft.5",
+  "privacyVersion": "2026-10-28.2"
 }

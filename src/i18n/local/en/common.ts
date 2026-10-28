@@ -576,7 +576,7 @@ export default {
     faq_q1: 'How do I order a carriage?',
     faq_a1: 'Register in the app, choose your pickup and destination, then press “Order a carriage”.',
     faq_q2: 'Can I pay in cash?',
-    faq_a2: 'Yes — payment is cash only, directly to the driver.',
+    faq_a2: 'Yes — you can pay the driver in cash. The app shows the payment methods available for your ride, including online card payment for eligible Leski Karuchka rides.',
     faq_q3: 'How long do I wait for a carriage in Levski?',
     faq_a3: "Availability and arrival times depend on drivers and traffic. Follow the status of your request in the app.",
     faq_q4: 'How much does a ride cost?',

@@ -173,7 +173,7 @@ test('a completed trip aborts its pending customer context route', async ({ page
 test('a remembered driver restores GPS without a permission query, across reloads, until Settings turns it off',async({page})=>{
  const state=await setupUi(page,'DRIVER');await installDevice(page);await socketHarness(page);
  await page.addInitScript(id=>{
-  localStorage.setItem('leski:auto-location:'+id,'on');
+  const key='leski:auto-location:'+id;if(localStorage.getItem(key)===null)localStorage.setItem(key,'on');
   Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>{throw new Error('Synthetic unsupported permission query');}}});
  },uiAccount);
  let online=true,writes=0,availabilityWrites=0;
