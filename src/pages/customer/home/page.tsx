@@ -329,7 +329,7 @@ export default function CustomerHome() {
     const revision = gpsRevision.current;
     void gpsPermission().then(permission => {
       if (!active || revision !== gpsRevision.current || getLocationEnabled(user.id) === false) return;
-      if (permission !== 'granted') return;
+      if (!(permission === 'granted' || permission === 'unknown' && getLocationEnabled(user.id) === true)) return;
       autoAttempted.current = user.id;
       if (permission === 'granted' && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
       void detectLocation(true);
@@ -342,7 +342,7 @@ export default function CustomerHome() {
     let active = true;
     let unsubscribe = () => {};
     void gpsPermission().then(permission => {
-      if (active && permission === 'granted') unsubscribe = subscribeGps(() => {});
+      if (active && getLocationEnabled(user.id) !== false && (permission === 'granted' || permission === 'unknown' && getLocationEnabled(user.id) === true)) unsubscribe = subscribeGps(() => {});
     });
     return () => { active = false; unsubscribe(); };
   }, [locationEnabled, user?.id, pickup, activeRequestId, recovering]);

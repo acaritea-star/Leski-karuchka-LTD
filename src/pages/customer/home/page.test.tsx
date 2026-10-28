@@ -217,6 +217,19 @@ it('does not ask for permission automatically on a first visit', async () => {
   const browser = gpsBrowser('prompt'); await mount();
   expect(browser.get).not.toHaveBeenCalled(); expect(browser.watch).not.toHaveBeenCalled();
 });
+it('restores an existing location choice when the browser cannot query GPS permission',async()=>{
+ const browser=gpsBrowser();browser.query.mockRejectedValue(new Error('Unsupported permission query'));
+ setLocationEnabled('customer',true);fake.reverse.mockResolvedValue({formatted_address:'GPS адрес'});
+ await mount();await act(async()=>{});
+ expect(browser.get).toHaveBeenCalledOnce();expect(fake.reverse).toHaveBeenCalledOnce();
+ fireEvent.click(screen.getByRole('button',{name:/Край/}));
+ await act(async()=>vi.advanceTimersByTimeAsync(351));
+ expect(fake.route).toHaveBeenCalledOnce();expect(screen.getAllByText('GPS адрес').length).toBeGreaterThan(0);
+});
+it('does not request location on an unsupported first visit without a saved choice',async()=>{
+ const browser=gpsBrowser();browser.query.mockRejectedValue(new Error('Unsupported permission query'));
+ await mount();expect(browser.get).not.toHaveBeenCalled();expect(browser.watch).not.toHaveBeenCalled();
+});
 it('cannot replace a manual pickup chosen while permission lookup was pending', async () => {
   const browser = gpsBrowser();
   let done!: (value: unknown) => void;

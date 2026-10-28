@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 import { setupUi, setShortViewport, uiAccount, uiCompany, uiDriver, type UiRole } from './helpers/uiFixture';
 
 const routes: Record<UiRole, string[]> = {
-  visitor: ['/', '/about', '/pricing', '/company-partner', '/driver-join', '/contact', '/novini', '/novini/missing-article', '/terms', '/privacy', '/cookies', '/auth/login', '/auth/register', '/company/login', '/driver/login', '/not-a-route'],
+  visitor: ['/', '/about', '/pricing', '/company-partner', '/driver-join', '/contact', '/novini', '/novini/missing-article', '/terms', '/privacy', '/cookies', '/data-deletion.html', '/auth/login', '/auth/register', '/company/login', '/driver/login', '/driver/access', '/not-a-route'],
   CUSTOMER: ['/customer/home', '/customer/orders', '/customer/profile', '/customer/settings'],
   DRIVER: ['/driver/home', '/driver/requests', '/driver/history', '/driver/earnings', '/driver/profile', '/driver/preparation'],
-  COMPANY_ADMIN: ['/company', '/company/setup', '/admin/dashboard', '/admin/map', '/admin/drivers', '/admin/vehicles', '/admin/customers', '/admin/orders', '/admin/pricing', '/admin/analytics', '/admin/settings'],
+  COMPANY_ADMIN: ['/company', '/company/setup', '/admin/divisions', '/admin/dashboard', '/admin/map', '/admin/drivers', '/admin/vehicles', '/admin/customers', '/admin/orders', '/admin/pricing', '/admin/analytics', '/admin/settings'],
   SUPER_ADMIN: ['/admin/companies', '/admin/dashboard', '/admin/news', '/admin/news/new'],
 };
 
@@ -14,6 +14,7 @@ for (const role of Object.keys(routes) as UiRole[]) test(`${role} screens fit na
   for (const path of routes[role]) for (const size of [{ width: 320, height: 568 }, { width: 1440, height: 900 }]) {
     await page.setViewportSize(size); await page.goto(path);
     await expect(page.getByRole('heading').first()).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/тестов(?:ия|ият)? период|в тестов режим|демо версия|testing period|demo version/i);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${role} ${path} ${size.width}px`).toBe(true);

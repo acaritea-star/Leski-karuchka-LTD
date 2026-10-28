@@ -12,23 +12,21 @@ export default function EnableNotificationsBanner() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { enable, permission, enabling, enabled } = usePushNotifications();
-  const [dismissed, setDismissed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(DISMISS_KEY + ':' + user?.id) === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  let dismissed = dismissedFor === user?.id;
+  try { dismissed ||= localStorage.getItem(DISMISS_KEY + ':' + user?.id) === 'true'; } catch { /* Optional device preference. */ }
   const [error, setError] = useState(false);
 
   if (!user?.id) return null;
   if (dismissed) return null;
   if (enabled) return null;
-  if (getPushPreference(user.id) === false) return null;
+  // An existing choice is managed in Settings, never re-solicited on login
+  // or while its saved browser subscription is being restored.
+  if (getPushPreference(user.id) !== null || permission === 'denied') return null;
   const needsSettings = permission === 'denied' || !pushSupported();
 
   const persistDismiss = () => {
-    setDismissed(true);
+    setDismissedFor(user.id);
     try {
       localStorage.setItem(DISMISS_KEY + ':' + user.id, 'true');
     } catch {

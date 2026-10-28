@@ -71,6 +71,8 @@ export default {
   notifications_browser_blocked: 'Your browser blocks notifications. Allow them in the website settings.',
   notifications_browser_unsupported: 'On iPhone, add the app to your Home Screen and open its icon. On other devices, check notification support.',
   notifications_device_off: 'Device notifications are off. Your inbox remains available.',
+  notifications_device_restoring: 'Your choice is saved. Restoring notification delivery on this device.',
+  notifications_restore: 'Restore connection',
   notifications_close: 'Close notifications',
   notifications_load_error: 'Notifications could not be loaded. Check your connection and try again.',
   notifications_read_error: 'Marking as read could not be confirmed. Please try again.',

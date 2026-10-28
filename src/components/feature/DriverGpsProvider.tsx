@@ -40,6 +40,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     && current.error === next.error && current.message === next.message ? current : next), []);
   const [retrying, setRetrying] = useState(false);
   const [permission, setPermission] = useState<Awaited<ReturnType<typeof gpsPermission>> | 'checking'>('checking');
+  const trackingPermission = permission === 'unknown' && locationEnabled === true ? 'granted' : permission;
   useEffect(() => {
     let active = true;
     const read = () => { void gpsPermission().then(value => { if (active) setPermission(value); }); };
@@ -56,21 +57,23 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
     if (!isDriver || !user?.id || !driver?.id || trackingRequired || !allowLocation) return;
     let active = true;
     void gpsPermission().then(async permission => {
-      if (!active || permission !== 'granted') return;
+      if (!active || !(permission === 'granted' || permission === 'unknown' && getLocationEnabled(user.id) === true)) return;
       const cached = getGpsPosition();
       const position = cached && Date.now() - cached.timestamp < 30_000 ? cached : await requestGps();
       if (!active || getLocationEnabled(user.id) === false) return;
       if (position.coords.accuracy <= 100 && isInBulgaria(position.coords.latitude, position.coords.longitude) && getLocationEnabled(user.id) === null) setLocationEnabled(user.id, true);
     }).catch(() => { /* Explicit GPS/Online actions display actionable errors. */ });
     return () => { active = false; };
-  }, [isDriver, user?.id, driver?.id, trackingRequired, allowLocation]);
+  }, [isDriver, user?.id, driver?.id, trackingRequired, allowLocation, locationEnabled]);
 
   useEffect(() => {
     if (!isDriver || !driver?.id || !trackingRequired || !allowLocation) { stopDriverGps(); setState({ status: 'idle', error: !allowLocation && trackingRequired ? 'Местоположението е изключено.' : '' }); return; }
-    if (permission !== 'granted') {
+    // Some browsers cannot query GPS permission. A saved opt-in may resume
+    // its watch; an unknown first visit, an expired grant or a denial may not.
+    if (trackingPermission !== 'granted') {
       stopDriverGps();
-      if (permission === 'checking') { setState({ status: 'acquiring', error: '', message: 'Проверяваме разрешението за GPS…' }); return; }
-      setState({ status: 'error', error: permission === 'denied' ? 'Разреши местоположението от настройките на браузъра.' : 'Натисни „Обнови GPS“, за да разрешиш местоположението.' });
+      if (trackingPermission === 'checking') { setState({ status: 'acquiring', error: '', message: 'Проверяваме разрешението за GPS…' }); return; }
+      setState({ status: 'error', error: trackingPermission === 'denied' ? 'Разреши местоположението от настройките на браузъра.' : 'Натисни „Обнови GPS“, за да разрешиш местоположението.' });
       return;
     }
     let alive = true;
@@ -99,7 +102,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
         setState(previous => {
           if (previous.status === 'error') return previous;
           const next: GpsState = Date.now() < acquisitionDeadline ? acquiringState
-            : { status: 'stale', error: '', message: stats.error || 'Още няма потвърдена позиция. Обнови GPS и провери локацията на устройството.' };
+            : { status: 'stale', error: '', message: stats.error || 'Още няма потвърдена позиция. GPS опитва автоматично. Провери локацията и връзката на устройството.' };
           return previous.status === next.status && previous.error === next.error && previous.message === next.message ? previous : next;
         });
     }, 5000);
@@ -132,7 +135,7 @@ export default function DriverGpsProvider({ children }: { children: ReactNode })
       document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility);
       document.removeEventListener('visibilitychange', wake); window.removeEventListener('pageshow', wake); void lock?.release();
     };
-  }, [isDriver, user?.id, driver?.id, driver?.company_id, trackingRequired, allowLocation, permission, publishState]);
+  }, [isDriver, user?.id, driver?.id, driver?.company_id, trackingRequired, allowLocation, trackingPermission, publishState]);
   const retryLocation = useCallback(() => {
     if (!isDriver || !driver || !trackingRequired || !allowLocation || retrying) return;
     const startedOwner = user?.id;

@@ -71,6 +71,8 @@ export default {
   notifications_browser_blocked: 'Браузърът блокира известията. Разреши ги от настройките на сайта.',
   notifications_browser_unsupported: 'За iPhone добави приложението към началния екран и го отвори от иконата. На други устройства провери поддръжката за известия.',
   notifications_device_off: 'Известията на това устройство са изключени. Историята остава достъпна.',
+  notifications_device_restoring: 'Изборът ти е запазен. Възстановяваме връзката за известията на това устройство.',
+  notifications_restore: 'Възстанови връзката',
   notifications_close: 'Затвори известията',
   notifications_load_error: 'Известията не се заредиха. Провери връзката и опитай отново.',
   notifications_read_error: 'Прочитането не е потвърдено. Опитай отново.',

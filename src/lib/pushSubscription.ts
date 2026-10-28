@@ -3,7 +3,17 @@ import { withRequestTimeout } from './requestTimeout';
 import { writePushIdentity } from './pushIdentity';
 
 const OWNER_KEY = 'leski_push_owner';
+const BROWSER_OWNER_KEY = 'leski_push_browser_owner';
 const preferenceKey = (userId: string) => `leski_push_enabled:${userId}`;
+const memory = new Map<string, string>();
+function stored(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return memory.get(key) ?? null; }
+}
+function save(key: string, value: string | null) {
+  if (value === null) memory.delete(key); else memory.set(key, value);
+  try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); }
+  catch { /* Keep this session usable when device storage is unavailable. */ }
+}
 let owner: string | null = null;
 let revision = 0;
 let validatedEndpoint: string | null = null;
@@ -36,7 +46,7 @@ async function bounded<T>(operation: PromiseLike<T>): Promise<T> {
 }
 export const pushSupported = () => 'Notification' in window && 'PushManager' in window && 'serviceWorker' in navigator;
 export function getPushPreference(userId: string): boolean | null {
-  const value = localStorage.getItem(preferenceKey(userId)) ?? localStorage.getItem('leski_notifications_enabled');
+  const value = stored(preferenceKey(userId)) ?? stored('leski_notifications_enabled');
   return value === 'false' ? false : value === 'true' ? true : null;
 }
 const allowed = (userId: string) => pushSupported() && Notification.permission === 'granted'
@@ -44,7 +54,7 @@ const allowed = (userId: string) => pushSupported() && Notification.permission =
 
 /** Also called for remote logout and account changes, before a profile finishes loading. */
 export function changePushSession(userId: string | null): Promise<void> {
-  const previousOwner = owner ?? localStorage.getItem(OWNER_KEY);
+  const previousOwner = owner ?? stored(OWNER_KEY);
   revision++;
   if (owner !== userId) setOwner(null);
   if (userId) suspended.delete(userId);
@@ -70,8 +80,9 @@ export function registerPush(userId: string): Promise<boolean> {
     if (!stillCurrent()) return false;
     let subscription = await bounded(registration.pushManager.getSubscription());
     // A shared browser must not reuse the previous account's delivery endpoint.
-    if (subscription && localStorage.getItem(OWNER_KEY) !== userId) {
+    if (subscription && (stored(BROWSER_OWNER_KEY) ?? stored(OWNER_KEY)) !== userId) {
       if (!await bounded(subscription.unsubscribe())) throw new Error('Could not release old subscription');
+      save(BROWSER_OWNER_KEY, null);
       subscription = null;
     }
     if (!subscription) {
@@ -96,13 +107,15 @@ export function registerPush(userId: string): Promise<boolean> {
       };
       const { error } = await withRequestTimeout(signal => supabase.rpc('register_push_subscription', body).abortSignal(signal));
       if (error) throw error;
-      localStorage.setItem(OWNER_KEY, userId);
+      save(OWNER_KEY, userId);
+      save(BROWSER_OWNER_KEY, userId);
       validatedEndpoint = json.endpoint;
       validatedAt = Date.now();
     }
     if (!stillCurrent()) return false;
     await bounded(writePushIdentity(userId));
     if (!stillCurrent()) return false;
+    if (getPushPreference(userId) === null) save(preferenceKey(userId), 'true');
     setOwner(userId);
     return true;
   });
@@ -115,8 +128,10 @@ export function registerPush(userId: string): Promise<boolean> {
 /** A verified new login resumes delivery without changing the saved choice. */
 export function startPushSession(userId: string) { suspended.delete(userId); }
 
-/** Logout releases this device. Only the settings switch records an opt-out. */
-export function detachPush(userId: string): Promise<void> {
+/** Logout revokes delivery and clears the worker identity. Keep a browser
+ * subscription for the same account: WebKit can require another gesture to
+ * recreate it even though notification permission is already granted. */
+export function detachPush(userId: string, preserveBrowser = true): Promise<void> {
   revision++;
   suspended.add(userId);
   if (owner === userId) setOwner(null);
@@ -126,31 +141,41 @@ export function detachPush(userId: string): Promise<void> {
   return serialized(async () => {
     await cleared;
     if (!('serviceWorker' in navigator)) return;
-    const registeredOwner = localStorage.getItem(OWNER_KEY);
+    const registeredOwner = stored(OWNER_KEY) ?? stored(BROWSER_OWNER_KEY);
     if (registeredOwner && registeredOwner !== userId) return;
     const registration = await bounded(navigator.serviceWorker.getRegistration('/'));
     const subscription = registration ? await bounded(registration.pushManager.getSubscription()) : null;
     if (subscription) {
-      const unsubscribed = await bounded(subscription.unsubscribe()).catch(() => false);
-      const { error } = await withRequestTimeout(signal => supabase.from('push_subscriptions').delete()
-        .eq('user_id', userId).eq('endpoint', subscription.endpoint).abortSignal(signal));
-      if (error && !unsubscribed) throw error;
+      let revokeError: unknown;
+      try {
+        const { error } = await withRequestTimeout(signal => supabase.from('push_subscriptions').delete()
+          .eq('user_id', userId).eq('endpoint', subscription.endpoint).abortSignal(signal));
+        revokeError = error;
+      } catch (error) { revokeError = error; }
+      if (preserveBrowser && !revokeError && !boundaryError) save(BROWSER_OWNER_KEY, userId);
+      else {
+        const unsubscribed = await bounded(subscription.unsubscribe()).catch(() => false);
+        if (revokeError && !unsubscribed) throw revokeError;
+        if (unsubscribed) save(BROWSER_OWNER_KEY, null);
+      }
+    } else {
+      save(BROWSER_OWNER_KEY, null);
     }
-    localStorage.removeItem(OWNER_KEY);
+    save(OWNER_KEY, null);
     validatedEndpoint = null;
     if (boundaryError) throw boundaryError;
   });
 }
 
 export function unregisterPush(userId: string): Promise<void> {
-  localStorage.setItem(preferenceKey(userId), 'false');
-  return detachPush(userId);
+  save(preferenceKey(userId), 'false');
+  return detachPush(userId, false);
 }
 
 export async function enablePush(userId: string): Promise<boolean> {
   if (!pushSupported() || Notification.permission === 'denied') return false;
   if (Notification.permission !== 'granted' && await Notification.requestPermission() !== 'granted') return false;
-  localStorage.setItem(preferenceKey(userId), 'true');
+  save(preferenceKey(userId), 'true');
   startPushSession(userId);
   return registerPush(userId);
 }

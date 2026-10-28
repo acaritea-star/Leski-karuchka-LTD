@@ -190,8 +190,11 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
     void drain();
   };
-  const refresh = async () => {
+  const refresh = async (force = false) => {
     if (run !== generation || permissionDenied || document.visibilityState === 'hidden' || locating || Date.now() - lastRefresh < 1000) return;
+    // A healthy native watch already delivers current measurements. Only
+    // probe a silent watch; resuming the app still forces a fresh check.
+    if (!force && lastFixAt && Date.now() - lastFixAt < GPS_HEARTBEAT_MS) return;
     lastRefresh = Date.now(); locating = true;
     try { push(await getCurrentPosition()); }
     catch (error) { fail(error); }
@@ -203,7 +206,7 @@ export function startDriverGps(id: string, company: string, callbacks: Callbacks
     failures = 0;
     nextAttempt = Math.max(lastAttempt + MOVING_INTERVAL_MS, Math.min(nextAttempt, Date.now()));
     if (retry !== undefined) { clearTimeout(retry); retry = undefined; }
-    void refresh();
+    void refresh(true);
     void drain();
   };
   unsubscribeGps = subscribeGps(push, fail);

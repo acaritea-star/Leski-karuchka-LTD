@@ -71,7 +71,11 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
       toJSON: () => ({ endpoint: subscription.endpoint, keys: { p256dh: 'synthetic', auth: 'synthetic' } }) };
     const registration = { pushManager: {
       getSubscription: async () => store.getItem('test:subscription') ? subscription : null,
-      subscribe: async () => { store.setItem('test:subscription', 'true'); return subscription; },
+      subscribe: async () => {
+        const calls=Number(store.getItem('test:subscribe-calls')??0)+1;store.setItem('test:subscribe-calls',String(calls));
+        if(calls>1)throw new Error('Synthetic WebKit requires another gesture to recreate the subscription');
+        store.setItem('test:subscription', 'true'); return subscription;
+      },
     } };
     const notifications = { get permission() { return store.getItem('test:permission') ?? 'default'; }, requestPermission: async () => {
       store.setItem('test:permission-calls', String(Number(store.getItem('test:permission-calls') ?? 0) + 1));
@@ -103,6 +107,8 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
   expect(await page.evaluate(async () => !!(await (await caches.open('leski-push-identity-v1')).match('/__leski_push_identity__')))).toBe(false);
   // The fixture restores a fresh authenticated session on the next navigation.
   await page.goto('/customer/settings'); await expect(toggle).toBeChecked();
+  expect(await page.evaluate(() => localStorage.getItem('test:subscribe-calls'))).toBe('1');
+  await expect(page.getByLabel('Настройка на известията')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBe('1');
   await toggle.click(); await expect(toggle).not.toBeChecked(); await page.reload(); await expect(toggle).not.toBeChecked();
   expect(await page.evaluate(id => localStorage.getItem('leski_push_enabled:' + id), uiAccount)).toBe('false');

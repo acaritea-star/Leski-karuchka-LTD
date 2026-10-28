@@ -28,6 +28,15 @@ it('shares a single native watch between dispatch and navigation and releases it
   a(); expect(clear).not.toHaveBeenCalled();
   b(); expect(clear).toHaveBeenCalledWith(7);
 });
+it('keeps recovering a silent watch after three transient failures without a manual refresh', async () => {
+ const dispatch=vi.fn();releases.push(subscribeGps(dispatch));
+ for(const delay of [15000,30000,60000,60000]){
+  watchError({code:3} as GeolocationPositionError);
+  await vi.advanceTimersByTimeAsync(delay);
+ }
+ expect(watch).toHaveBeenCalledTimes(5);
+ receive(fix());expect(dispatch).toHaveBeenCalledOnce();
+});
 it('deduplicates concurrent fresh reads without returning a cached old position', async () => {
   const first = requestGps(), second = requestGps();
   expect(first).toBe(second); expect(get).toHaveBeenCalledTimes(1);
@@ -166,14 +175,14 @@ it('observes permission revocation without automatic prompts and resumes only wh
   status.state = 'granted'; status.dispatchEvent(new Event('change'));
   expect(watch).toHaveBeenCalledTimes(2);
 });
-it('limits native watch recovery attempts and removes their timers when the last subscriber leaves', async () => {
+it('bounds native recovery frequency and removes its timers when the last subscriber leaves', async () => {
   const release = subscribeGps(() => {}); releases.push(release);
   for (const delay of [15_000, 30_000, 60_000]) {
     watchError({ code: 2 } as GeolocationPositionError); await vi.advanceTimersByTimeAsync(delay);
   }
   watchError({ code: 2 } as GeolocationPositionError);
   await vi.advanceTimersByTimeAsync(120_000);
-  expect(watch).toHaveBeenCalledTimes(4);
+  expect(watch).toHaveBeenCalledTimes(5);
   release(); expect(vi.getTimerCount()).toBe(0);
 });
 it('expires a one-shot read on return from frozen browser timers', async () => {

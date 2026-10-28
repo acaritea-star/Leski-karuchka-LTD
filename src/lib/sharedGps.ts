@@ -58,13 +58,13 @@ function clearWatch() {
 }
 function report(error: unknown) { listeners.forEach(fn => fn(error)); }
 function scheduleRecovery() {
-  if (recovery !== undefined || recoveryAttempts >= 3 || permissionBlocked || !listeners.size) return;
+  if (recovery !== undefined || permissionBlocked || !listeners.size) return;
   recovery = setTimeout(() => {
     recovery = undefined;
     if (document.visibilityState === 'hidden') return;
     recoveryAttempts++;
     clearWatch(); startWatch();
-  }, 15_000 * 2 ** recoveryAttempts);
+  }, 15_000 * 2 ** Math.min(recoveryAttempts, 2));
 }
 function startWatch() {
   if (watchId !== null || permissionBlocked || !listeners.size || document.visibilityState === 'hidden') return;

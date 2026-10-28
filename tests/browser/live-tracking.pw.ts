@@ -169,3 +169,30 @@ test('a completed trip aborts its pending customer context route', async ({ page
     expect(state.errors).toEqual([]);
   } finally { release(); }
 });
+
+test('a remembered driver restores GPS without a permission query, across reloads, until Settings turns it off',async({page})=>{
+ const state=await setupUi(page,'DRIVER');await installDevice(page);await socketHarness(page);
+ await page.addInitScript(id=>{
+  localStorage.setItem('leski:auto-location:'+id,'on');
+  Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>{throw new Error('Synthetic unsupported permission query');}}});
+ },uiAccount);
+ let online=true,writes=0,availabilityWrites=0;
+ await page.route('**/rest/v1/drivers?*',async route=>{
+  if(route.request().method()==='PATCH'){availabilityWrites++;online=route.request().postDataJSON().is_online;}
+  const row={id:uiDriver,user_id:uiAccount,company_id:uiCompany,is_online:online,is_verified:true,status:online?'online':'offline',vehicle_id:null};
+  await route.fulfill({headers:cors,json:route.request().method()==='PATCH'||new URL(route.request().url()).searchParams.has('user_id')?row:[row]});
+ });
+ await page.route('**/rest/v1/driver_locations?*',async route=>{
+  if(route.request().method()==='POST')writes++;
+  await route.fulfill({headers:cors,json:{updated_at:await page.evaluate(()=>new Date().toISOString())}});
+ });
+ await page.goto('/driver/home');await expect(page.locator('html')).toHaveAttribute('data-gps-watches','1');
+ await expect.poll(()=>writes).toBeGreaterThan(0);
+ const first=writes;await page.reload();await expect(page.locator('html')).toHaveAttribute('data-gps-watches','1');
+ await expect.poll(()=>writes).toBeGreaterThan(first);expect(availabilityWrites).toBe(0);
+ await page.goto('/driver/profile');const toggle=page.getByRole('switch',{name:'Използвай местоположението автоматично',exact:true});
+ await expect(toggle).toBeChecked();await toggle.click();await expect(toggle).not.toBeChecked();
+ await expect(page.locator('html')).toHaveAttribute('data-gps-watches','0');await expect.poll(()=>availabilityWrites).toBe(1);
+ const stopped=writes;await page.reload();await expect(toggle).not.toBeChecked();
+ expect(writes).toBe(stopped);expect(state.errors).toEqual([]);
+});

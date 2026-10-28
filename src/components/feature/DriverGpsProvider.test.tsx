@@ -6,12 +6,12 @@ const fake = vi.hoisted(() => ({
  user:{id:'driver-user',role:'DRIVER'},driver:{id:'driver',user_id:'driver-user',company_id:'company',is_online:true},
  callbacks:null as null | {onUpdate:()=>void;onError:(error:string,recoverable?:boolean)=>void},
  stats:{lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''},
- start:vi.fn(),stop:vi.fn(),probe:vi.fn(),permission:'granted',
+ start:vi.fn(),stop:vi.fn(),probe:vi.fn(),permission:'granted',preference:true as boolean|null,
  active:null as null | {id:string;driver_id:string;status:string},
 }));
 vi.mock('@/hooks/useAuth',()=>({useAuth:()=>({user:fake.user})}));
-vi.mock('@/hooks/useLocationPreference',()=>({useLocationPreference:()=>true}));
-vi.mock('@/lib/locationPreference',()=>({getLocationEnabled:()=>true,setLocationEnabled:vi.fn()}));
+vi.mock('@/hooks/useLocationPreference',()=>({useLocationPreference:()=>fake.preference}));
+vi.mock('@/lib/locationPreference',()=>({getLocationEnabled:()=>fake.preference,setLocationEnabled:vi.fn()}));
 vi.mock('@/lib/sharedGps',()=>({gpsPermission:async()=>fake.permission,getGpsPosition:()=>null,requestGps:vi.fn(),stopSharedGps:vi.fn()}));
 vi.mock('@/lib/driverRecord',()=>({driverRecordOptions:(id:string)=>({queryKey:['driver-test',id],queryFn:async()=>fake.driver,staleTime:Infinity})}));
 vi.mock('@/lib/driverActiveRequest',()=>({driverActiveRequestOptions:(_client:unknown,id:string)=>({queryKey:['active-test',id],queryFn:async()=>fake.active})}));
@@ -22,7 +22,7 @@ import DriverGpsProvider,{useDriverGps} from './DriverGpsProvider';
 function Probe(){const gps=useDriverGps();fake.probe();return <div><output data-testid="state">{gps.status}</output><p role="status">{gps.message}</p>{gps.error&&<p role="alert">{gps.error}</p>}</div>;}
 async function mount(){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});client.setQueryData(['driver-test','driver-user'],fake.driver);
  render(<QueryClientProvider client={client}><DriverGpsProvider><Probe /></DriverGpsProvider></QueryClientProvider>);await act(async()=>{});return client;}
-beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();fake.permission='granted';fake.driver.is_online=true;fake.active=null;fake.callbacks=null;fake.stats={lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''};
+beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();fake.permission='granted';fake.preference=true;fake.driver.is_online=true;fake.active=null;fake.callbacks=null;fake.stats={lastWriteAgeMs:Infinity,lastConfirmedFixAgeMs:Infinity,error:''};
  Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 it('shows acquisition instead of a red error for an initial coarse fix and goes green only after a confirmed write',async()=>{
@@ -48,6 +48,11 @@ it('does not repaint driver consumers for repeated healthy GPS acknowledgements'
  const client=await mount();fake.stats={lastWriteAgeMs:0,lastConfirmedFixAgeMs:0,error:''};act(()=>fake.callbacks!.onUpdate());const renders=fake.probe.mock.calls.length;
  act(()=>{for(let i=0;i<100;i++)fake.callbacks!.onUpdate();});expect(fake.probe).toHaveBeenCalledTimes(renders);client.clear();
 });
+it('does not restart a healthy native watch when its first confirmed fix saves the location choice',async()=>{
+ fake.preference=null;const client=await mount();expect(fake.start).toHaveBeenCalledOnce();
+ fake.preference=true;fake.stats={lastWriteAgeMs:0,lastConfirmedFixAgeMs:0,error:''};act(()=>fake.callbacks!.onUpdate());
+ expect(fake.start).toHaveBeenCalledOnce();expect(screen.getByTestId('state').textContent).toBe('tracking');client.clear();
+});
 it('restores a still-confirmed position after a brief switch between browser windows',async()=>{
  const client=await mount();fake.stats={lastWriteAgeMs:60000,lastConfirmedFixAgeMs:60000,error:''};act(()=>fake.callbacks!.onUpdate());
  expect(screen.getByTestId('state').textContent).toBe('tracking');
@@ -65,6 +70,20 @@ it('does not prompt for GPS automatically when remembered consent has expired',a
 it('does not acquire GPS automatically while browser permission is denied',async()=>{
  fake.permission='denied';const client=await mount();
  expect(fake.start).not.toHaveBeenCalled();expect(screen.getByRole('alert').textContent).toContain('настройките на браузъра');client.clear();
+});
+it('resumes a remembered opt-in when the browser cannot query its GPS permission',async()=>{
+ fake.permission='unknown';const client=await mount();
+ expect(fake.start).toHaveBeenCalledOnce();expect(screen.queryByRole('alert')).toBeNull();
+ fake.stats={lastWriteAgeMs:0,lastConfirmedFixAgeMs:0,error:''};act(()=>fake.callbacks!.onUpdate());
+ expect(screen.getByTestId('state').textContent).toBe('tracking');client.clear();
+});
+it('does not treat an unsupported permission query as first-time consent',async()=>{
+ fake.permission='unknown';fake.preference=null;const client=await mount();
+ expect(fake.start).not.toHaveBeenCalled();client.clear();
+});
+it('keeps an explicit location opt-out even on browsers without permission queries',async()=>{
+ fake.permission='unknown';fake.preference=false;const client=await mount();
+ expect(fake.start).not.toHaveBeenCalled();expect(screen.getByRole('alert').textContent).toContain('изключено');client.clear();
 });
 
 it('keeps an unavailable driver tracking the existing ride and stops after its confirmed completion',async()=>{

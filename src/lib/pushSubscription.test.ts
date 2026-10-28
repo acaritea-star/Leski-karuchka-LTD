@@ -108,12 +108,16 @@ describe('push account and device isolation', () => {
   it('preserves the enabled choice across logout and restores silently on a verified login', async () => {
     storage.set('leski_push_enabled:alice', 'true');
     await push.registerPush('alice');
+    const subscriptions=manager.subscribe.mock.calls.length, unsubscriptions=subscription.unsubscribe.mock.calls.length;
     await push.detachPush('alice');
     expect(storage.get('leski_push_enabled:alice')).toBe('true');
     expect(await push.registerPush('alice')).toBe(false);
     push.startPushSession('alice');
     expect(await push.registerPush('alice')).toBe(true);
     expect(Notification.requestPermission).not.toHaveBeenCalled();
+    expect(manager.subscribe).toHaveBeenCalledTimes(subscriptions);
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(unsubscriptions);
+    expect(storage.get('leski_push_browser_owner')).toBe('alice');
   });
   it('keeps the settings opt-out after a later login', async () => {
     await push.unregisterPush('alice');
@@ -156,10 +160,10 @@ describe('push account and device isolation', () => {
     expect(mocks.identity.mock.calls).toEqual([['alice'], [null], ['bob']]);
     expect(push.getPushOwner()).toBeNull();
   });
-  it('unsubscribes the previous endpoint on external Auth logout', async () => {
+  it('revokes server delivery on external logout while keeping the same-account browser subscription', async () => {
     storage.set('leski_push_owner', 'alice');
     await push.registerPush('alice'); await push.changePushSession(null);
-    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
     expect(filters).toContainEqual(['user_id', 'alice']); expect(push.getPushOwner()).toBeNull();
   });
   it('keeps device delivery disabled when logout cleanup fails', async () => {
@@ -182,5 +186,26 @@ describe('push account and device isolation', () => {
     expect(await registering).toBe(false); await leaving;
     expect(storage.has('leski_push_enabled:alice')).toBe(false);
     expect(push.getPushOwner()).toBeNull();
+  });
+  it('rotates a retained browser endpoint before delivering to a different account',async()=>{
+    storage.set('leski_push_owner','alice');await push.registerPush('alice');
+    await push.detachPush('alice');expect(subscription.unsubscribe).not.toHaveBeenCalled();
+    await push.changePushSession('bob');mocks.session.mockResolvedValue({data:{session:{user:{id:'bob'}}}});
+    expect(await push.registerPush('bob')).toBe(true);
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();expect(manager.subscribe).toHaveBeenCalledOnce();
+    expect(storage.get('leski_push_browser_owner')).toBe('bob');
+  });
+  it('unsubscribes as a fail-closed fallback if logout cannot revoke server delivery',async()=>{
+    storage.set('leski_push_owner','alice');await push.registerPush('alice');
+    mocks.from.mockReturnValueOnce({delete:()=>({eq:()=>({eq:()=>({abortSignal:async()=>({error:new Error('Offline')})})})})});
+    await push.detachPush('alice');expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(storage.has('leski_push_owner')).toBe(false);expect(storage.has('leski_push_browser_owner')).toBe(false);
+    expect(push.getPushOwner()).toBeNull();
+  });
+  it('keeps settings usable with a session fallback when browser storage is unavailable',async()=>{
+    vi.stubGlobal('localStorage',{getItem:()=>{throw new Error('Storage unavailable');},setItem:()=>{throw new Error('Storage unavailable');},removeItem:()=>{throw new Error('Storage unavailable');}});
+    expect(await push.enablePush('alice')).toBe(true);expect(push.getPushPreference('alice')).toBe(true);
+    await push.unregisterPush('alice');expect(push.getPushPreference('alice')).toBe(false);
+    expect(await push.registerPush('alice')).toBe(false);
   });
 });

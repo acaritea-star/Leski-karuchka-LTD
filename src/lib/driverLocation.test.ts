@@ -23,6 +23,15 @@ beforeEach(() => {
 afterEach(()=>{stopDriverGps();stopSharedGps();vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('driver GPS writes',()=>{
+  it('does not request another native measurement while the shared watch is healthy',async()=>{
+    startDriverGps('driver','company');watch(fix());await flush();
+    await vi.advanceTimersByTimeAsync(10000);watch(fix());await flush();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    expect(single).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledOnce();
+  });
   it('writes an idle heartbeat after 15 seconds even with identical coordinates',async()=>{
     startDriverGps('driver','company');watch(fix());await flush();
     expect(single).toHaveBeenCalledTimes(1);
