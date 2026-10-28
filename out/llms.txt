@@ -2,9 +2,9 @@
 
 Website: https://leskikaruchka.com/
 
-Leski Karuchka is a digital intermediary that connects customers looking for transport with registered drivers and taxi companies in Levski and the surrounding region in Bulgaria. The platform does not carry passengers and is not a party to the transport contract. The relevant carrier provides and is responsible for the transport. Availability depends on participating carriers and authorised vehicles. “Karuchka” is the platform brand. The application is currently in a testing period.
+Leski Karuchka is a digital intermediary that connects customers looking for transport with registered drivers and taxi companies in Levski and the surrounding region in Bulgaria. The platform does not carry passengers and is not a party to the transport contract. The relevant carrier provides and is responsible for the transport. Availability depends on participating carriers and authorised vehicles. “Karuchka” is the platform brand.
 
-Users select pickup and destination, view an estimated amount and send a request. Sending a request does not guarantee an available driver or a specific arrival time. For taxi transport, the carrier’s displayed tariff, taximeter and fiscal reporting rules determine the final fare. This version uses cash payment to the driver.
+Users select pickup and destination, view an estimated amount and send a request. Sending a request does not guarantee an available driver or a specific arrival time. For taxi transport, the carrier’s displayed tariff, taximeter and fiscal reporting rules determine the final fare. Payment methods are shown for each ride: cash to the driver, and online card payments after arrival for eligible Leski Karuchka rides.
 
 
 Company partnerships: the service fee is 8–12% of actually paid fares for completed trips sourced through the platform, excluding tips and refunded amounts. Own-company trips recorded only for reporting have no such service fee. The precise rate, review period and payment terms are agreed before paid activation; accepting driver training alone does not activate billing or authorise a personal deduction. Larger capacity and platform-sourced paid volume inform a lower negotiated rate. The range includes VAT when applicable.
