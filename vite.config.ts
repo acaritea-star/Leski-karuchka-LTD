@@ -2,10 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import AutoImport from "unplugin-auto-import/vite";
+import stagingHeaders from './deployment/security/staging-headers.json';
 // import { readdyJsxRuntimeProxyPlugin } from "./vite.jsx-runtime-proxy";
 
 const base = process.env.BASE_PATH || "/";
 const isPreview = process.env.IS_PREVIEW ? true : false;
+const securityStaging = process.env.SECURITY_STAGING === '1';
 //const proxyPlugins = isPreview ? [readdyJsxRuntimeProxyPlugin()] : [];
 // https://vite.dev/config/
 export default defineConfig({
@@ -81,6 +83,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: "0.0.0.0",
+    host: securityStaging ? '127.0.0.1' : '0.0.0.0',
+    headers: securityStaging ? stagingHeaders : undefined,
   },
+  preview: { headers: securityStaging ? stagingHeaders : undefined },
 });

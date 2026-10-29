@@ -13,6 +13,8 @@ const manifest=JSON.parse(readFileSync('supabase/tests/baseline-manifest.json','
 for(const file of readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort()) {
  if(!manifest.includedMigrations.includes(file)) run(`supabase/migrations/${file}`);
 }
+const netSecurity = spawnSync(process.execPath,['scripts/test-security-net.mjs'],{stdio:'inherit'});
+if(netSecurity.status!==0) process.exit(netSecurity.status||1);
 run('supabase/tests/run.sql');
 
 // Concurrent fixtures must commit to be visible to separate connections.
