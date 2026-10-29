@@ -48,10 +48,13 @@ Readdy hosting cannot be certified by these fixtures.
 ## Settings requiring a separate hosted staging project/operator
 
 - Leaked-password protection is a hosted Auth setting available on Pro and
-  above. It has not been enabled or simulated as a substitute. Test rejection
-  of a known leaked password, acceptable password registration/change, existing
-  sign-in and both OAuth providers in a dedicated hosted project. Preserve the
-  four existing password customers; do not disable their provider.
+  above; production has not been changed. The CI job starts a second disposable
+  GoTrue container with GOTRUE_PASSWORD_HIBP_ENABLED and FAIL_CLOSED enabled.
+  It calls the actual HIBP integration with synthetic passwords and verifies
+  leaked signup/change rejection, strong signup/login/change, legacy sign-in
+  and unchanged provider settings. A hosted rollout still needs plan support
+  and real Google/Facebook redirect checks. Preserve the four existing password
+  customers; do not disable their provider.
 - Hosted net objects are owned by supabase_admin, and the current production
   postgres role cannot revoke their privileges. The owner script fails before
   modifying anything when permission is missing. Supabase must provide the

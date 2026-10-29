@@ -29,6 +29,8 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/leski-db"
           npx --yes supabase@2.120.0 db advisors --local --type security --fail-on none
+      - name: Verify leaked-password protection in isolated Auth
+        run: node scripts/test-password-protection.mjs
       - name: Stop test services
         if: always()
         run: |
