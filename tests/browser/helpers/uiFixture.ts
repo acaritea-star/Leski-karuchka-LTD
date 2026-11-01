@@ -26,7 +26,7 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
     welcomeFirst: false, welcomeClaims: 0,
     notices: [] as Record<string, unknown>[], rides: [] as Record<string, unknown>[], ratings: [] as Record<string, unknown>[], cars: [] as Record<string, unknown>[],
     articles: [] as Record<string, unknown>[], articleDeletes: 0, failArticleDelete: false,
-    failProfile: false, failPreferences: false, failNotificationReads: false, failNotificationWrites: false, failRating: false, loseRatingResponse: false, failContact: false,
+    failProfile: false, failPreferences: false, failNotificationReads: false, failNotificationWrites: false, failPushRegistration: false, failRating: false, loseRatingResponse: false, failContact: false,
     writeDelay: 0, notificationWrites: 0, notificationStateReads: 0, notificationPageReads: 0, notificationOpens: [] as string[], pushRegistrations: 0, pushDeletes: 0, external: [] as string[], errors: [] as string[],
   };
   page.on('pageerror', error => state.errors.push(error.message));
@@ -98,6 +98,7 @@ export async function setupUi(page: Page, role: UiRole, aal: 'aal1' | 'aal2' = r
       data = { publicKey: Buffer.from('synthetic-web-push-key').toString('base64') };
     } else if (url.pathname.endsWith('/rpc/register_push_subscription')) {
       state.pushRegistrations++; data = null;
+      if (state.failPushRegistration) return reply({ message: 'Synthetic temporary registration failure' }, 503);
     } else if (url.pathname.endsWith('/push_subscriptions')) {
       if (request.method() === 'DELETE') state.pushDeletes++;
       data = [];

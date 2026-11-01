@@ -11,6 +11,7 @@ vi.mock('@/lib/pushSubscription',()=>({getPushPreference:()=>fake.preference,pus
 import NotificationSettings from './NotificationSettings';
 import EnableNotificationsBanner from './EnableNotificationsBanner';
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear();fake.user={id:'alice',role:'CUSTOMER'};fake.preference=true;
+ fake.enable.mockReset().mockResolvedValue(true);
  fake.enabled=false;fake.permission='granted';fake.enabling=false;fake.supported=true;});
 afterEach(cleanup);
 it('keeps a saved choice on while delivery is restoring and lets the switch turn it off',async()=>{
@@ -37,4 +38,36 @@ it('keeps dismissal scoped to its account when a new account arrives',()=>{
  fireEvent.click(screen.getByRole('button',{name:'Отказ'}));expect(screen.queryByLabelText('Настройка на известията')).toBeNull();
  fake.user={id:'bob',role:'CUSTOMER'};view.rerender(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
  expect(screen.getByLabelText('Настройка на известията')).toBeTruthy();
+});
+it('keeps a failed first registration visible after the preference is saved and allows retry',async()=>{
+ fake.preference=null;fake.permission='granted';
+ fake.enable.mockImplementationOnce(async()=>{fake.preference=true;return false;});
+ render(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Включи известия'}));await act(async()=>{});
+ const retry=screen.getByRole('button',{name:'Опитай отново'});
+ expect(screen.getByLabelText('Настройка на известията').textContent).toContain('Не успяхме');
+ fireEvent.click(retry);await act(async()=>{});
+ expect(fake.enable).toHaveBeenCalledTimes(2);
+ expect(screen.queryByLabelText('Настройка на известията')).toBeNull();
+});
+it('keeps an attempted registration visible while the saved preference is true and the request is pending',async()=>{
+ fake.preference=null;let finish!:(value:boolean)=>void;
+ fake.enable.mockImplementationOnce(()=>{fake.preference=true;return new Promise<boolean>(resolve=>{finish=resolve;});});
+ const view=render(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Включи известия'}));
+ view.rerender(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ expect(screen.getByLabelText('Настройка на известията')).toBeTruthy();
+ await act(async()=>{finish(false);});
+ expect(screen.getByRole('button',{name:'Опитай отново'})).toBeTruthy();
+});
+it('does not carry a failed notification prompt into a different account',async()=>{
+ fake.preference=null;fake.enable.mockImplementationOnce(async()=>{fake.preference=true;return false;});
+ const view=render(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Включи известия'}));await act(async()=>{});
+ fake.user={id:'bob',role:'CUSTOMER'};
+ view.rerender(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ expect(screen.queryByLabelText('Настройка на известията')).toBeNull();
+ fake.preference=null;view.rerender(<MemoryRouter><EnableNotificationsBanner /></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Включи известия'})).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'Опитай отново'})).toBeNull();
 });

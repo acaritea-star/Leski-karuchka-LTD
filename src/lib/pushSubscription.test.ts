@@ -87,6 +87,29 @@ describe('push account and device isolation', () => {
     await expect(push.registerPush('alice')).rejects.toThrow('Registration unavailable');
     expect(push.getPushOwner()).toBeNull();
   });
+  it('retries a failed server registration without recreating its new browser subscription', async () => {
+    manager.getSubscription.mockResolvedValueOnce(null);
+    manager.subscribe.mockResolvedValueOnce(subscription).mockRejectedValueOnce(new Error('Another gesture required'));
+    mocks.rpc.mockReturnValueOnce({ abortSignal: () => Promise.resolve({ error: new Error('Registration unavailable') }) });
+    await expect(push.enablePush('alice')).rejects.toThrow('Registration unavailable');
+    expect(push.getPushOwner()).toBeNull();
+    expect(storage.get('leski_push_owner')).toBeUndefined();
+    expect(await push.enablePush('alice')).toBe(true);
+    expect(manager.subscribe).toHaveBeenCalledOnce();
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+  });
+  it('releases a failed registration browser endpoint before a different account can register', async () => {
+    manager.getSubscription.mockResolvedValueOnce(null);
+    mocks.rpc.mockReturnValueOnce({ abortSignal: () => Promise.resolve({ error: new Error('Registration unavailable') }) });
+    await expect(push.enablePush('alice')).rejects.toThrow('Registration unavailable');
+    mocks.session.mockResolvedValue({ data: { session: { user: { id: 'bob' } } } });
+    await push.changePushSession('bob');
+    expect(await push.enablePush('bob')).toBe(true);
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(manager.subscribe).toHaveBeenCalledTimes(2);
+    expect(push.getPushOwner()).toBe('bob');
+  });
   it('does not wait for serviceWorker.ready on a device without a registration', async () => {
     vi.stubGlobal('navigator', { serviceWorker: {
       getRegistration: vi.fn().mockResolvedValue(undefined), ready: new Promise(() => {}),
