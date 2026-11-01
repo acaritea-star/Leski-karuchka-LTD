@@ -90,7 +90,7 @@ test('notification opt-in recovers a failed save, survives ten reloads and logou
   state.failPushRegistration = true;
   await page.goto('/customer/settings');
   const toggle = page.getByRole('switch', { name: 'Известия', exact: true });
-  const settings = page.locator('section').filter({ has: toggle });
+  const settings = toggle.locator('xpath=ancestor::section[1]');
   await expect(toggle).not.toBeChecked();
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBeNull();
   await toggle.click();
