@@ -1,5 +1,6 @@
 import { admin, json } from '../_shared/auth.ts';
 import { classifyPushFailure, isAllowedPushEndpoint, isUuid, pushTtl } from '../_shared/push.ts';
+import { readVapidKeys } from '../_shared/vapid.ts';
 // @deno-types="npm:@types/web-push@3.6.4"
 import webpush from 'npm:web-push@3.6.7';
 
@@ -39,13 +40,12 @@ Deno.serve(async (req) => {
       return json({ status: 'skipped' });
     }
 
-    const { data: config, error: configError } = await admin.from('app_config')
-      .select('vapid_public_key,vapid_private_key').eq('id', 1).maybeSingle();
-    if (configError || !config?.vapid_public_key || !config.vapid_private_key) {
+    const config = await readVapidKeys(admin).catch(() => null);
+    if (!config) {
       await finish('retry', 'VAPID_UNAVAILABLE');
       return json({ status: 'retry' }, 503);
     }
-    webpush.setVapidDetails('mailto:admin@leskikaruchka.com', config.vapid_public_key, config.vapid_private_key);
+    webpush.setVapidDetails('mailto:admin@leskikaruchka.com', config.publicKey, config.privateKey);
 
     const { data: subscriptions, error: subscriptionError } = await admin.from('push_subscriptions')
       .select('id,endpoint,p256dh,auth').eq('user_id', job.recipient_id).eq('is_active', true);

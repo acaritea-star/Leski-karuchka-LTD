@@ -15,14 +15,16 @@ export default function EnableNotificationsBanner() {
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   let dismissed = dismissedFor === user?.id;
   try { dismissed ||= localStorage.getItem(DISMISS_KEY + ':' + user?.id) === 'true'; } catch { /* Optional device preference. */ }
-  const [error, setError] = useState(false);
+  const [attemptedFor, setAttemptedFor] = useState<string | null>(null);
+  const [errorFor, setErrorFor] = useState<string | null>(null);
+  const error = errorFor === user?.id;
 
   if (!user?.id) return null;
   if (dismissed) return null;
   if (enabled) return null;
-  // An existing choice is managed in Settings, never re-solicited on login
-  // or while its saved browser subscription is being restored.
-  if (getPushPreference(user.id) !== null || permission === 'denied') return null;
+  // Existing choices stay in Settings. A choice saved by this attempt must
+  // not hide a pending registration or its retry button after a failure.
+  if (getPushPreference(user.id) !== null && attemptedFor !== user.id || permission === 'denied') return null;
   const needsSettings = permission === 'denied' || !pushSupported();
 
   const persistDismiss = () => {
@@ -35,13 +37,14 @@ export default function EnableNotificationsBanner() {
   };
 
   const handleEnable = async () => {
-    setError(false);
+    setErrorFor(null);
     if (needsSettings) { navigate(user.role === 'DRIVER' ? '/driver/profile' : user.role === 'CUSTOMER' ? '/customer/settings' : '/admin/settings'); return; }
+    setAttemptedFor(user.id);
     const ok = await enable(user.id);
     if (ok) {
       persistDismiss();
     } else {
-      setError(true);
+      setErrorFor(user.id);
     }
   };
 

@@ -96,6 +96,10 @@ export function registerPush(userId: string): Promise<boolean> {
       subscription = await bounded(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
     }
     if (!stillCurrent()) return false;
+    // This endpoint was created for the current account. Keep that local
+    // ownership across a failed server save so retry can reuse it. Delivery
+    // is still marked enabled only after the authenticated RPC succeeds.
+    save(BROWSER_OWNER_KEY, userId);
     const { data: current } = await bounded(supabase.auth.getSession());
     if (current.session?.user.id !== userId) return false;
     const json = subscription.toJSON();

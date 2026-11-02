@@ -62,7 +62,7 @@ test('a closed inbox pauses hidden checks and recovers missed events without loa
   expect(state.notificationPageReads).toBe(1); expect(state.errors).toEqual([]);
 });
 
-test('notification opt-in survives ten reloads and logout; a settings opt-out stays off', async ({ page }) => {
+test('notification opt-in recovers a failed save, survives ten reloads and logout; a settings opt-out stays off', async ({ page }) => {
   const state = await setupUi(page, 'CUSTOMER'); await realtime(page);
   await page.addInitScript(() => {
     const store = localStorage;
@@ -87,10 +87,23 @@ test('notification opt-in survives ten reloads and logout; a settings opt-out st
       register: async () => registration, ready: Promise.resolve(registration), getRegistration: async () => registration,
     } });
   });
+  state.failPushRegistration = true;
   await page.goto('/customer/settings');
-  const toggle = page.getByRole('switch', { name: 'Известия', exact: true }); await expect(toggle).not.toBeChecked();
+  const toggle = page.getByRole('switch', { name: 'Известия', exact: true });
+  const settings = toggle.locator('xpath=ancestor::section[1]');
+  await expect(toggle).not.toBeChecked();
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBeNull();
-  await toggle.click(); await expect(toggle).toBeChecked();
+  await toggle.click();
+  await expect(settings.getByRole('alert')).toContainText('Не успяхме да включим известията');
+  await expect(settings.getByRole('button', { name: 'Възстанови връзката', exact: true })).toBeVisible();
+  expect(await page.evaluate(id => localStorage.getItem('leski_push_enabled:' + id), uiAccount)).toBe('true');
+  state.failPushRegistration = false;
+  await settings.getByRole('button', { name: 'Възстанови връзката', exact: true }).click();
+  await expect(settings.getByRole('status')).toHaveText('Известията са включени!');
+  await expect(settings.getByRole('alert')).toHaveCount(0);
+  expect(state.pushRegistrations).toBe(2);
+  expect(await page.evaluate(() => localStorage.getItem('test:subscribe-calls'))).toBe('1');
+  await expect(toggle).toBeChecked();
   expect(await page.evaluate(async () => (await (await caches.open('leski-push-identity-v1')).match('/__leski_push_identity__'))?.json())).toEqual({ userId: uiAccount });
   for (let i = 0; i < 10; i++) { await page.reload(); await expect(toggle).toBeChecked(); }
   expect(await page.evaluate(() => localStorage.getItem('test:permission-calls'))).toBe('1');

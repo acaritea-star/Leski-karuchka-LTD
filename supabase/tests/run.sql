@@ -1,4 +1,11 @@
 \set ON_ERROR_STOP on
+-- Only test helpers in this connection's temporary schema need execution
+-- rights. Public/private application function defaults remain restricted.
+CREATE TEMP TABLE security_test_namespace(dummy integer);
+DO $$ BEGIN
+ EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role',
+  (SELECT nspname FROM pg_namespace WHERE oid=pg_my_temp_schema()));
+END $$;
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
@@ -98,3 +105,5 @@ ROLLBACK;
 \ir cash_payment_choice.sql
 \ir live_service_terms_status.sql
 \ir geographic_reference.sql
+\ir security_hardening.sql
+\ir security_vapid.sql
