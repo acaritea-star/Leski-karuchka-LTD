@@ -53,7 +53,8 @@ export const stageLabels: Record<string, string> = { pending: 'Преди при
 export const actorLabels: Record<string, string> = { customer: 'Клиент', driver: 'Шофьор', admin: 'Администратор', system: 'Система' };
 export const kindLabels: Record<MoneyEntry['kind'], string> = { income: 'Деклариран приход', expense: 'Деклариран разход', handover: 'Декларирано предаване', confirmation: 'Потвърждение от фирмата', reversal: 'Обратен запис' };
 export const evidenceLabels: Record<string,string> = {declaration:'Деклариран запис',cash_count:'Преброени пари',cash_book:'Касов разчет',receipt:'Разписка / документ',bank_record:'Платежен запис'};
-export const reasonLabels: Record<string, string> = { no_driver: 'Няма наличен шофьор', customer_requested: 'Отказ по желание на клиента', not_provided: 'Без посочена причина' };
+export const reasonLabels: Record<string, string> = { no_driver: 'Няма наличен шофьор', customer_requested: 'Отказ по желание на клиента', not_provided: 'Без посочена причина',
+ admin_driver_unfinished: 'Шофьорът не е приключил курса (отменено от фирмата)', admin_customer_request: 'По молба на клиента (отменено от фирмата)', admin_other: 'Друга причина (отменено от фирмата)' };
 export async function loadAccounting(month: string, scope: { companyId?: string; driverId?: string }, page = 0, signal?: AbortSignal): Promise<AccountingReport> {
  const { from, until } = monthBounds(month);
  const { data, error } = await withRequestTimeout(abort => supabase.rpc('accounting_report', { p_from: from, p_until: until, p_company_id: scope.companyId, p_driver_id: scope.driverId, p_page: page }).abortSignal(abort),10_000,signal);
