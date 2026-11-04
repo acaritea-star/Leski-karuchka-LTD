@@ -58,6 +58,21 @@ export function cancelTaxiRequest(requestId: string, status: Request['status']) 
   requestId, row => row.id === requestId && row.status === 'cancelled', 'ride.cancel');
 }
 
+export const ADMIN_CANCEL_REASONS = ['admin_driver_unfinished', 'admin_customer_request', 'admin_other'] as const;
+export type AdminCancelReason = typeof ADMIN_CANCEL_REASONS[number];
+export const ACTIVE_RIDE_STATUSES = ['pending', 'accepted', 'arrived', 'in_progress'] as const;
+
+// A company administrator closes an active ride without booking turnover.
+// The database trigger records the administrator as the author and keeps the
+// price unchanged; the status guard prevents closing a ride that moved on.
+export function adminCancelTaxiRequest(requestId: string, status: Request['status'], reason: AdminCancelReason) {
+  if (!ADMIN_CANCEL_REASONS.includes(reason)) return Promise.reject(new Error('Избери причина за отмяната.'));
+  return confirmedWrite(signal => supabase.from('taxi_requests')
+    .update({ status: 'cancelled', cancel_reason: reason })
+    .eq('id', requestId).eq('status', status).select('*').abortSignal(signal).single(),
+  requestId, row => row.id === requestId && row.status === 'cancelled', 'ride.cancel');
+}
+
 export function createTaxiRequest(quoteId: string, requestId: string, customerId: string) {
   // The RPC locks the customer's quote and returns its linked request when
   // already used. That existing ID can differ from this browser's new key;

@@ -2,7 +2,8 @@ import { ContentSkeleton } from '@/components/feature/LoadingState';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import AdminCancelRideButton from './AdminCancelRideButton';
 import { queryKeys } from '@/lib/queryKeys';
 import { loadAdminOrders } from '@/lib/adminOrders';
 import { ADMIN_PAGE_SIZE } from '@/lib/adminData';
@@ -26,6 +27,7 @@ export default function AdminOrders() {
 function OrderList() {
   const { t } = useTranslation();
   const { companyId } = useAdminCompany();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const requested = search.get('request');
   const requestId = requested && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requested) ? requested : undefined;
@@ -139,6 +141,10 @@ function OrderList() {
                     <i className="ri-wallet-3-line text-foreground-400" />
                     {o.payment_method === 'cash' ? 'Кеш' : o.payment_method === 'card' ? 'Карта' : 'Онлайн'}
                   </span>
+                  {companyId && <AdminCancelRideButton request={o} onCancelled={() => {
+                    void queryClient.invalidateQueries({ queryKey: queryKeys.adminOrders(companyId) });
+                    void queryClient.invalidateQueries({ queryKey: queryKeys.adminDashboard(companyId) });
+                  }} />}
                 </div>
               </div>
             );
