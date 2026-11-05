@@ -55,11 +55,6 @@ export default function SocialAuthPage({ mode, audience = 'general' }: { mode: '
       <Link to="/" className="flex items-center gap-2" aria-label={t('auth_home')}>
         <BrandLogo alt={t('app_name')} className="h-8 w-auto rounded-lg" />
       </Link>
-      <a href={'tel:' + legalOperator.phone} aria-label={t('auth_support_phone')}
-        className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors whitespace-nowrap">
-        <i className="ri-phone-line" aria-hidden="true" />
-        {t('landing.footer_phone')}
-      </a>
     </header>
     <main className="flex-1 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">

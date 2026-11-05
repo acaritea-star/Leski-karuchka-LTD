@@ -23,7 +23,7 @@ export function OperatorDetails() {
       {legalOperator.correspondenceAddress && <p><strong>Адрес за кореспонденция:</strong> {legalOperator.correspondenceAddress}</p>}
       {legalOperator.vatNumber && <p><strong>ДДС номер:</strong> {legalOperator.vatNumber}</p>}
     </> : null}
-    <p><strong>Телефон за контакт:</strong> <a className="underline" href={'tel:' + legalOperator.phone}>{legalOperator.phone}</a></p>
+    {legalOperator.phone && <p><strong>Телефон за контакт:</strong> <a className="underline" href={'tel:' + legalOperator.phone}>{legalOperator.phone}</a></p>}
   </div>;
 }
 
@@ -32,6 +32,13 @@ export default function LegalPage({ title, children, version = legalOperator.ter
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
   }, [hash]);
+  // Legal pages stay reachable for people but are kept out of search results.
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots'; meta.content = 'noindex, nofollow, noarchive';
+    document.head.appendChild(meta);
+    return () => { meta.remove(); };
+  }, []);
   return <main className="brand-scope min-h-[100dvh] bg-background-50">
     <div className="mx-auto max-w-4xl px-4 md:px-6 py-10 md:py-16">
       <Link to="/" className="inline-flex items-center gap-2 text-sm text-primary-700 mb-8 underline">
