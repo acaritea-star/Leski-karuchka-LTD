@@ -1,10 +1,10 @@
 {
-  "termsVersion": "2026-10-11-driver.1",
-  "trainingVersion": "2026-10-11.1",
-  "sha256": "f2f994314fedf8d908b2ea1bbaa40268bc2ba58f4492ea6c066194930e4fd367",
+  "termsVersion": "2026-11-05-driver.1",
+  "trainingVersion": "2026-11-05.1",
+  "sha256": "5250f56c909fd2609edfd51f9fb18ca1f8a24ceb167d115f164bf37276f42505",
   "source": "src/config/driverPreparation.json",
-  "migration": "20261011081118_partner_service_fee_training.sql",
+  "migration": "20261105115615_tavora_operator_contacts.sql",
   "legalReleaseApproved": false,
   "databaseApplied": true,
-  "verifiedSourceCommit": "3563ac0883b3a2fd0177dab221ee509b4f544d49"
+  "verifiedSourceCommit": ""
 }

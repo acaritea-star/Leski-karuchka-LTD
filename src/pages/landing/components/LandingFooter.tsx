@@ -97,12 +97,6 @@ export default function LandingFooter() {
                 <span>{t('landing.footer_address')}</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <i className="ri-phone-line text-primary-600 mt-0.5" />
-                <a href="tel:+359890005900" className="hover:text-primary-600 transition-colors whitespace-nowrap">
-                  {t('landing.footer_phone')}
-                </a>
-              </li>
-              <li className="flex items-start gap-2.5">
                 <i className="ri-mail-line text-primary-600 mt-0.5" />
                 <a href={'mailto:' + legalOperator.email} className="hover:text-primary-600 transition-colors break-all">
                   {legalOperator.email}

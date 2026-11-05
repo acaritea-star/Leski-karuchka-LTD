@@ -2,20 +2,20 @@
   "brand": "Лески Каручка",
   "website": "https://leskikaruchka.com",
   "dataController": {
-    "name": "Владимир Атанасов",
+    "name": "ТАВОРА ЕООД",
     "country": "България"
   },
-  "legalName": "",
-  "registrationNumber": "",
-  "registeredAddress": "",
+  "legalName": "ТАВОРА ЕООД",
+  "registrationNumber": "208438650",
+  "registeredAddress": "гр. Велико Търново, ул. „Велчо Джамджията“",
   "correspondenceAddress": "",
-  "email": "vladiata39@gmail.com",
-  "phone": "+359890005900",
+  "email": "info@imashnujnoto.com",
+  "phone": "",
   "vatNumber": "",
-  "identityVerified": false,
-  "contactsVerified": false,
+  "identityVerified": true,
+  "contactsVerified": true,
   "transportModel": "transport-intermediary",
-  "termsVersion": "2026-10-28-draft.5",
-  "privacyVersion": "2026-10-28.2",
-  "updatedAt": "28 октомври 2026 г."
+  "termsVersion": "2026-11-05.1",
+  "privacyVersion": "2026-11-05.1",
+  "updatedAt": "5 ноември 2026 г."
 }

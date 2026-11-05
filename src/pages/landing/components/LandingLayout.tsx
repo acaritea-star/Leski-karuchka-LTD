@@ -80,14 +80,6 @@ export default function LandingLayout() {
 
           {/* Right actions */}
           <div className="hidden md:flex items-center gap-3">
-            <a
-              href="tel:+359890005900"
-              className="hidden xl:inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors whitespace-nowrap"
-              aria-label="Телефон за връзка с поддръжката"
-            >
-              <i className="ri-phone-line" aria-hidden="true" />
-              +359 89 000 5900
-            </a>
             {!user && (
               <Link
                 to="/auth/login"
@@ -137,14 +129,6 @@ export default function LandingLayout() {
               ))}
             </nav>
             <div className="flex flex-col gap-2.5 mt-5 pt-5 border-t border-background-200/70">
-              <a
-                href="tel:+359890005900"
-                className="px-4 py-3.5 rounded-full border border-foreground-300 text-foreground-700 text-[15px] font-semibold text-center transition-colors hover:bg-background-100 whitespace-nowrap"
-                aria-label="Телефон за връзка с поддръжката"
-              >
-                <i className="ri-phone-line mr-1.5" aria-hidden="true" />
-                +359 89 000 5900
-              </a>
               {!user && (
                 <Link
                   to="/auth/login"

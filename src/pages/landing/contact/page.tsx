@@ -22,7 +22,6 @@ export default function ContactPage() {
   }, [status]);
 
   const infoCards = [
-    { icon: 'ri-phone-line', label: t('landing.contact_phone_label'), value: t('landing.footer_phone'), href: 'tel:+359890005900' },
     { icon: 'ri-mail-line', label: t('landing.contact_email_label'), value: legalOperator.email, href: 'mailto:' + legalOperator.email },
     { icon: 'ri-map-pin-2-line', label: t('landing.contact_address_label'), value: t('landing.footer_address') },
     { icon: 'ri-time-line', label: t('landing.contact_hours_label'), value: t('landing.contact_hours_value') },
